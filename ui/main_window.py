@@ -366,7 +366,7 @@ class MainWindow(QMainWindow):
         lay.addWidget(title_lbl)
         lay.addSpacing(16)
 
-        title_lbl = QLabel("Author: G.Thịnh ")
+        title_lbl = QLabel("Author: Thịnh.G ")
         title_lbl.setStyleSheet("color: #f8fafc; font-size: 14px; font-weight: 600;")
         lay.addWidget(title_lbl)
         lay.addSpacing(16)
