@@ -250,7 +250,11 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
         a = int((1.0 - alpha) * 255)
         return f"&H{a:02X}{b:02X}{g:02X}{r:02X}"
 
-    safe_srt = srt_path.replace("\\", "/").replace(":", "\\:")
+    # Escape special characters for FFmpeg's subtitles filter.
+    # We use double-quoted filter args so single quotes (apostrophes) are safe.
+    # Only need to escape: backslash → forward slash, and colon → escaped colon.
+    # FFmpeg's libass accepts both forward-slash and backslash paths on Windows.
+    safe_srt = srt_path.replace("\\", "/")
 
     font_color_ass = _hex_to_ass(style.font_color, 1.0)
 
@@ -290,7 +294,7 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
         f"MarginR={margin_r}"
     )
 
-    return f"subtitles='{safe_srt}':force_style='{force_style}'"
+    return f'subtitles="{safe_srt}":force_style="{force_style}"'
 
 
 # ---------------------------------------------------------------------------
