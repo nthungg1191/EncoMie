@@ -1,94 +1,92 @@
 # Auto Video Editor
 
-Một ứng dụng desktop giúp tạo video từ file âm thanh (mp3, m4a, wav, aac) và phụ đề SRT, bằng cách:
+Mot cua so dong ung dung desktop giup tao video tu file am thanh (mp3, m4a, wav, aac) va phu de SRT, bang cach:
 
-- **Chọn ngẫu nhiên** một video nền từ thư mục
-- **Ghép âm thanh + SRT** thành cặp video + phụ đề
-- **Render** bằng FFmpeg (hỗ trợ GPU NVENC hoặc CPU)
-- **Chỉnh sửa style phụ đề** trực tiếp trong giao diện: font, màu sắc, đường viền, nền, bóng
+- **Chon ngau nhien** mot video nen tu thu muc
+- **Ghep am thanh + SRT** thanh cap video + phu de
+- **Render** bang FFmpeg (ho tro GPU NVENC hoac CPU)
+- **Chinh sua style phu de** truc tiep trong giao dien: font, mau sac, duong vien, nen, bong
 
-Ứng dụng được viết bằng **Python 3 + PyQt6**, gọi FFmpeg từ thư mục `bin/` hoặc từ PATH hệ thống.
+Ung dung duoc viet bang **Python 3 + PyQt6**, goi FFmpeg tu thu muc `bin/` hoac tu PATH he thong.
 
 ---
 
-## Cấu trúc dự án
+## Cau truc du an
 
 ```
 auto_video_editor/
-├── bin/                           # FFmpeg & FFprobe (nếu có)
+├── bin/                    # FFmpeg & FFprobe (neu co)
 │   ├── ffmpeg.exe
 │   └── ffprobe.exe
-├── core/                          # Logic xử lý chính
-│   ├── video_processor.py         # Render pipeline, FFmpeg wrapper
-│   ├── srt_service.py            # Đọc/ghi/sửa file SRT
-│   ├── subtitle_model.py          # Kiểu dữ liệu phụ đề
-│   ├── style_preset_service.py    # Lưu/tải preset style
-│   └── worker.py                  # Qt worker thread cho render
-├── ui/                            # Giao diện PyQt6
-│   ├── main_window.py             # Cửa sổ chính (3-panel)
-│   ├── subtitle_preview_widget.py # Preview phụ đề
-│   └── subtitle_editor_widget.py  # Widget chỉnh sửa
+├── core/                   # Logic xu ly chinh
+│   ├── video_processor.py  # Render pipeline, FFmpeg wrapper
+│   ├── srt_service.py       # Doc/ghi/sua file SRT
+│   ├── subtitle_model.py    # Kieu du lieu phu de
+│   ├── style_preset_service.py  # Luu/tai preset style
+│   └── worker.py            # Qt worker thread cho render
+├── ui/                     # Giao dien PyQt6
+│   ├── main_window.py      # Cua so chinh (3-panel)
+│   ├── subtitle_preview_widget.py  # Preview phu de
+│   └── subtitle_editor_widget.py    # Widget chinh sua
 ├── presets/
-│   └── subtitle_presets.json      # Các preset style phụ đề
+│   └── subtitle_presets.json  # Cac preset style phu de
 ├── utils/
-│   ├── gpu_detect.py              # Phát hiện GPU & NVENC
-│   └── settings.py                # Cấu hình lưu trữ
-├── main.py                        # Entry point
+│   ├── gpu_detect.py       # Phat hien GPU & NVENC
+│   └── settings.py         # Cau hinh luu tru
+├── main.py                 # Entry point
 └── README.md
 ```
 
 ---
 
-## Tính năng chính
+## Tinh nang chinh
 
-### Ghép video nền + âm thanh + phụ đề
+### Chen phu de vao video
 
-- Chọn thư mục chứa file âm thanh và thư mục chứa file SRT
-- Tự động ghép cặp audio + SRT theo tên file (theo thứ tự hoặc fuzzy match)
-- Chọn video nền ngẫu nhiên từ thư mục (hoặc chọn video cố định)
-- Điều chỉnh tốc độ video nền (lam chậm/chạy nhanh theo %)
-- Hỗ trợ nhiều video nền, xử lý tuần tự theo hàng đợi
+- Chon thu muc chua file am thanh va thu muc chua file SRT
+- Tu dong ghep cap audio + SRT theo ten file
+- Chon video nen ngau nhien tu thu muc (hoac video co dinh)
+- Dieu chinh toc do video (lam cham/chay nhanh)
 
-### Chỉnh sửa style phụ đề
+### Chinh sua style phu de
 
-| Thành phần | Tùy chọn |
-|------------|----------|
-| Font       | Arial, Roboto, Montserrat, Open Sans, Verdana, Tahoma, Georgia, Times New Roman... |
-| Kích thước | 12 - 100 px |
-| Màu chữ   | Màu sắc tùy chọn (HEX) |
-| Đường viền | Màu + độ rộng |
-| Nền        | Màu nền + độ trong + bo góc + padding |
-| Bóng       | Màu + độ trong + góc + khoảng cách + blur |
-| Vị trí     | Giữa màn hình / Dưới giữa / Trên giữa |
+| Thanh phan    | Tuy chon                                      |
+|---------------|-----------------------------------------------|
+| Font          | Arial, Roboto, Montserrat, Open Sans, ...     |
+| Kich thuoc    | 12 - 100 px                                   |
+| Mau chu       | Mau sac tuy chon (HEX)                        |
+| Duong vien    | Mau + do rong                                 |
+| Nen           | Mau nen + do trong + bo goc + padding         |
+| Bong           | Mau + do trong + goc + khoang cach + blur   |
+| Vi tri        | Giua man hinh / duoi giua / tren giua         |
 
-Có sẵn **5 preset** style: Mặc định, Sáng, To, newpreset, tbn1. Có thể lưu/tải preset tùy ý.
+Co san **5 preset** style: Mac dinh, Sang, To, newpreset, tbn1. Co the luu/tai preset tuy y.
 
 ### Render
 
 - **Codec**: H.265 HEVC (GPU/CPU), H.264 AVC (GPU/CPU)
-- **GPU**: Tự động phát hiện NVIDIA GPU & NVENC
-- **Điều khiển**: Tạm dừng, tiếp tục, dừng render
-- **Log**: Xem FFmpeg log trực tiếp trong giao diện
-- **Xếp hàng**: Render nhiều cặp video/audio theo thứ tự
-- **Tiến trình**: Thanh progress theo thời gian thực
+- **GPU**: Tu dong phat hien NVIDIA GPU & NVENC
+- **Dieu khien**: Tam dung, tiep tuc, dung render
+- **Log**: Xem FFmpeg log truc tiep trong giao dien
+- **Xep hang**: Render nhieu cap video/audio theo thu tu
 
 ---
 
-## Cài đặt
+## Cai dat
 
-### Yêu cầu
+### Yeu cau
 
 - Python 3.8+
 - PyQt6
-- FFmpeg & FFprobe (trong `bin/` hoặc PATH hệ thống)
+- FFmpeg & FFprobe (trong `bin/` hoac PATH)
 
-### Cài đặt thư viện
+### Cau lenh cai dat
 
 ```bash
 pip install PyQt6
 ```
 
-### Khởi động
+### Khoi dong
 
 ```bash
 python main.py
@@ -96,58 +94,26 @@ python main.py
 
 ### FFmpeg
 
-Nếu FFmpeg chưa có trong PATH, copy `ffmpeg.exe` và `ffprobe.exe` vào thư mục `bin/`. Ứng dụng sẽ ưu tiên sử dụng các file này.
+Neu FFmpeg chua co trong PATH, copy `ffmpeg.exe` va `ffprobe.exe` vao thu muc `bin/`. Ung dung se uu tien su dung cac file nay.
 
 ---
 
-## Giao diện
+## Giao dien
 
-Giao diện gồm **3 panel ngang**:
+Giao dien gom **3 panel ngang**:
 
-| Panel trái | Panel giữa | Panel phải |
-|------------|------------|------------|
-| Chọn thư mục audio / SRT / video nền | Chỉnh sửa style phụ đề + Preview | Cấu hình render + Log + Nút render |
-
----
-
-## Preview phụ đề
-
-Widget preview hiển thị phụ đề với đầy đủ các thuộc tính: fill, stroke, background, shadow. Thư mục `presets/subtitle_presets.json` lưu các preset style, có thể chỉnh sửa trực tiếp bằng giao diện.
+| Panel trai                     | Panel giua                         | Panel phai                        |
+|---------------------------------|-------------------------------------|-----------------------------------|
+| Chon thu muc audio / SRT / video nen | Chinh sua style phu de + Preview | Cau hinh render + Log + Nut render |
 
 ---
 
-## Changelog
+## Giao dien phu de (Preview)
 
-### [Unreleased]
-
-### [1.1.0] - 2026-06-15
-
-#### Fixed
-- **Escape ký tự đặc biệt trong tên file SRT**: Sửa lỗi FFmpeg không mở được file SRT có dấu nháy đơn (apostrophe) trong tên file. Trước đây, file như `001_ I Overheard Her Tell Her Ex 'I Still Love You.'...srt` sẽ gây lỗi "Unable to open" do FFmpeg interpret sai cú pháp filter. Đã thêm escape `'` → `'\''` trong `_build_subtitle_filter()`.
-
+Widget preview hien thi phu de voi day du cac thuoc tinh: fill, stroke, background, shadow. Thu muc `presets/subtitle_presets.json` luu cac preset style, co the chinh sua truc tiep bang giao dien.
 
 ---
 
-### [1.0.0] - 2026-06-14
-
-#### Added
-- Ứng dụng desktop Auto Video Editor
-- Giao diện PyQt6 với 3 panel ngang
-- Chọn thư mục audio, SRT, video nền
-- Ghép cặp audio + SRT theo tên file
-- Chọn video nền ngẫu nhiên từ thư mục
-- Điều chỉnh tốc độ video nền (%)
-- Chỉnh sửa style phụ đề: font, màu, viền, nền, bóng, vị trí
-- 5 preset style phụ đề có sẵn
-- Render với FFmpeg (GPU NVENC / CPU)
-- Hỗ trợ codec H.265 HEVC và H.264 AVC
-- Tự động phát hiện NVIDIA GPU
-- Điều khiển render: tạm dừng, tiếp tục, dừng
-- Hiển thị log FFmpeg trực tiếp
-- Thanh tiến trình real-time
-
----
-
-## Từ khóa
+## Tu khoa
 
 PyQt6, FFmpeg, NVENC, subtitle, SRT, video editor, GPU encoding, HEVC, H.264
