@@ -1396,13 +1396,14 @@ class SubtitleStyleEditor(QWidget):
         root.setSpacing(10)
 
         # Left: controls panel
-        ctrl = QWidget()
-        ctrl.setStyleSheet(f"background: {C_BG};")
-        ctrlLay = QVBoxLayout(ctrl)
+        self._ctrl = QWidget()
+        self._ctrl.setStyleSheet(f"background: {C_BG};")
+        ctrlLay = QVBoxLayout(self._ctrl)
         ctrlLay.setContentsMargins(0, 0, 0, 0)
         ctrlLay.setSpacing(6)
 
-        ctrlLay.addWidget(self._build_preset_bar())
+        self._preset_bar = self._build_preset_bar()
+        ctrlLay.addWidget(self._preset_bar)
         ctrlLay.addWidget(self._build_text_section())
         ctrlLay.addWidget(self._build_appearance_section())
         ctrlLay.addWidget(self._build_layout_section())
@@ -1413,10 +1414,19 @@ class SubtitleStyleEditor(QWidget):
         self._preview.setMinimumWidth(320)
         self._preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
-        root.addWidget(ctrl, 1)
+        root.addWidget(self._ctrl, 1)
         root.addWidget(self._preview, 1)
 
         self._set_alignment_button(2)
+
+    def hide_preset_bar(self):
+        if hasattr(self, "_preset_bar"):
+            self._preset_bar.setVisible(False)
+
+
+    def reload_srt(self, srt_path: str):
+        if hasattr(self, "_preview"):
+            self._preview.reload_srt(srt_path)
 
     # ---- Preset bar ----
 

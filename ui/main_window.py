@@ -35,7 +35,7 @@ from core.subtitle_model import SubtitleStylePreset
 from core.srt_service import SrtService
 from core.style_preset_service import StylePresetService
 from core.subtitle_model import SubtitleEntry
-from ui.subtitle_preview_widget import SubtitlePreviewWidget, SubtitleStyleEditor
+from ui.subtitle_preview_widget import SubtitlePreviewWidget, SubtitleStyleEditor, LiveFramePreview
 from utils import settings as cfg
 from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
 
@@ -337,10 +337,10 @@ class MainWindow(QMainWindow):
         splitter.addWidget(left)
         splitter.addWidget(middle)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setStretchFactor(2, 3)
-        splitter.setSizes([420, 280, 420])
+        splitter.setStretchFactor(0, 11)
+        splitter.setStretchFactor(1, 18)
+        splitter.setStretchFactor(2, 11)
+        splitter.setSizes([330, 540, 330])
 
         root_lay.addWidget(splitter, 1)
 
@@ -521,45 +521,99 @@ class MainWindow(QMainWindow):
         panel.setStyleSheet("background: #fafafa;")
         lay = QVBoxLayout(panel)
         lay.setContentsMargins(10, 10, 10, 10)
-        lay.setSpacing(8)
+        lay.setSpacing(10)
 
-        # --- Subtitle style editor (built-in preview) ---
+        # --- Subtitle Style (controls only) ---
         grp_style = QGroupBox("💬  Subtitle Style")
         grp_style.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
         style_lay = QVBoxLayout(grp_style)
-        self.style_panel = SubtitleStyleEditor()
-        style_lay.addWidget(self.style_panel)
-        lay.addWidget(grp_style)
+        style_lay.setSpacing(6)
 
-        # --- Preset controls ---
-        grp_preset = QGroupBox("Preset Style")
-        grp_preset.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        pst_lay = QHBoxLayout(grp_preset)
+        self.style_panel = SubtitleStyleEditor()
+        self.style_panel.hide_preset_bar()
+        self.style_panel._preview.setVisible(False)
+
+        self.style_panel.style_changed.connect(self._on_style_changed)
+
+        preset_bar = QWidget()
+        preset_bar.setFixedHeight(32)
+        preset_bar.setStyleSheet(
+            "background: #1e1e2e; border-radius: 4px; border: 1px solid #2e3347;"
+        )
+        pst_lay = QHBoxLayout(preset_bar)
+        pst_lay.setContentsMargins(8, 0, 8, 0)
         pst_lay.setSpacing(6)
+
+        title = QLabel("Presets")
+        title.setStyleSheet("color: #f8fafc; font-size: 11px; font-weight: 600;")
+        pst_lay.addWidget(title)
+        pst_lay.addSpacing(4)
+
         self.cmb_preset = QComboBox()
-        self.cmb_preset.setStyleSheet("font-size: 12px;")
+        self.cmb_preset.setStyleSheet(
+            "QComboBox { background: #2e3347; color: #f8fafc; border: 1px solid #2e3347; "
+            "border-radius: 4px; padding: 0px 8px; font-size: 11px; height: 26px; }"
+            "QComboBox::drop-down { border: none; width: 18px; }"
+            "QComboBox::down-arrow { image: none; border-left: 3px solid transparent; "
+            "border-right: 3px solid transparent; border-top: 4px #9ca3af; }"
+        )
         self.cmb_preset.currentIndexChanged.connect(self._on_preset_changed)
         pst_lay.addWidget(self.cmb_preset, 1)
-        self.btn_save_preset = QPushButton("Lưu preset")
-        self.btn_save_preset.setFixedWidth(80)
-        self.btn_save_preset.setStyleSheet("font-size: 11px;")
-        self.btn_save_preset.clicked.connect(self._on_save_preset)
-        pst_lay.addWidget(self.btn_save_preset)
-        self.btn_apply_to_all = QPushButton("Áp toàn bộ")
-        self.btn_apply_to_all.setFixedWidth(80)
-        self.btn_apply_to_all.setStyleSheet("font-size: 11px;")
-        self.btn_apply_to_all.clicked.connect(self._on_apply_style_to_all)
-        pst_lay.addWidget(self.btn_apply_to_all)
-        self.btn_refresh_frame = QPushButton("🔄 Frame")
-        self.btn_refresh_frame.setFixedWidth(75)
-        self.btn_refresh_frame.setStyleSheet("font-size: 11px;")
+
+        for icon, tip, handler in [
+            ("💾", "Save preset", self._on_save_preset),
+            ("🗑", "Delete preset", self._on_delete_preset_inline),
+            ("↺", "Reset defaults", self._on_reset_defaults_inline),
+        ]:
+            btn = QPushButton(icon)
+            btn.setFixedSize(28, 22)
+            btn.setToolTip(tip)
+            btn.setStyleSheet(
+                "QPushButton { background: #2e3347; color: #f8fafc; border: 1px solid #2e3347; "
+                "border-radius: 4px; font-size: 12px; padding: 0; }"
+                "QPushButton:hover { background: #5b8def; border-color: #5b8def; }"
+            )
+            btn.clicked.connect(handler)
+            pst_lay.addWidget(btn)
+
+        style_lay.addWidget(preset_bar)
+        style_lay.addWidget(self.style_panel._ctrl)
+        lay.addWidget(grp_style)
+
+        # --- Preview ---
+        grp_preview = QGroupBox("🖼  Preview")
+        grp_preview.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
+        preview_lay = QVBoxLayout(grp_preview)
+        preview_lay.setSpacing(6)
+
+        self.preview_widget = self.style_panel._preview
+        self.preview_widget.setMinimumHeight(180)
+        self.preview_widget.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        preview_lay.addWidget(self.preview_widget)
+
+        preview_ctrl = QHBoxLayout()
+        preview_ctrl.setSpacing(6)
+        preview_ctrl.addStretch()
+        self.btn_refresh_frame = QPushButton("🔄  Load frame from video")
+        self.btn_refresh_frame.setStyleSheet("font-size: 12px;")
         self.btn_refresh_frame.setToolTip("Extract a frame from the first video as preview background")
         self.btn_refresh_frame.clicked.connect(self._on_refresh_preview_frame)
-        pst_lay.addWidget(self.btn_refresh_frame)
-        lay.addWidget(grp_preset)
+        preview_ctrl.addWidget(self.btn_refresh_frame)
+        preview_lay.addLayout(preview_ctrl)
 
-        lay.addStretch()
+        lay.addWidget(grp_preview, 1)
+
+        self.style_panel.hide_preset_bar()
+        self.preview_widget.set_style(self.style_panel.get_style())
         return panel
+
+    def _on_style_changed(self, style: SubtitleStylePreset):
+        """Sync style changes from style_panel to preview_widget."""
+        if hasattr(self, "preview_widget"):
+            self.preview_widget.set_style(style)
+        self._active_preset = None  # mark as modified (not from preset)
 
     # ---- Right panel — Render + Log + Controls ----
 
@@ -1059,7 +1113,32 @@ class MainWindow(QMainWindow):
             return
         preset = self._presets[index]
         self.style_panel.load_from_style(preset)
+        if hasattr(self.style_panel, "_cmb_preset"):
+            self.style_panel._cmb_preset.setCurrentText(preset.name)
         self._active_preset = preset
+
+    def _on_delete_preset_inline(self):
+        """Delete current preset from both editor and main preset list."""
+        name = self.style_panel._cmb_preset.currentText()
+        if not name:
+            return
+        if name in self.style_panel.PRESETS_BUILTIN:
+            QMessageBox.information(
+                self, "Xóa preset",
+                "Preset mặc định không thể xóa."
+            )
+            return
+        self.style_panel._delete_preset()
+        idx = self.cmb_preset.findText(name)
+        if idx >= 0:
+            self.cmb_preset.removeItem(idx)
+
+    def _on_reset_defaults_inline(self):
+        """Reset current preset back to built-in default."""
+        self.style_panel._reset_defaults()
+        self.cmb_preset.setCurrentText("Classic")
+        if hasattr(self.style_panel, "_on_changed"):
+            self.style_panel._on_changed()
 
     def _on_save_preset(self):
         """Save current style as a new preset."""
@@ -1264,11 +1343,13 @@ class MainWindow(QMainWindow):
     def _on_refresh_preview_frame(self):
         """Extract a frame from the first selected video and set it as preview background."""
         video_files = self.pick_bg.selected_files()
+        if not hasattr(self, "preview_widget"):
+            return
         if not video_files:
-            self.style_panel.set_frame(None)
+            self.preview_widget.set_frame(None)
             return
         frame = _extract_video_frame(video_files[0])
-        self.style_panel.set_frame(frame)
+        self.preview_widget.set_frame(frame)
 
     def _on_first_sub_to_zero(self):
         """Shift the entire subtitle timeline so the first subtitle starts at 0s."""
@@ -1314,6 +1395,8 @@ class MainWindow(QMainWindow):
             self._scan_pairs()
             if srt_files:
                 self.style_panel.reload_srt_entries(srt_files[0])
+                if hasattr(self, "preview_widget"):
+                    self.preview_widget.reload_srt_entries(srt_files[0])
         elif errors:
             QMessageBox.warning(self, "Shift To 0s", f"Lỗi: {', '.join(errors)}")
         self._log(f"[Timing] Shift to 0s: {changed} file, offset=-{total_offset_ms}ms")

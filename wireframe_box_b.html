@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<title>Wireframe Box B - Middle Panel</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: #f3f4f6;
+    margin: 0;
+    padding: 24px;
+    color: #111827;
+  }
+  h1 { text-align: center; margin-bottom: 4px; font-size: 22px; }
+  .subtitle { text-align: center; color: #6b7280; margin-bottom: 20px; font-size: 14px; }
+
+  .app {
+    max-width: 1100px;
+    margin: 0 auto;
+    background: #e5e7eb;
+    border: 2px solid #9ca3af;
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .title-bar {
+    background: #1e1e2e;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .badge {
+    background: #374151;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .split {
+    display: flex;
+    gap: 0;
+    min-height: 540px;
+    user-select: none;
+  }
+  .resizer {
+    width: 6px;
+    cursor: col-resize;
+    background: #d1d5db;
+    border-radius: 3px;
+    margin: 0 2px;
+    flex-shrink: 0;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .resizer:hover,
+  .resizer.active {
+    background: #5b8def;
+  }
+  .resizer::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 24px;
+    background: #9ca3af;
+    border-radius: 2px;
+  }
+  .resizer:hover::after,
+  .resizer.active::after {
+    background: white;
+  }
+  .panel {
+    background: #fafafa;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+  }
+  .panel-left { flex: 11; min-width: 0; overflow: hidden; }
+  .panel-middle { flex: 18; min-width: 0; overflow: hidden; }
+  .panel-right { flex: 11; min-width: 0; overflow: hidden; }
+
+  .box {
+    border: 1px solid #9ca3af;
+    border-radius: 4px;
+    padding: 8px;
+    margin-bottom: 10px;
+    background: white;
+  }
+  .box-title {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 6px;
+    color: #374151;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 4px;
+  }
+  .row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .field {
+    background: #e5e7eb;
+    border: 1px solid #d1d5db;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 10px;
+    color: #6b7280;
+    text-align: center;
+    min-width: 50px;
+  }
+  .field-label { font-size: 10px; color: #6b7280; min-width: 40px; }
+  .field-long { flex: 1; min-width: 90px; }
+  .field-short { min-width: 36px; }
+  .btn {
+    background: #e5e7eb;
+    border: 1px solid #9ca3af;
+    border-radius: 3px;
+    padding: 3px 7px;
+    font-size: 10px;
+    color: #374151;
+  }
+  .btn-primary {
+    background: #2563eb;
+    color: white;
+    border-color: #1d4ed8;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+    margin-top: 4px;
+  }
+  th, td {
+    border: 1px solid #d1d5db;
+    padding: 3px 5px;
+    text-align: left;
+  }
+  th { background: #f3f4f6; font-weight: 600; }
+  td { background: white; height: 16px; }
+
+  /* Box B */
+  .middle { display: flex; flex-direction: column; height: 100%; gap: 10px; }
+  .subtitle-box { flex: 0 0 auto; }
+  .preview-box { flex: 1; display: flex; flex-direction: column; }
+  .preview-canvas {
+    flex: 1;
+    background: #0a0b10;
+    border: 1px solid #1e2235;
+    border-radius: 4px;
+    min-height: 150px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #6b7280;
+    font-size: 11px;
+    position: relative;
+  }
+  .preview-canvas::after {
+    content: "Video frame + subtitle overlay";
+    position: absolute;
+    color: #4b5563;
+  }
+  .preview-controls {
+    margin-top: 6px;
+    display: flex;
+    justify-content: center;
+  }
+  .subtitle-content {
+    display: flex;
+    flex-direction: row;
+    gap: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    flex: 1;
+    align-items: flex-start;
+  }
+  .subtitle-content .section {
+    flex: 0 0 auto;
+    min-width: 220px;
+    margin-bottom: 0;
+  }
+
+  .section {
+    background: #181b26;
+    border: 1px solid #2e3347;
+    border-radius: 4px;
+    padding: 5px 7px;
+    margin-bottom: 5px;
+  }
+  .section-title {
+    color: #dde3f0;
+    font-size: 10px;
+    font-weight: 600;
+    margin-bottom: 3px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+  }
+  .toggle {
+    display: inline-block;
+    width: 26px;
+    height: 14px;
+    background: #9ca3af;
+    border-radius: 7px;
+    position: relative;
+  }
+  .toggle.on { background: #5b8def; }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    width: 10px; height: 10px;
+    background: white;
+    border-radius: 50%;
+    top: 2px; left: 2px;
+  }
+  .toggle.on::after { left: 14px; }
+  .swatch {
+    width: 28px; height: 15px;
+    border-radius: 3px;
+    border: 1px solid #d1d5db;
+    display: inline-block;
+  }
+  .align-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 22px);
+    grid-template-rows: repeat(3, 16px);
+    gap: 2px;
+    margin-top: 3px;
+  }
+  .align-btn {
+    background: #e5e7eb;
+    border: 1px solid #d1d5db;
+    border-radius: 2px;
+    font-size: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .align-btn.active {
+    background: #5b8def;
+    color: white;
+    border-color: #3a5299;
+  }
+
+  .notes {
+    max-width: 1100px;
+    margin: 14px auto 0;
+    background: white;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 12px;
+  }
+  .notes h3 { margin: 0 0 6px; font-size: 13px; }
+  .notes ul { margin: 4px 0; padding-left: 18px; }
+  .notes li { margin-bottom: 3px; }
+  .hl { background: #fef3c7; padding: 1px 4px; border-radius: 2px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <h1>📐 Wireframe Box B — Middle Panel</h1>
+  <p class="subtitle">Thiết kế lại phần giữa: bỏ Preset Style, thêm Preview bên dưới Subtitle Style</p>
+
+  <div class="app">
+    <div class="title-bar">
+      <span>▶ Auto Video Editor</span>
+      <span class="badge">CPU: 45%</span>
+      <span class="badge">RAM: 62%</span>
+      <span class="badge">GPU: RTX 3060</span>
+    </div>
+
+    <div class="split">
+      <!-- LEFT PANEL -->
+      <div class="panel panel-left">
+        <div class="box">
+          <div class="box-title">📁 Thư mục</div>
+          <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">video.mp4</span><button class="btn">Chọn file…</button></div>
+          <div class="row"><span class="field-label">Nguồn media:</span><span class="field field-long">audio_1.mp3</span><button class="btn">Chọn file…</button></div>
+          <div class="row"><span class="field-label">Subtitle SRT:</span><span class="field field-long">sub_1.srt</span><button class="btn">Chọn file…</button></div>
+          <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output</span><button class="btn">Chọn…</button></div>
+          <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại file</button>
+        </div>
+        <div class="box" style="flex:1;">
+          <div class="box-title">📋 Danh sách file (audio ↔ SRT)</div>
+          <table>
+            <tr><th>#</th><th>Audio file</th><th>SRT file</th><th>Trạng thái</th></tr>
+            <tr><td>1</td><td>audio_1.mp3</td><td>sub_1.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
+            <tr><td>2</td><td>audio_2.mp3</td><td>sub_2.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
+            <tr><td>3</td><td>audio_3.mp3</td><td>—</td><td style="color:#dc2626;">✗ Thiếu</td></tr>
+          </table>
+          <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 file — 2 khớp ✓ — 1 thiếu ✗</div>
+        </div>
+      </div>
+
+      <div class="resizer" data-target="panel-left" data-next="panel-middle"></div>
+
+      <!-- MIDDLE PANEL — BOX B -->
+      <div class="panel panel-middle">
+        <div class="middle">
+          <!-- Subtitle Style -->
+          <div class="box subtitle-box">
+            <div class="box-title">💬 Subtitle Style</div>
+
+            <!-- Preset bar (internal to editor) -->
+            <div class="section" style="padding:4px 7px; margin-bottom:5px;">
+              <div class="row" style="align-items:center;">
+                <span style="color:#7b849c; font-size:10px; font-weight:600;">Presets</span>
+                <select class="field field-long" style="height:22px; font-size:10px;">
+                  <option>Classic</option>
+                  <option>Cinematic</option>
+                  <option>Clean</option>
+                </select>
+                <button class="btn" style="font-size:10px;">💾</button>
+                <button class="btn" style="font-size:10px;">🗑</button>
+                <button class="btn" style="font-size:10px;">↺</button>
+              </div>
+            </div>
+
+            <div class="subtitle-content">
+              <!-- Text -->
+              <div class="section">
+                <div class="section-title">TEXT</div>
+                <div class="grid-2">
+                  <div class="row"><span class="field-label">Font</span><span class="field field-long">Arial</span></div>
+                  <div class="row"><span class="field-label">Size</span><span class="field field-short">36</span></div>
+                </div>
+                <div class="row" style="margin-top:3px;">
+                  <span class="field-label">Color</span>
+                  <span class="swatch" style="background:#FFFFFF;"></span>
+                  <span class="field field-long" style="font-family:monospace;">#FFFFFF</span>
+                </div>
+              </div>
+
+              <!-- Appearance -->
+              <div class="section">
+                <div class="section-title">APPEARANCE</div>
+                <div class="grid-3">
+                  <div class="row"><span class="field-label">Stroke</span><span class="toggle on"></span></div>
+                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                  <div class="row"><span class="field-label">Width</span><span class="field field-short">2.0px</span></div>
+                </div>
+                <div class="grid-3" style="margin-top:3px;">
+                  <div class="row"><span class="field-label">BG</span><span class="toggle on"></span></div>
+                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                  <div class="row"><span class="field-label">Opacity</span><span class="field field-short">70%</span></div>
+                </div>
+                <div class="grid-3" style="margin-top:3px;">
+                  <div class="row"><span class="field-label">Pad X</span><span class="field field-short">12</span></div>
+                  <div class="row"><span class="field-label">Pad Y</span><span class="field field-short">6</span></div>
+                  <div class="row"><span class="field-label">Radius</span><span class="field field-short">4px</span></div>
+                </div>
+                <div class="grid-3" style="margin-top:3px;">
+                  <div class="row"><span class="field-label">Shadow</span><span class="toggle"></span></div>
+                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                  <div class="row"><span class="field-label">Opacity</span><span class="field field-short">80%</span></div>
+                </div>
+              </div>
+
+              <!-- Layout -->
+              <div class="section">
+                <div class="section-title">LAYOUT — Position</div>
+                <div class="align-grid">
+                  <div class="align-btn">↖</div><div class="align-btn">↑</div><div class="align-btn">↗</div>
+                  <div class="align-btn">←</div><div class="align-btn active">•</div><div class="align-btn">→</div>
+                  <div class="align-btn">↙</div><div class="align-btn">↓</div><div class="align-btn">↘</div>
+                </div>
+                <div class="grid-3" style="margin-top:5px;">
+                  <div class="row"><span class="field-label">Margin V</span><span class="field field-short">50px</span></div>
+                  <div class="row"><span class="field-label">Margin L</span><span class="field field-short">20px</span></div>
+                  <div class="row"><span class="field-label">Margin R</span><span class="field field-short">20px</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Preview -->
+          <div class="box preview-box">
+            <div class="box-title">🖼 Preview</div>
+            <div class="preview-canvas"></div>
+            <div class="preview-controls">
+              <button class="btn btn-primary">🔄 Load frame from video</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT PANEL -->
+      <div class="panel panel-right">
+        <div class="box" style="flex:0 0 auto;">
+          <div class="box-title">⚙️ Cài đặt Render</div>
+          <div class="row"><span class="field-label">Codec:</span><span class="field field-long">H.265 HEVC — GPU (NVENC)</span></div>
+          <div class="row"><span class="field-label">Slow min:</span><span class="field field-short">35%</span><span class="field-label">Slow max:</span><span class="field field-short">45%</span></div>
+        </div>
+        <div style="display:flex; gap:10px; flex:1; min-height:0;">
+          <div class="box" style="flex:1; min-width:0;">
+            <div class="box-title">⏱ Timing Tools</div>
+            <div class="row" style="flex-wrap:wrap;">
+              <button class="btn">⏮ Shift To 0s</button>
+              <button class="btn">↩ Undo</button>
+            </div>
+          </div>
+          <div class="box" style="flex:1; min-width:0; display:flex; flex-direction:column;">
+            <div class="box-title">📝 Log FFmpeg</div>
+            <div style="background:#111827; color:#d1fae5; font-family:monospace; font-size:10px; padding:5px; border-radius:3px; flex:1; min-height:0; overflow:hidden;">
+              [INFO] Bắt đầu render 2 video...<br>
+              [INFO] Codec: hevc_nvenc | GPU: True<br>
+              [INFO] [1/2] Đang render...
+            </div>
+            <button class="btn" style="margin-top:4px;">Xóa log</button>
+          </div>
+        </div>
+        <div class="box" style="flex:0 0 auto;">
+          <div class="box-title">▶ Render</div>
+          <div class="row" style="flex-wrap:wrap;">
+            <button class="btn btn-primary">▶ Bắt đầu Render</button>
+            <button class="btn">📤 Xuất JSON</button>
+            <button class="btn">⏸ Tạm dừng</button>
+            <button class="btn">⏹ Dừng</button>
+          </div>
+          <div style="background:#e2e8f0; border-radius:3px; height:14px; margin-top:5px; border:1px solid #cbd5e1;">
+            <div style="background:#2563eb; width:0%; height:100%; border-radius:2px;"></div>
+          </div>
+          <div style="font-size:10px; color:#64748b; margin-top:2px;">Sẵn sàng</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <h3>📋 Ghi chú thiết kế</h3>
+    <ul>
+      <li><span class="hl">Bỏ:</span> Nhóm <em>Preset Style</em> cũ (combobox + Lưu preset + Áp toàn bộ + Frame).</li>
+      <li><span class="hl">Giữ:</span> Preset bar có sẵn trong <em>Subtitle Style Editor</em> (Classic / Cinematic / Clean + Save/Delete/Reset).</li>
+      <li><span class="hl">Thêm:</span> Vùng <strong>Preview</strong> ngay bên dưới Subtitle Style, chứa canvas render phụ đề + nút <em>Load frame from video</em>.</li>
+      <li>Thứ tự mới trong Box B: <strong>Subtitle Style → Preview</strong>.</li>
+      <li>Không thay đổi gì các panel trái và phải.</li>
+    </ul>
+  </div>
+</body>
+</html>
