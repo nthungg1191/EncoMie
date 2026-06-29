@@ -417,22 +417,37 @@ def render_pair(
     output_filename = f"{audio_stem}.mp4"
     output_path = os.path.join(config.output_folder, output_filename)
 
-    _progress(10, f"[{pair.index}] Bắt đầu render với FFmpeg...")
+    _progress(10, f"[{pair.index}] Chuẩn bị tệp phụ đề tạm thời...")
+    import tempfile
+    import shutil
 
-    cmd = build_ffmpeg_cmd(
-        bg_video=bg_video,
-        bg_start=bg_start,
-        bg_segment_duration=bg_seg_dur,
-        slow_pct=slow_pct,
-        audio_path=pair.audio_path,
-        srt_path=pair.srt_path,
-        output_path=output_path,
-        config=config
-    )
+    temp_dir = tempfile.mkdtemp()
+    # Use a clean ASCII name without spaces or single quotes
+    temp_srt_path = os.path.join(temp_dir, "temp_render.srt")
+    try:
+        shutil.copy2(pair.srt_path, temp_srt_path)
 
-    _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+        _progress(12, f"[{pair.index}] Bắt đầu render với FFmpeg...")
 
-    _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort)
+        cmd = build_ffmpeg_cmd(
+            bg_video=bg_video,
+            bg_start=bg_start,
+            bg_segment_duration=bg_seg_dur,
+            slow_pct=slow_pct,
+            audio_path=pair.audio_path,
+            srt_path=temp_srt_path,
+            output_path=output_path,
+            config=config
+        )
+
+        _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+
+        _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort)
+    finally:
+        try:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+        except Exception:
+            pass
 
     _progress(100, f"[{pair.index}] Hoàn thành! → {output_filename}")
     return output_path

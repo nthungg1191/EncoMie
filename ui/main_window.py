@@ -505,6 +505,7 @@ class MainWindow(QMainWindow):
         grp_pairs.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
         p_lay = QVBoxLayout(grp_pairs)
         self.pair_table = PairTable()
+        self.pair_table.itemSelectionChanged.connect(self._on_pair_selection_changed)
         p_lay.addWidget(self.pair_table)
 
         self.lbl_pair_summary = QLabel("Chưa quét")
@@ -531,7 +532,7 @@ class MainWindow(QMainWindow):
 
         self.style_panel = SubtitleStyleEditor()
         self.style_panel.hide_preset_bar()
-        self.style_panel._preview.setVisible(False)
+        self.style_panel._preview.setVisible(True)
 
         self.style_panel.style_changed.connect(self._on_style_changed)
 
@@ -591,6 +592,9 @@ class MainWindow(QMainWindow):
         self.preview_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
+        self.preview_widget.clicked.connect(self._on_refresh_preview_frame)
+        self.preview_widget.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.preview_widget.setToolTip("Click vào đây để tải/làm mới khung hình xem trước từ video")
         preview_lay.addWidget(self.preview_widget)
 
         preview_ctrl = QHBoxLayout()
@@ -1090,6 +1094,10 @@ class MainWindow(QMainWindow):
         self.lbl_pair_summary.setText(summary)
         self._auto_export_json()
 
+        # Automatically select the first row to trigger the preview
+        if total > 0:
+            self.pair_table.selectRow(0)
+
     # ------------------------------------------------------------------
     # Subtitle editor integration (Phase 1 + Phase 4)
     # ------------------------------------------------------------------
@@ -1350,6 +1358,26 @@ class MainWindow(QMainWindow):
             return
         frame = _extract_video_frame(video_files[0])
         self.preview_widget.set_frame(frame)
+
+    def _on_pair_selection_changed(self):
+        """Update preview background and subtitle text when a pair is selected in the table."""
+        selected_ranges = self.pair_table.selectedRanges()
+        if not selected_ranges:
+            return
+        row = selected_ranges[0].topRow()
+        if row < 0 or row >= len(self._pairs):
+            return
+
+        pair = self._pairs[row]
+        if not pair.matched:
+            return
+
+        # 1. Load SRT file to preview
+        if pair.srt_path and os.path.exists(pair.srt_path):
+            self.style_panel.reload_srt(pair.srt_path)
+
+        # 2. Extract a frame from the first background video as preview
+        self._on_refresh_preview_frame()
 
     def _on_first_sub_to_zero(self):
         """Shift the entire subtitle timeline so the first subtitle starts at 0s."""

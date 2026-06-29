@@ -25,7 +25,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox,
     QPushButton, QFrame, QToolButton, QSizePolicy,
-    QLineEdit, QSlider, QDialog,
+    QLineEdit, QSlider, QDialog, QScrollArea,
 )
 from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal, QPoint
 from PyQt6.QtGui import (
@@ -860,6 +860,8 @@ class SubtitlePreviewWidget(QWidget):
       - Text fill (color, font, size, alignment)
     """
 
+    clicked = pyqtSignal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self._style = SubtitleStylePreset(name="Default")
@@ -887,8 +889,37 @@ class SubtitlePreviewWidget(QWidget):
         self._entries = SrtService.parse(srt_path) if srt_path else []
         self.update()
 
+    def _wrap_line_text(self, text: str, fm, max_w: int) -> list[str]:
+        """Wrap text to fit within max_w pixels using font metrics fm."""
+        max_w = max(50, max_w)
+        paragraphs = text.split("\n")
+        wrapped = []
+        for para in paragraphs:
+            words = para.split(" ")
+            current_line = []
+            for word in words:
+                if not word:
+                    continue
+                test_line = " ".join(current_line + [word]) if current_line else word
+                if fm.horizontalAdvance(test_line) <= max_w:
+                    current_line.append(word)
+                else:
+                    if current_line:
+                        wrapped.append(" ".join(current_line))
+                        current_line = [word]
+                    else:
+                        wrapped.append(word)
+            if current_line:
+                wrapped.append(" ".join(current_line))
+        return wrapped
+
     def minimumSizeHint(self) -> QSize:
         return QSize(200, 160)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mousePressEvent(event)
 
     # ------------------------------------------------------------------
     # Painting helpers
@@ -960,15 +991,40 @@ class SubtitlePreviewWidget(QWidget):
 
     def _draw_text_with_stroke(self, p: QPainter, lines: list[str],
                                x: float, y: float,
+                               txt_w: float, h_anchor: float,
                                style: SubtitleStylePreset,
                                fm):
-        """Draw text lines with stroke (outline) then fill."""
+        """Draw text lines with stroke (outline) then fill, supporting alignment & shadows."""
         font = QFont(style.font_name, style.font_size)
         p.setFont(font)
 
         line_h = fm.height()
         spacing = int(line_h * 0.15)
 
+        # 1. Text Shadow (drawn only when shadow is enabled and background box is disabled)
+        if style.shadow_enabled and not style.bg_enabled:
+            rad = math.radians(style.shadow_angle)
+            dx = style.shadow_distance * math.cos(rad)
+            dy = style.shadow_distance * math.sin(rad)
+
+            shadow_col = QColor(style.shadow_color)
+            shadow_col.setAlphaF(style.shadow_opacity)
+            p.setPen(shadow_col)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+
+            for i, line in enumerate(lines):
+                line_w = fm.horizontalAdvance(line)
+                if h_anchor == 0.0:  # Left
+                    lx = x
+                elif h_anchor == 0.5:  # Center
+                    lx = x + (txt_w - line_w) / 2
+                else:  # Right
+                    lx = x + (txt_w - line_w)
+
+                ty = y + i * (line_h + spacing)
+                p.drawText(int(lx + dx), int(ty + dy), line)
+
+        # 2. Text Stroke/Outline
         if style.stroke_enabled and style.stroke_width > 0:
             stroke_col = QColor(style.stroke_color)
             pen_stroke = QPen(stroke_col)
@@ -976,29 +1032,41 @@ class SubtitlePreviewWidget(QWidget):
             pen_stroke.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
             p.setPen(pen_stroke)
             p.setBrush(Qt.BrushStyle.NoBrush)
-            for i, line in enumerate(lines):
-                ty = y + i * (line_h + spacing)
-                p.drawText(int(x), int(ty), line)
 
+            for i, line in enumerate(lines):
+                line_w = fm.horizontalAdvance(line)
+                if h_anchor == 0.0:  # Left
+                    lx = x
+                elif h_anchor == 0.5:  # Center
+                    lx = x + (txt_w - line_w) / 2
+                else:  # Right
+                    lx = x + (txt_w - line_w)
+
+                ty = y + i * (line_h + spacing)
+                p.drawText(int(lx), int(ty), line)
+
+        # 3. Text Fill
         fill_col = QColor(style.font_color)
         p.setPen(fill_col)
         p.setBrush(Qt.BrushStyle.NoBrush)
         for i, line in enumerate(lines):
+            line_w = fm.horizontalAdvance(line)
+            if h_anchor == 0.0:  # Left
+                lx = x
+            elif h_anchor == 0.5:  # Center
+                lx = x + (txt_w - line_w) / 2
+            else:  # Right
+                lx = x + (txt_w - line_w)
+
             ty = y + i * (line_h + spacing)
-            p.drawText(int(x), int(ty), line)
+            p.drawText(int(lx), int(ty), line)
 
     # ------------------------------------------------------------------
-    # Main paint
+    # Shared paint pipeline
     # ------------------------------------------------------------------
 
-    def paintEvent(self, event):
-        import math
-        p = QPainter(self)
-        p.setRenderHint(QPainter.RenderHint.Antialiasing)
-
+    def _paint_subtitle(self, p: QPainter, cw: int, ch: int):
         style = self._style
-        cw = self.width()
-        ch = self.height()
         margin_l = style.margin_l
         margin_r = style.margin_r
         margin_v = style.margin_v
@@ -1009,30 +1077,30 @@ class SubtitlePreviewWidget(QWidget):
 
         # Show first SRT entry if loaded, otherwise sample text
         if self._entries:
-            lines = self._entries[0].text.split("\n")
+            raw_text = self._entries[0].text
         else:
-            lines = self._sample_text.split("\n")
+            raw_text = self._sample_text
 
-        max_lw = max(fm.horizontalAdvance(ln) for ln in lines) if lines else 100
+        # Compute max text width allowed inside the canvas
+        max_allowed_w = cw - margin_l - margin_r - 2 * style.bg_padding_x
+        lines = self._wrap_line_text(raw_text, fm, max_allowed_w)
+
+        max_lw = max(fm.horizontalAdvance(ln) for ln in lines) if lines else 0
         line_h = fm.height()
         spacing = int(line_h * 0.15)
         n = len(lines)
         txt_h = n * line_h + (n - 1) * spacing
         txt_w = max_lw
 
-        # Inner text bounding box
-        bx0 = 0
-        by0 = 0
+        # Bounding box of the background (including padding)
         inner_rect = QRect(
-            bx0 + style.bg_padding_x,
-            by0 + style.bg_padding_y,
+            0,
+            0,
             txt_w + 2 * style.bg_padding_x,
             txt_h + 2 * style.bg_padding_y,
         )
 
-        # Map alignment
-        # v=0.0 → top of canvas, v=0.5 → middle, v=1.0 → bottom
-        # UI grid: row 0=top (codes 7-9), row 2=bottom (codes 1-3)
+        # Map alignment code (7-9 top, 4-6 middle, 1-3 bottom)
         align_map = {
             7: (0.0, 0.0), 8: (0.5, 0.0), 9: (1.0, 0.0),
             4: (0.0, 0.5), 5: (0.5, 0.5), 6: (1.0, 0.5),
@@ -1046,25 +1114,37 @@ class SubtitlePreviewWidget(QWidget):
             h_a, v_a, margin_l, margin_r, margin_v,
         )
 
-        bx0 = bx
-        by0 = by
-        inner_rect.translate(bx0, by0)
+        inner_rect.translate(bx, by)
 
-        # Shadow (drawn behind everything)
-        self._draw_shadow(
-            p,
-            float(inner_rect.x()), float(inner_rect.y()),
-            float(inner_rect.width()), float(inner_rect.height()),
-            style,
-        )
+        # 1. Shadow (drawn behind the box only if shadow is enabled and bg is enabled)
+        if style.shadow_enabled and style.bg_enabled:
+            self._draw_shadow(
+                p,
+                float(inner_rect.x()), float(inner_rect.y()),
+                float(inner_rect.width()), float(inner_rect.height()),
+                style,
+            )
 
-        # Background
+        # 2. Background Box
         self._draw_background(p, inner_rect, style)
 
-        # Text
+        # 3. Text Overlay
         txt_x = float(inner_rect.x() + style.bg_padding_x)
         txt_y = float(inner_rect.y() + style.bg_padding_y + fm.ascent())
-        self._draw_text_with_stroke(p, lines, txt_x, txt_y, style, fm)
+        self._draw_text_with_stroke(p, lines, txt_x, txt_y, txt_w, h_a, style, fm)
+
+    # ------------------------------------------------------------------
+    # Main paint
+    # ------------------------------------------------------------------
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Fill standard preview background
+        p.fillRect(self.rect(), QColor(C_PREVIEW_BG))
+        
+        self._paint_subtitle(p, self.width(), self.height())
 
 
 # ---------------------------------------------------------------------------
@@ -1076,12 +1156,6 @@ class LiveFramePreview(SubtitlePreviewWidget):
     Drop-in replacement for SubtitlePreviewWidget.
     Displays a video frame (or image) as the background, then overlays
     the styled subtitle on top using the exact same rendering pipeline.
-
-    Usage:
-        preview = LiveFramePreview()
-        preview.set_frame(QImage or QPixmap)
-        preview.set_style(SubtitleStylePreset)
-        preview.set_sample_text("Your subtitle text")
     """
 
     def __init__(self, parent=None):
@@ -1106,83 +1180,41 @@ class LiveFramePreview(SubtitlePreviewWidget):
         cw = self.width()
         ch = self.height()
 
-        # 1. Draw background frame (aspect-ratio-preserved, fill canvas)
+        # Fill background with a very dark placeholder color
+        p.fillRect(0, 0, cw, ch, QColor("#0A0A0A"))
+
+        # 1. Draw background frame (aspect-ratio-preserved, centered)
         if self._frame_img and not self._frame_img.isNull():
             scaled = self._frame_img.scaled(
                 cw, ch,
-                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            x_off = (scaled.width() - cw) // 2
-            y_off = (scaled.height() - ch) // 2
-            src = QRect(x_off, y_off, cw, ch)
-            p.drawImage(QPoint(0, 0), scaled, src)
+            vx = (cw - scaled.width()) // 2
+            vy = (ch - scaled.height()) // 2
+            vw = scaled.width()
+            vh = scaled.height()
+
+            p.drawImage(QPoint(vx, vy), scaled)
+
+            # 2. Overlay semi-transparent vignette (clipped to video frame)
+            vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
+            vignette.setColorAt(0.0, QColor(0, 0, 0, 0))
+            vignette.setColorAt(1.0, QColor(0, 0, 0, 60))
+            
+            p.save()
+            p.setClipRect(vx, vy, vw, vh)
+            p.fillRect(vx, vy, vw, vh, vignette)
+            p.restore()
+
+            # 3. Draw subtitle relative to the video frame geometry (translate painter)
+            p.save()
+            p.translate(vx, vy)
+            self._paint_subtitle(p, vw, vh)
+            p.restore()
         else:
-            p.fillRect(0, 0, cw, ch, QColor("#111111"))
-
-        # 2. Overlay semi-transparent vignette to make subtitle readable
-        # (subtle darkening at edges)
-        vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
-        vignette.setColorAt(0.0, QColor(0, 0, 0, 0))
-        vignette.setColorAt(1.0, QColor(0, 0, 0, 60))
-        p.fillRect(0, 0, cw, ch, vignette)
-
-        # 3. Draw subtitle (reuse inherited methods on same canvas)
-        style = self._style
-        margin_l = style.margin_l
-        margin_r = style.margin_r
-        margin_v = style.margin_v
-
-        font = QFont(style.font_name, style.font_size)
-        p.setFont(font)
-        fm = p.fontMetrics()
-
-        if self._entries:
-            lines = self._entries[0].text.split("\n")
-        else:
-            lines = self._sample_text.split("\n")
-        max_lw = max(fm.horizontalAdvance(ln) for ln in lines) if lines else 100
-        line_h = fm.height()
-        spacing = int(line_h * 0.15)
-        n = len(lines)
-        txt_h = n * line_h + (n - 1) * spacing
-        txt_w = max_lw
-
-        inner_rect = QRect(
-            style.bg_padding_x,
-            style.bg_padding_y,
-            txt_w + 2 * style.bg_padding_x,
-            txt_h + 2 * style.bg_padding_y,
-        )
-
-        # v=0.0 → top of canvas, v=0.5 → middle, v=1.0 → bottom
-        # UI grid: row 0=top (codes 7-9), row 2=bottom (codes 1-3)
-        align_map = {
-            7: (0.0, 0.0), 8: (0.5, 0.0), 9: (1.0, 0.0),
-            4: (0.0, 0.5), 5: (0.5, 0.5), 6: (1.0, 0.5),
-            1: (0.0, 1.0), 2: (0.5, 1.0), 3: (1.0, 1.0),
-            10: (0.5, 1.0),
-        }
-        h_a, v_a = align_map.get(style.alignment, (0.5, 1.0))
-
-        bx, by = self._anchor_to_pos(
-            cw, ch, inner_rect.width(), inner_rect.height(),
-            h_a, v_a, margin_l, margin_r, margin_v,
-        )
-
-        inner_rect.translate(bx, by)
-
-        self._draw_shadow(
-            p,
-            float(inner_rect.x()), float(inner_rect.y()),
-            float(inner_rect.width()), float(inner_rect.height()),
-            style,
-        )
-        self._draw_background(p, inner_rect, style)
-
-        txt_x = float(inner_rect.x() + style.bg_padding_x)
-        txt_y = float(inner_rect.y() + style.bg_padding_y + fm.ascent())
-        self._draw_text_with_stroke(p, lines, txt_x, txt_y, style, fm)
+            # Fallback if no frame loaded: draw centered in widget canvas
+            self._paint_subtitle(p, cw, ch)
 
 
 # ---------------------------------------------------------------------------
@@ -1402,14 +1434,40 @@ class SubtitleStyleEditor(QWidget):
         ctrlLay.setContentsMargins(0, 0, 0, 0)
         ctrlLay.setSpacing(6)
 
+        # Add preset bar on top
         self._preset_bar = self._build_preset_bar()
         ctrlLay.addWidget(self._preset_bar)
-        ctrlLay.addWidget(self._build_text_section())
-        ctrlLay.addWidget(self._build_appearance_section())
-        ctrlLay.addWidget(self._build_layout_section())
-        ctrlLay.addStretch()
 
-        # Right: live preview (LiveFramePreview supports video/image frame + subtitle overlay)
+        # Create a QScrollArea for horizontal scrolling of sections
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background-color: transparent;
+            }}
+        """)
+        scroll.setFixedHeight(185)
+
+        # Container widget for sections arranged horizontally
+        scroll_widget = QWidget()
+        scroll_widget.setStyleSheet(f"background-color: transparent;")
+        scroll_layout = QHBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(8)
+
+        # Build and add sections horizontally
+        scroll_layout.addWidget(self._build_text_section())
+        scroll_layout.addWidget(self._build_appearance_section())
+        scroll_layout.addWidget(self._build_layout_section())
+        scroll_layout.addStretch()
+
+        scroll.setWidget(scroll_widget)
+        ctrlLay.addWidget(scroll)
+
+        # Right: live preview
         self._preview = LiveFramePreview()
         self._preview.setMinimumWidth(320)
         self._preview.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
