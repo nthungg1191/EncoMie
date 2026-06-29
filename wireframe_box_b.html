@@ -287,116 +287,782 @@
       <span class="badge">GPU: RTX 3060</span>
     </div>
 
-    <div class="split">
+    <!-- Main Tab Headers (Edit Sub vs Edit Video) -->
+    <div class="main-tab-header" style="display: flex; background: #d1d5db; border: 1px solid #9ca3af; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; overflow: hidden; margin-bottom: 0;">
+      <button class="main-tab-btn active" onclick="switchMainTab(event, 'main-tab-sub')" style="flex: 1; padding: 10px 16px; border: none; background: white; font-size: 12px; font-weight: bold; cursor: pointer; color: #2563eb; border-bottom: 2px solid #2563eb; border-right: 1px solid #9ca3af; outline: none; transition: all 0.2s;">✍️ Edit Sub (Biên tập phụ đề)</button>
+      <button class="main-tab-btn" onclick="switchMainTab(event, 'main-tab-video')" style="flex: 1; padding: 10px 16px; border: none; background: #e5e7eb; font-size: 12px; font-weight: bold; cursor: pointer; color: #4b5563; outline: none; transition: all 0.2s;">🎬 Edit Video (Biên tập video)</button>
+    </div>
+
+    <div class="split" style="border: 1px solid #9ca3af; border-top: none; background: #f3f4f6; padding: 10px; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">
       <!-- LEFT PANEL -->
       <div class="panel panel-left">
-        <div class="box">
-          <div class="box-title">📁 Thư mục</div>
-          <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">video.mp4</span><button class="btn">Chọn file…</button></div>
-          <div class="row"><span class="field-label">Nguồn media:</span><span class="field field-long">audio_1.mp3</span><button class="btn">Chọn file…</button></div>
-          <div class="row"><span class="field-label">Subtitle SRT:</span><span class="field field-long">sub_1.srt</span><button class="btn">Chọn file…</button></div>
-          <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output</span><button class="btn">Chọn…</button></div>
-          <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại file</button>
+        <!-- Group 1: Edit Sub folder and list -->
+        <div id="left-sub-container" style="display: flex; flex-direction: column; gap: 10px; height: 100%;">
+          <div class="box">
+            <div class="box-title">📁 Thư mục (Biên tập phụ đề)</div>
+            <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">video.mp4</span><button class="btn">Chọn file…</button></div>
+            <div class="row"><span class="field-label">Nguồn media:</span><span class="field field-long">audio_1.mp3</span><button class="btn">Chọn file…</button></div>
+            <div class="row"><span class="field-label">Subtitle SRT:</span><span class="field field-long">sub_1.srt</span><button class="btn">Chọn file…</button></div>
+            <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output</span><button class="btn">Chọn…</button></div>
+            <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại file</button>
+          </div>
+          <div class="box" style="flex:1;">
+            <div class="box-title">📋 Danh sách file (audio ↔ SRT)</div>
+            <table>
+              <tr><th>#</th><th>Audio file</th><th>SRT file</th><th>Trạng thái</th></tr>
+              <tr><td>1</td><td>audio_1.mp3</td><td>sub_1.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
+              <tr><td>2</td><td>audio_2.mp3</td><td>sub_2.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
+              <tr><td>3</td><td>audio_3.mp3</td><td>—</td><td style="color:#dc2626;">✗ Thiếu</td></tr>
+            </table>
+            <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 file — 2 khớp ✓ — 1 thiếu ✗</div>
+          </div>
         </div>
-        <div class="box" style="flex:1;">
-          <div class="box-title">📋 Danh sách file (audio ↔ SRT)</div>
-          <table>
-            <tr><th>#</th><th>Audio file</th><th>SRT file</th><th>Trạng thái</th></tr>
-            <tr><td>1</td><td>audio_1.mp3</td><td>sub_1.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
-            <tr><td>2</td><td>audio_2.mp3</td><td>sub_2.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
-            <tr><td>3</td><td>audio_3.mp3</td><td>—</td><td style="color:#dc2626;">✗ Thiếu</td></tr>
-          </table>
-          <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 file — 2 khớp ✓ — 1 thiếu ✗</div>
+
+        <!-- Group 2: Edit Video folder and list -->
+        <div id="left-video-container" style="display: none; flex-direction: column; gap: 10px; height: 100%;">
+          <div class="box">
+            <div class="box-title">📁 Thư mục (Biên tập video)</div>
+            <div class="row"><span class="field-label" style="font-size: 9px; line-height: 1.1;">Video nguồn (.mp4):</span><span class="field field-long">D:\input_videos</span><button class="btn">Chọn thư mục…</button></div>
+            <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">7p07.mp4 (Tùy chọn)</span><button class="btn">Chọn file…</button></div>
+            <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output_scaled</span><button class="btn">Chọn…</button></div>
+            <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại thư mục</button>
+          </div>
+          <div class="box" style="flex:1;">
+            <div class="box-title">📋 Danh sách Video cần Scale hàng loạt</div>
+            <table>
+              <tr><th>#</th><th>Tên video nguồn</th><th>Độ phân giải đích</th><th>Trạng thái</th></tr>
+              <tr><td>1</td><td>talking_head_1.mp4</td><td>1080x1920 (9:16)</td><td style="color:#2563eb;">Sẵn sàng</td></tr>
+              <tr><td>2</td><td>vlog_outdoor.mp4</td><td>1080x1920 (9:16)</td><td style="color:#2563eb;">Sẵn sàng</td></tr>
+              <tr><td>3</td><td>tutorial_screen.mp4</td><td>1080x1920 (9:16)</td><td style="color:#16a34a;">✓ Đã scale</td></tr>
+            </table>
+            <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 video — 1 đã xử lý ✓ — 2 sẵn sàng</div>
+          </div>
         </div>
       </div>
 
       <div class="resizer" data-target="panel-left" data-next="panel-middle"></div>
 
       <!-- MIDDLE PANEL — BOX B -->
-      <div class="panel panel-middle">
+      <div class="panel panel-middle" style="background: transparent; border: none; padding: 0;">
         <div class="middle">
-          <!-- Subtitle Style -->
-          <div class="box subtitle-box">
-            <div class="box-title">💬 Subtitle Style</div>
+          <!-- Main Tab 1 Content -->
+          <div id="main-tab-sub" class="main-tab-pane" style="display: block;">
+            <!-- Subtitle Style & Image Layers Tab widget -->
+            <div class="box subtitle-box" style="padding: 0; background: transparent; border: none; margin-bottom: 0;">
+              <!-- Tab headers -->
+              <div class="tab-header" style="display: flex; background: #e5e7eb; border: 1px solid #9ca3af; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; overflow: hidden;">
+                <button class="tab-btn active" onclick="switchTab(event, 'tab-subtitle')" style="flex: 1; padding: 6px 12px; border: none; background: white; font-size: 11px; font-weight: 600; cursor: pointer; color: #2563eb; border-bottom: 2px solid #2563eb; border-right: 1px solid #d1d5db; outline: none; transition: all 0.2s;">💬 Subtitle Style</button>
+                <button class="tab-btn" onclick="switchTab(event, 'tab-layers')" style="flex: 1; padding: 6px 12px; border: none; background: #f3f4f6; font-size: 11px; font-weight: 600; cursor: pointer; color: #4b5563; outline: none; transition: all 0.2s;">🖼️ Image Layers</button>
+              </div>
+              
+              <!-- Tab contents container -->
+              <div class="tab-content-container" style="background: white; border: 1px solid #9ca3af; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; padding: 8px;">
+                <!-- Tab 1: Subtitle Style -->
+                <div id="tab-subtitle" class="tab-pane" style="display: block;">
+                <!-- Preset bar (internal to editor) -->
+                <div class="section" style="padding:4px 7px; margin-bottom:5px;">
+                  <div class="row" style="align-items:center;">
+                    <span style="color:#7b849c; font-size:10px; font-weight:600;">Presets</span>
+                    <select class="field field-long" style="height:22px; font-size:10px;">
+                      <option>Classic</option>
+                      <option>Cinematic</option>
+                      <option>Clean</option>
+                    </select>
+                    <button class="btn" style="font-size:10px;">💾</button>
+                    <button class="btn" style="font-size:10px;">🗑</button>
+                    <button class="btn" style="font-size:10px;">↺</button>
+                  </div>
+                </div>
 
-            <!-- Preset bar (internal to editor) -->
-            <div class="section" style="padding:4px 7px; margin-bottom:5px;">
-              <div class="row" style="align-items:center;">
-                <span style="color:#7b849c; font-size:10px; font-weight:600;">Presets</span>
-                <select class="field field-long" style="height:22px; font-size:10px;">
-                  <option>Classic</option>
-                  <option>Cinematic</option>
-                  <option>Clean</option>
+                <div class="subtitle-content">
+                  <!-- Text -->
+                  <div class="section">
+                    <div class="section-title">TEXT</div>
+                    <div class="grid-2">
+                      <div class="row"><span class="field-label">Font</span><span class="field field-long">Arial</span></div>
+                      <div class="row"><span class="field-label">Size</span><span class="field field-short">36</span></div>
+                    </div>
+                    <div class="row" style="margin-top:3px;">
+                      <span class="field-label">Color</span>
+                      <span class="swatch" style="background:#FFFFFF;"></span>
+                      <span class="field field-long" style="font-family:monospace;">#FFFFFF</span>
+                    </div>
+                  </div>
+
+                  <!-- Appearance -->
+                  <div class="section">
+                    <div class="section-title">APPEARANCE</div>
+                    <div class="grid-3">
+                      <div class="row"><span class="field-label">Stroke</span><span class="toggle on"></span></div>
+                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                      <div class="row"><span class="field-label">Width</span><span class="field field-short">2.0px</span></div>
+                    </div>
+                    <div class="grid-3" style="margin-top:3px;">
+                      <div class="row"><span class="field-label">BG</span><span class="toggle on"></span></div>
+                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                      <div class="row"><span class="field-label">Opacity</span><span class="field field-short">70%</span></div>
+                    </div>
+                    <div class="grid-3" style="margin-top:3px;">
+                      <div class="row"><span class="field-label">Pad X</span><span class="field field-short">12</span></div>
+                      <div class="row"><span class="field-label">Pad Y</span><span class="field field-short">6</span></div>
+                      <div class="row"><span class="field-label">Radius</span><span class="field field-short">4px</span></div>
+                    </div>
+                    <div class="grid-3" style="margin-top:3px;">
+                      <div class="row"><span class="field-label">Shadow</span><span class="toggle"></span></div>
+                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
+                      <div class="row"><span class="field-label">Opacity</span><span class="field field-short">80%</span></div>
+                    </div>
+                  </div>
+
+                  <!-- Layout -->
+                  <div class="section">
+                    <div class="section-title">LAYOUT — Position</div>
+                    <div class="align-grid">
+                      <div class="align-btn">↖</div><div class="align-btn">↑</div><div class="align-btn">↗</div>
+                      <div class="align-btn">←</div><div class="align-btn active">•</div><div class="align-btn">→</div>
+                      <div class="align-btn">↙</div><div class="align-btn">↓</div><div class="align-btn">↘</div>
+                    </div>
+                    <div class="grid-3" style="margin-top:5px;">
+                      <div class="row"><span class="field-label">Margin V</span><span class="field field-short">50px</span></div>
+                      <div class="row"><span class="field-label">Margin L</span><span class="field field-short">20px</span></div>
+                      <div class="row"><span class="field-label">Margin R</span><span class="field field-short">20px</span></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Tab 2: Image Layers -->
+              <div id="tab-layers" class="tab-pane" style="display: none;">
+                <!-- Layer selector buttons -->
+                <div style="display: flex; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid #2e3347; padding-bottom: 6px;">
+                  <button class="layer-tab-btn active" onclick="switchLayer(event, 'layer-1')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #2563eb; color: white; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                    <span style="display: inline-block; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
+                    Layer 1
+                  </button>
+                  <button class="layer-tab-btn" onclick="switchLayer(event, 'layer-2')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                    <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
+                    Layer 2
+                  </button>
+                  <button class="layer-tab-btn" onclick="switchLayer(event, 'layer-3')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                    <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
+                    Layer 3
+                  </button>
+                </div>
+
+                <!-- Layer 1 Config -->
+                <div id="layer-1" class="layer-pane" style="display: block;">
+                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 1</div>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                        <span class="toggle on" onclick="toggleLayerActivation(this, 'layer-1')"></span>
+                      </div>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 8px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
+                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">logo_main.png</span>
+                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 12px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
+                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                        <option>Góc dưới - Phải (Bottom-Right)</option>
+                        <option>Góc dưới - Trái (Bottom-Left)</option>
+                        <option selected>Góc trên - Phải (Top-Right)</option>
+                        <option>Góc trên - Trái (Top-Left)</option>
+                        <option>Ở giữa - Trên (Top-Center)</option>
+                      </select>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="20" max="500" value="120" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">120px</span>
+                        </div>
+                      </div>
+                      
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="10" max="100" value="90" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">90%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Margin adjustments -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Layer 2 Config -->
+                <div id="layer-2" class="layer-pane" style="display: none;">
+                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 2</div>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                        <span class="toggle" onclick="toggleLayerActivation(this, 'layer-2')"></span>
+                      </div>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 8px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
+                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
+                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 12px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
+                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                        <option>Góc dưới - Phải (Bottom-Right)</option>
+                        <option>Góc dưới - Trái (Bottom-Left)</option>
+                        <option>Góc trên - Phải (Top-Right)</option>
+                        <option>Góc trên - Trái (Top-Left)</option>
+                        <option>Ở giữa - Trên (Top-Center)</option>
+                      </select>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="20" max="500" value="80" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">80px</span>
+                        </div>
+                      </div>
+                      
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="10" max="100" value="50" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">50%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Margin adjustments -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Layer 3 Config -->
+                <div id="layer-3" class="layer-pane" style="display: none;">
+                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 3</div>
+                      <div style="display: flex; align-items: center; gap: 6px;">
+                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                        <span class="toggle" onclick="toggleLayerActivation(this, 'layer-3')"></span>
+                      </div>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 8px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
+                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
+                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
+                    </div>
+                    
+                    <div class="row" style="margin-bottom: 12px;">
+                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
+                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                        <option>Góc dưới - Phải (Bottom-Right)</option>
+                        <option>Góc dưới - Trái (Bottom-Left)</option>
+                        <option>Góc trên - Phải (Top-Right)</option>
+                        <option>Góc trên - Trái (Top-Left)</option>
+                        <option>Ở giữa - Trên (Top-Center)</option>
+                      </select>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="20" max="500" value="80" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">80px</span>
+                        </div>
+                      </div>
+                      
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                          <input type="range" min="10" max="100" value="50" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">50%</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Margin adjustments -->
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Tab 2 Content: Edit Video -->
+          <div id="main-tab-video" class="main-tab-pane" style="display: none;">
+            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px;">
+              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">TỶ LỆ KHUNG HÌNH & SCALE</div>
+              
+              <div class="row" style="margin-bottom: 8px;">
+                <span class="field-label" style="color: #7b849c; min-width: 90px; font-size: 11px; text-align: left;">Độ phân giải:</span>
+                <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                  <option selected>1920x1080 (16:9 - Ngang chuẩn)</option>
+                  <option>1080x1920 (9:16 - Dọc TikTok/Reels)</option>
+                  <option>1080x1080 (1:1 - Vuông Instagram)</option>
+                  <option>1280x720 (16:9 - HD)</option>
                 </select>
-                <button class="btn" style="font-size:10px;">💾</button>
-                <button class="btn" style="font-size:10px;">🗑</button>
-                <button class="btn" style="font-size:10px;">↺</button>
+              </div>
+
+              <div class="row" style="margin-bottom: 8px;">
+                <span class="field-label" style="color: #7b849c; min-width: 90px; font-size: 11px; text-align: left;">Chế độ Scale:</span>
+                <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                  <option selected>Fit with Black padding (Viền đen)</option>
+                  <option>Fit with Blur padding (Mờ nền)</option>
+                  <option>Crop to Fill (Cắt đổ đầy)</option>
+                  <option>Stretch (Kéo giãn)</option>
+                </select>
               </div>
             </div>
 
-            <div class="subtitle-content">
-              <!-- Text -->
-              <div class="section">
-                <div class="section-title">TEXT</div>
-                <div class="grid-2">
-                  <div class="row"><span class="field-label">Font</span><span class="field field-long">Arial</span></div>
-                  <div class="row"><span class="field-label">Size</span><span class="field field-short">36</span></div>
+            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px; margin-top: 8px;">
+              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">ĐIỀU CHỈNH ÂM LƯỢNG & TỐC ĐỘ</div>
+              
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                  <span class="field-label" style="color: #7b849c; font-size: 11px;">Âm lượng gốc:</span>
+                  <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                    <input type="range" min="0" max="200" value="100" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                    <span style="color: #dde3f0; font-size: 11px; min-width: 36px; text-align: right;">100%</span>
+                  </div>
                 </div>
-                <div class="row" style="margin-top:3px;">
-                  <span class="field-label">Color</span>
-                  <span class="swatch" style="background:#FFFFFF;"></span>
-                  <span class="field field-long" style="font-family:monospace;">#FFFFFF</span>
+                
+                <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                  <span class="field-label" style="color: #7b849c; font-size: 11px;">Tốc độ phát:</span>
+                  <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                    <input type="range" min="50" max="200" value="100" oninput="this.nextElementSibling.innerText = (this.value/100).toFixed(1) + 'x'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                    <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">1.0x</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px; margin-top: 8px;">
+              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">CẤU HÌNH CÁC LỚP VIDEO (VIDEO LAYERS)</div>
+              
+              <!-- Video Layer selector sub-tabs -->
+              <div style="display: flex; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid #2e3347; padding-bottom: 6px;">
+                <button class="vid-tab-btn active" onclick="switchVidLayer(event, 'vid-layer-1')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #2563eb; color: white; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                  <span style="display: inline-block; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
+                  Video Layer 1
+                </button>
+                <button class="vid-tab-btn" onclick="switchVidLayer(event, 'vid-layer-2')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                  <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
+                  Video Layer 2
+                </button>
+                <button class="vid-tab-btn" onclick="switchVidLayer(event, 'vid-layer-3')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
+                  <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
+                  Video Layer 3
+                </button>
+              </div>
+
+              <!-- Vid Layer 1 Config -->
+              <div id="vid-layer-1" class="vid-pane" style="display: block;">
+                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 1</div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                      <span class="toggle on" onclick="toggleVidActivation(this, 'vid-layer-1')"></span>
+                    </div>
+                  </div>
+
+                  <div class="row" style="margin-bottom: 8px;">
+                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video:</span>
+                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                      <option selected>Theo danh sách chạy (Batch Source File)</option>
+                      <option>File cố định (Static file...)</option>
+                    </select>
+                  </div>
+
+                  <div class="row" style="margin-bottom: 8px;">
+                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Vị trí đè:</span>
+                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                      <option selected>Ở giữa (Center)</option>
+                      <option>Góc dưới - Phải (Bottom-Right)</option>
+                      <option>Góc dưới - Trái (Bottom-Left)</option>
+                      <option>Góc trên - Phải (Top-Right)</option>
+                      <option>Góc trên - Trái (Top-Left)</option>
+                    </select>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Tỉ lệ Scale (Cỡ):</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                        <input id="vid-scale-range" type="range" min="10" max="100" value="30" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-scale-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">30%</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Bo góc (Corners):</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                        <input id="vid-radius-range" type="range" min="0" max="50" value="10" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-radius-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">10px</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Margins -->
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid-margin-t-range" type="range" min="0" max="225" value="67" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-margin-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">67px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid-margin-b-range" type="range" min="0" max="225" value="68" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-margin-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">68px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid-margin-l-range" type="range" min="0" max="400" value="140" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-margin-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">140px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid-margin-r-range" type="range" min="0" max="400" value="140" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
+                        <span id="vid-margin-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">140px</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Layer 1 Crop Section -->
+                  <div style="margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold; margin-bottom: 6px;">CẮT CÚP LAYER 1 (CROP)</div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trên:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid1-crop-t" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid1-crop-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Dưới:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid1-crop-b" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid1-crop-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trái:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid1-crop-l" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid1-crop-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Phải:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid1-crop-r" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid1-crop-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Appearance -->
-              <div class="section">
-                <div class="section-title">APPEARANCE</div>
-                <div class="grid-3">
-                  <div class="row"><span class="field-label">Stroke</span><span class="toggle on"></span></div>
-                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                  <div class="row"><span class="field-label">Width</span><span class="field field-short">2.0px</span></div>
-                </div>
-                <div class="grid-3" style="margin-top:3px;">
-                  <div class="row"><span class="field-label">BG</span><span class="toggle on"></span></div>
-                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                  <div class="row"><span class="field-label">Opacity</span><span class="field field-short">70%</span></div>
-                </div>
-                <div class="grid-3" style="margin-top:3px;">
-                  <div class="row"><span class="field-label">Pad X</span><span class="field field-short">12</span></div>
-                  <div class="row"><span class="field-label">Pad Y</span><span class="field field-short">6</span></div>
-                  <div class="row"><span class="field-label">Radius</span><span class="field field-short">4px</span></div>
-                </div>
-                <div class="grid-3" style="margin-top:3px;">
-                  <div class="row"><span class="field-label">Shadow</span><span class="toggle"></span></div>
-                  <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                  <div class="row"><span class="field-label">Opacity</span><span class="field field-short">80%</span></div>
+              <!-- Vid Layer 2 Config -->
+              <div id="vid-layer-2" class="vid-pane" style="display: none;">
+                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 2</div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                      <span class="toggle on" onclick="toggleVidActivation(this, 'vid-layer-2')"></span>
+                    </div>
+                  </div>
+
+                  <div class="row" style="margin-bottom: 8px;">
+                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video/Ảnh:</span>
+                    <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">logo.png</span>
+                    <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
+                  </div>
+
+                  <div class="row" style="margin-bottom: 8px;">
+                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Vị trí đè:</span>
+                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
+                      <option>Ở giữa (Center)</option>
+                      <option selected>Góc dưới - Phải (Bottom-Right)</option>
+                      <option>Góc dưới - Trái (Bottom-Left)</option>
+                      <option>Góc trên - Phải (Top-Right)</option>
+                      <option>Góc trên - Trái (Top-Left)</option>
+                    </select>
+                  </div>
+
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Tỉ lệ Scale (Cỡ):</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                        <input id="vid2-scale-range" type="range" min="10" max="100" value="15" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 4px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-scale-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">15%</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Bo góc (Corners):</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
+                        <input id="vid2-radius-range" type="range" min="0" max="50" value="4" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 4px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-radius-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">4px</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Margins -->
+                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid2-margin-t-range" type="range" min="0" max="225" value="145" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-margin-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">145px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid2-margin-b-range" type="range" min="0" max="225" value="20" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-margin-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid2-margin-l-range" type="range" min="0" max="400" value="320" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-margin-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">320px</span>
+                      </div>
+                    </div>
+                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
+                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                        <input id="vid2-margin-r-range" type="range" min="0" max="400" value="20" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
+                        <span id="vid2-margin-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Layer 2 Crop Section -->
+                  <div style="margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
+                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold; margin-bottom: 6px;">CẮT CÚP LAYER 2 (CROP)</div>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trên:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid2-crop-t" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid2-crop-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Dưới:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid2-crop-b" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid2-crop-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trái:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid2-crop-l" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid2-crop-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
+                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Phải:</span>
+                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
+                          <input id="vid2-crop-r" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
+                          <span id="vid2-crop-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <!-- Layout -->
-              <div class="section">
-                <div class="section-title">LAYOUT — Position</div>
-                <div class="align-grid">
-                  <div class="align-btn">↖</div><div class="align-btn">↑</div><div class="align-btn">↗</div>
-                  <div class="align-btn">←</div><div class="align-btn active">•</div><div class="align-btn">→</div>
-                  <div class="align-btn">↙</div><div class="align-btn">↓</div><div class="align-btn">↘</div>
-                </div>
-                <div class="grid-3" style="margin-top:5px;">
-                  <div class="row"><span class="field-label">Margin V</span><span class="field field-short">50px</span></div>
-                  <div class="row"><span class="field-label">Margin L</span><span class="field field-short">20px</span></div>
-                  <div class="row"><span class="field-label">Margin R</span><span class="field field-short">20px</span></div>
+              <!-- Vid Layer 3 Config -->
+              <div id="vid-layer-3" class="vid-pane" style="display: none;">
+                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 3</div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
+                      <span class="toggle" onclick="toggleVidActivation(this, 'vid-layer-3')"></span>
+                    </div>
+                  </div>
+                  <div class="row" style="margin-bottom: 8px;">
+                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video:</span>
+                    <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
+                    <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
+                  </div>
+                  <div style="font-size: 10px; color: #7b849c; text-align: center; padding: 10px 0;">(Cài đặt vị trí, kích cỡ, bo góc và margins tương tự Layer 1)</div>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Preview -->
-          <div class="box preview-box">
-            <div class="box-title">🖼 Preview</div>
-            <div class="preview-canvas"></div>
+          <div class="box preview-box" style="flex: 1; display: flex; flex-direction: column;">
+            <div class="box-title" style="display: flex; justify-content: space-between; align-items: center;">
+              <span>🖼 Preview (Kéo/Thả/Scale & Cắt khung trực tiếp)</span>
+              <button id="btn-crop-mode" onclick="toggleCropMode()" style="display: none; background: #1e293b; color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; outline: none;">✂ Bật Crop Mode</button>
+            </div>
+            
+            <div class="preview-canvas" style="position: relative; height: 260px; background: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #1e293b; border-radius: 4px; padding: 0;">
+              <!-- Background Canvas -->
+              <div id="preview-workspace" style="position: relative; width: 400px; height: 225px; background: #1e293b; border: 1px solid #334155; user-select: none;">
+                <div style="position: absolute; color: #475569; font-size: 11px; font-weight: bold; width: 100%; text-align: center; top: 10px; pointer-events: none;">VIDEO NỀN (BACKGROUND)</div>
+                
+                <!-- Main Subtitle Style Overlay -->
+                <div id="mock-subtitle" style="position: absolute; bottom: 20px; width: 80%; left: 10%; background: rgba(0,0,0,0.6); color: white; padding: 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); font-size: 11px; text-align: center; pointer-events: none;">
+                  Mẫu phụ đề hiển thị: " Martha: and he let it go. "
+                </div>
+
+                <!-- Crop Box (Orange border dashed, resizable, only active in Crop Mode) -->
+                <div id="crop-box" style="display: none; position: absolute; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.15); cursor: move; left: 20px; top: 15px; width: 360px; height: 195px; box-sizing: border-box;">
+                  <div style="position: absolute; top: 2px; left: 4px; color: #f59e0b; font-size: 9px; font-weight: bold; pointer-events: none;">Khung Cắt (Crop Box)</div>
+                  <!-- Handles for resizing crop box -->
+                  <div class="crop-handle n" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; top: -3px; left: 50%; margin-left: -3px; cursor: ns-resize;"></div>
+                  <div class="crop-handle s" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; bottom: -3px; left: 50%; margin-left: -3px; cursor: ns-resize;"></div>
+                  <div class="crop-handle w" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; left: -3px; top: 50%; margin-top: -3px; cursor: ew-resize;"></div>
+                  <div class="crop-handle e" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; right: -3px; top: 50%; margin-top: -3px; cursor: ew-resize;"></div>
+                </div>
+
+                <!-- Resizable & Draggable Video Layer 1 Box (Blue) -->
+                <div id="mock-video-layer" style="display: none; position: absolute; width: 120px; height: 67px; background: rgba(37, 99, 235, 0.25); border: 2px solid #2563eb; border-radius: 10px; cursor: move; left: 140px; top: 60px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; transition: border-radius 0.1s;">
+                  <div style="text-align: center; color: #60a5fa; font-size: 9px; font-weight: bold; line-height: 1.1; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">Video Layer 1<br>(Kéo/Co giãn)</div>
+                  
+                  <!-- Handles for resizing video layer -->
+                  <div class="resize-handle nw" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; top: -3px; left: -3px; cursor: nwse-resize;"></div>
+                  <div class="resize-handle ne" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; top: -3px; right: -3px; cursor: nesw-resize;"></div>
+                  <div class="resize-handle sw" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; bottom: -3px; left: -3px; cursor: nesw-resize;"></div>
+                  <div class="resize-handle se" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; bottom: -3px; right: -3px; cursor: nwse-resize;"></div>
+                </div>
+
+                <!-- Resizable & Draggable Video Layer 2 Box (Green) -->
+                <div id="mock-video-layer-2" style="display: none; position: absolute; width: 60px; height: 60px; background: rgba(16, 185, 129, 0.25); border: 2px solid #10b981; border-radius: 4px; cursor: move; left: 320px; top: 145px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
+                  <div style="text-align: center; color: #34d399; font-size: 8px; font-weight: bold; line-height: 1.1; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">logo.png<br>(Layer 2)</div>
+                  <!-- Handles for resizing layer 2 -->
+                  <div class="resize-handle nw" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; top: -3px; left: -3px; cursor: nwse-resize;"></div>
+                  <div class="resize-handle ne" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; top: -3px; right: -3px; cursor: nesw-resize;"></div>
+                  <div class="resize-handle sw" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; bottom: -3px; left: -3px; cursor: nesw-resize;"></div>
+                  <div class="resize-handle se" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; bottom: -3px; right: -3px; cursor: nwse-resize;"></div>
+                </div>
+              </div>
+            </div>
+            
             <div class="preview-controls">
-              <button class="btn btn-primary">🔄 Load frame from video</button>
+              <button class="btn btn-primary">🔄 Load frame từ video nguồn</button>
             </div>
           </div>
         </div>
@@ -454,5 +1120,601 @@
       <li>Không thay đổi gì các panel trái và phải.</li>
     </ul>
   </div>
+
+  <script>
+    function switchMainTab(event, tabId) {
+      // Hide all main tab panes
+      document.querySelectorAll('.main-tab-pane').forEach(el => el.style.display = 'none');
+      // Show active main tab pane
+      document.getElementById(tabId).style.display = 'block';
+      
+      // Reset all main tab buttons
+      document.querySelectorAll('.main-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '#f3f4f6';
+        btn.style.color = '#4b5563';
+        btn.style.borderBottom = 'none';
+      });
+      
+      // Set active main tab button style
+      const activeBtn = event.currentTarget;
+      activeBtn.classList.add('active');
+      activeBtn.style.background = 'white';
+      activeBtn.style.color = '#2563eb';
+      activeBtn.style.borderBottom = '2px solid #2563eb';
+
+      // Toggle left panel containers & preview controls
+      if (tabId === 'main-tab-sub') {
+        document.getElementById('left-sub-container').style.display = 'flex';
+        document.getElementById('left-video-container').style.display = 'none';
+        
+        // Hide video editor overlay boxes and crop button in Edit Sub mode
+        document.getElementById('mock-video-layer').style.display = 'none';
+        document.getElementById('mock-video-layer-2').style.display = 'none';
+        document.getElementById('btn-crop-mode').style.display = 'none';
+        document.getElementById('crop-box').style.display = 'none';
+        
+        // Show subtitle preview
+        document.getElementById('mock-subtitle').style.display = 'block';
+      } else {
+        document.getElementById('left-sub-container').style.display = 'none';
+        document.getElementById('left-video-container').style.display = 'flex';
+        
+        // Show video editor overlay boxes (if enabled) and crop button in Edit Video mode
+        document.getElementById('mock-video-layer').style.display = 'flex';
+        document.getElementById('mock-video-layer-2').style.display = 'flex';
+        document.getElementById('btn-crop-mode').style.display = 'block';
+        
+        // Hide subtitle preview to focus on video scale
+        document.getElementById('mock-subtitle').style.display = 'none';
+      }
+    }
+
+    function switchTab(event, tabId) {
+      // Hide all tab panes
+      document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
+      // Show active tab pane
+      document.getElementById(tabId).style.display = 'block';
+      
+      // Reset all tab button classes and styles
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '#f3f4f6';
+        btn.style.color = '#4b5563';
+        btn.style.borderBottom = 'none';
+      });
+      
+      // Set active button style
+      const activeBtn = event.currentTarget;
+      activeBtn.classList.add('active');
+      activeBtn.style.background = 'white';
+      activeBtn.style.color = '#2563eb';
+      activeBtn.style.borderBottom = '2px solid #2563eb';
+    }
+
+    function switchLayer(event, layerId) {
+      // Hide all layer panes
+      document.querySelectorAll('.layer-pane').forEach(el => el.style.display = 'none');
+      // Show active layer pane
+      document.getElementById(layerId).style.display = 'block';
+      
+      // Reset all layer tab buttons
+      document.querySelectorAll('.layer-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '#1e2235';
+        btn.style.color = '#7b849c';
+      });
+      
+      // Set active button style
+      const activeBtn = event.currentTarget;
+      activeBtn.classList.add('active');
+      activeBtn.style.background = '#2563eb';
+      activeBtn.style.color = 'white';
+    }
+
+    function toggleLayerActivation(el, layerId) {
+      el.classList.toggle('on');
+      const dot = document.querySelector(`button[onclick*="${layerId}"] span`);
+      if (el.classList.contains('on')) {
+        dot.style.background = '#4ade80';
+      } else {
+        dot.style.background = '#9ca3af';
+      }
+    }
+
+    function switchVidLayer(event, paneId) {
+      // Hide all vid panes
+      document.querySelectorAll('.vid-pane').forEach(el => el.style.display = 'none');
+      // Show active vid pane
+      document.getElementById(paneId).style.display = 'block';
+      
+      // Reset all vid tab buttons
+      document.querySelectorAll('.vid-tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.background = '#1e2235';
+        btn.style.color = '#7b849c';
+      });
+      
+      // Set active button style
+      let activeBtn;
+      if (event) {
+        activeBtn = event.currentTarget;
+      } else {
+        activeBtn = document.querySelector(`button[onclick*="${paneId}"]`);
+      }
+      if (activeBtn) {
+        activeBtn.classList.add('active');
+        activeBtn.style.background = '#2563eb';
+        activeBtn.style.color = 'white';
+      }
+
+      // Sync canvas selection (avoiding recursion)
+      if (isManualSelection) return;
+      if (paneId === 'vid-layer-1') {
+        selectPreviewLayer(document.getElementById('mock-video-layer'), true);
+      } else if (paneId === 'vid-layer-2') {
+        selectPreviewLayer(document.getElementById('mock-video-layer-2'), true);
+      }
+    }
+
+    function toggleVidActivation(el, paneId) {
+      el.classList.toggle('on');
+      const dot = document.querySelector(`button[onclick*="${paneId}"] span`);
+      if (el.classList.contains('on')) {
+        dot.style.background = '#4ade80';
+        if (paneId === 'vid-layer-1') {
+          document.getElementById('mock-video-layer').style.display = 'flex';
+        }
+        if (paneId === 'vid-layer-2') {
+          document.getElementById('mock-video-layer-2').style.display = 'flex';
+        }
+      } else {
+        dot.style.background = '#9ca3af';
+        if (paneId === 'vid-layer-1') {
+          document.getElementById('mock-video-layer').style.display = 'none';
+        }
+        if (paneId === 'vid-layer-2') {
+          document.getElementById('mock-video-layer-2').style.display = 'none';
+        }
+      }
+    }
+
+    // --- INTERACTIVE PREVIEW INTERFACE DEMO ---
+    let isCropMode = false;
+    let selectedLayerId = 'vid-layer-1'; // Default selected layer
+    let isManualSelection = false;
+
+    const mockLayer = document.getElementById('mock-video-layer');
+    const mockLayer2 = document.getElementById('mock-video-layer-2');
+    const mockBg = document.getElementById('preview-workspace');
+    const mockCrop = document.getElementById('crop-box');
+
+    // Function to visually select a layer and update tabs
+    function selectPreviewLayer(el, fromTab = false) {
+      if (!el) return;
+      
+      // Update selectedLayerId
+      selectedLayerId = el.id === 'mock-video-layer' ? 'vid-layer-1' : 'vid-layer-2';
+      
+      // Visual feedback
+      if (selectedLayerId === 'vid-layer-1') {
+        mockLayer.style.border = '2px dashed #3b82f6';
+        mockLayer2.style.border = '2px solid #10b981';
+      } else {
+        mockLayer.style.border = '2px solid #2563eb';
+        mockLayer2.style.border = '2px dashed #34d399';
+      }
+
+      // Switch tab on the left if not triggered from tab click
+      if (!fromTab) {
+        isManualSelection = true;
+        switchVidLayer(null, selectedLayerId);
+        isManualSelection = false;
+      }
+
+      // If already in Crop Mode, reposition crop box over newly selected layer
+      if (isCropMode) {
+        positionCropBoxOverSelectedLayer();
+      }
+    }
+
+    function toggleCropMode() {
+      isCropMode = !isCropMode;
+      const btn = document.getElementById('btn-crop-mode');
+      const cropBox = document.getElementById('crop-box');
+      
+      if (isCropMode) {
+        btn.innerText = '✓ Đang Crop (Tắt)';
+        btn.style.background = '#f59e0b';
+        btn.style.color = '#000';
+        cropBox.style.display = 'block';
+        
+        // Disable dragging of layers while cropping
+        mockLayer.style.pointerEvents = 'none';
+        mockLayer2.style.pointerEvents = 'none';
+        
+        positionCropBoxOverSelectedLayer();
+      } else {
+        btn.innerText = '✂ Bật Crop Mode';
+        btn.style.background = '#1e293b';
+        btn.style.color = '#f59e0b';
+        cropBox.style.display = 'none';
+        
+        mockLayer.style.pointerEvents = 'auto';
+        mockLayer2.style.pointerEvents = 'auto';
+        mockLayer.style.opacity = '1';
+        mockLayer2.style.opacity = '1';
+      }
+    }
+
+    // Position crop box exactly over the selected layer bounds
+    function positionCropBoxOverSelectedLayer() {
+      const activeLayer = selectedLayerId === 'vid-layer-1' ? mockLayer : mockLayer2;
+      const otherLayer = selectedLayerId === 'vid-layer-1' ? mockLayer2 : mockLayer;
+      
+      activeLayer.style.opacity = '1';
+      otherLayer.style.opacity = '0.3';
+      
+      // Align crop box to the selected layer's bounds
+      mockCrop.style.left = activeLayer.offsetLeft + 'px';
+      mockCrop.style.top = activeLayer.offsetTop + 'px';
+      mockCrop.style.width = activeLayer.offsetWidth + 'px';
+      mockCrop.style.height = activeLayer.offsetHeight + 'px';
+
+      updateCropBoxFromSliders();
+    }
+
+    // Initialize selection
+    setTimeout(() => { selectPreviewLayer(mockLayer); }, 100);
+
+    let activeEl = null;
+    let dragMode = null; // 'move', 'resize', 'crop-resize'
+    let currentResizeHandle = null;
+    let startMouseX = 0, startMouseY = 0;
+    let startW = 0, startH = 0;
+    let startL = 0, startT = 0;
+
+    // Video Layer 1 Mouse Downs
+    mockLayer.addEventListener('mousedown', function(e) {
+      if (isCropMode) return;
+      selectPreviewLayer(mockLayer);
+      activeEl = mockLayer;
+      if (e.target.classList.contains('resize-handle')) {
+        dragMode = 'resize';
+        currentResizeHandle = e.target;
+        startW = mockLayer.offsetWidth;
+        startH = mockLayer.offsetHeight;
+      } else {
+        dragMode = 'move';
+      }
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      startL = mockLayer.offsetLeft;
+      startT = mockLayer.offsetTop;
+      e.preventDefault();
+    });
+
+    // Video Layer 2 Mouse Downs
+    mockLayer2.addEventListener('mousedown', function(e) {
+      if (isCropMode) return;
+      selectPreviewLayer(mockLayer2);
+      activeEl = mockLayer2;
+      if (e.target.classList.contains('resize-handle')) {
+        dragMode = 'resize';
+        currentResizeHandle = e.target;
+        startW = mockLayer2.offsetWidth;
+        startH = mockLayer2.offsetHeight;
+      } else {
+        dragMode = 'move';
+      }
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      startL = mockLayer2.offsetLeft;
+      startT = mockLayer2.offsetTop;
+      e.preventDefault();
+    });
+
+    // Crop Box Mouse Downs
+    mockCrop.addEventListener('mousedown', function(e) {
+      if (!isCropMode) return;
+      activeEl = mockCrop;
+      if (e.target.classList.contains('crop-handle')) {
+        dragMode = 'crop-resize';
+        currentResizeHandle = e.target;
+        startW = mockCrop.offsetWidth;
+        startH = mockCrop.offsetHeight;
+      } else {
+        dragMode = 'move';
+      }
+      startMouseX = e.clientX;
+      startMouseY = e.clientY;
+      startL = mockCrop.offsetLeft;
+      startT = mockCrop.offsetTop;
+      e.preventDefault();
+    });
+
+    // Global Mouse Move
+    document.addEventListener('mousemove', function(e) {
+      if (!activeEl || !dragMode) return;
+
+      const dx = e.clientX - startMouseX;
+      const dy = e.clientY - startMouseY;
+
+      if (dragMode === 'move') {
+        let newL = startL + dx;
+        let newT = startT + dy;
+        newL = Math.max(0, Math.min(newL, mockBg.offsetWidth - activeEl.offsetWidth));
+        newT = Math.max(0, Math.min(newT, mockBg.offsetHeight - activeEl.offsetHeight));
+        
+        activeEl.style.left = newL + 'px';
+        activeEl.style.top = newT + 'px';
+
+        if (activeEl === mockLayer) {
+          updateSlidersFromMockLayer();
+        } else if (activeEl === mockLayer2) {
+          updateSlidersFromMockLayer2();
+        } else if (activeEl === mockCrop) {
+          updateSlidersFromMockCrop();
+        }
+      } 
+      else if (dragMode === 'resize') {
+        if (activeEl === mockLayer) {
+          if (currentResizeHandle.classList.contains('se')) {
+            let newW = startW + dx;
+            newW = Math.max(40, Math.min(newW, mockBg.offsetWidth - mockLayer.offsetLeft));
+            let newH = Math.round(newW * 0.5625);
+            mockLayer.style.width = newW + 'px';
+            mockLayer.style.height = newH + 'px';
+          }
+          else if (currentResizeHandle.classList.contains('sw')) {
+            let newW = startW - dx;
+            let newL = startL + dx;
+            if (newL >= 0 && newW >= 40) {
+              mockLayer.style.left = newL + 'px';
+              mockLayer.style.width = newW + 'px';
+              mockLayer.style.height = Math.round(newW * 0.5625) + 'px';
+            }
+          }
+          updateSlidersFromMockLayer();
+        } 
+        else if (activeEl === mockLayer2) {
+          if (currentResizeHandle.classList.contains('se')) {
+            let newW = startW + dx;
+            newW = Math.max(20, Math.min(newW, mockBg.offsetWidth - mockLayer2.offsetLeft));
+            mockLayer2.style.width = newW + 'px';
+            mockLayer2.style.height = newW + 'px'; // 1:1 aspect ratio
+          }
+          else if (currentResizeHandle.classList.contains('sw')) {
+            let newW = startW - dx;
+            let newL = startL + dx;
+            if (newL >= 0 && newW >= 20) {
+              mockLayer2.style.left = newL + 'px';
+              mockLayer2.style.width = newW + 'px';
+              mockLayer2.style.height = newW + 'px';
+            }
+          }
+          updateSlidersFromMockLayer2();
+        }
+      }
+      else if (dragMode === 'crop-resize') {
+        if (currentResizeHandle.classList.contains('e')) {
+          let newW = startW + dx;
+          newW = Math.max(40, Math.min(newW, mockBg.offsetWidth - mockCrop.offsetLeft));
+          mockCrop.style.width = newW + 'px';
+        }
+        else if (currentResizeHandle.classList.contains('s')) {
+          let newH = startH + dy;
+          newH = Math.max(40, Math.min(newH, mockBg.offsetHeight - mockCrop.offsetTop));
+          mockCrop.style.height = newH + 'px';
+        }
+        else if (currentResizeHandle.classList.contains('w')) {
+          let newW = startW - dx;
+          let newL = startL + dx;
+          if (newL >= 0 && newW >= 40) {
+            mockCrop.style.left = newL + 'px';
+            mockCrop.style.width = newW + 'px';
+          }
+        }
+        else if (currentResizeHandle.classList.contains('n')) {
+          let newH = startH - dy;
+          let newT = startT + dy;
+          if (newT >= 0 && newH >= 40) {
+            mockCrop.style.top = newT + 'px';
+            mockCrop.style.height = newH + 'px';
+          }
+        }
+        updateSlidersFromMockCrop();
+      }
+    });
+
+    document.addEventListener('mouseup', function() {
+      activeEl = null;
+      dragMode = null;
+      currentResizeHandle = null;
+    });
+
+    // Update Sliders when dragging Layer 1
+    function updateSlidersFromMockLayer() {
+      const scaleRange = document.getElementById('vid-scale-range');
+      const scaleVal = document.getElementById('vid-scale-val');
+      
+      const tRange = document.getElementById('vid-margin-t-range');
+      const tVal = document.getElementById('vid-margin-t-val');
+      const bRange = document.getElementById('vid-margin-b-range');
+      const bVal = document.getElementById('vid-margin-b-val');
+      const lRange = document.getElementById('vid-margin-l-range');
+      const lVal = document.getElementById('vid-margin-l-val');
+      const rRange = document.getElementById('vid-margin-r-range');
+      const rVal = document.getElementById('vid-margin-r-val');
+
+      const scalePct = Math.round((mockLayer.offsetWidth / mockBg.offsetWidth) * 100);
+      scaleRange.value = scalePct;
+      scaleVal.innerText = scalePct + '%';
+
+      const top = mockLayer.offsetTop;
+      const left = mockLayer.offsetLeft;
+      const bottom = mockBg.offsetHeight - (top + mockLayer.offsetHeight);
+      const right = mockBg.offsetWidth - (left + mockLayer.offsetWidth);
+
+      tRange.value = top;
+      tVal.innerText = top + 'px';
+      bRange.value = bottom;
+      bVal.innerText = bottom + 'px';
+      lRange.value = left;
+      lVal.innerText = left + 'px';
+      rRange.value = right;
+      rVal.innerText = right + 'px';
+    }
+
+    // Update Sliders when dragging Layer 2
+    function updateSlidersFromMockLayer2() {
+      const scaleRange = document.getElementById('vid2-scale-range');
+      const scaleVal = document.getElementById('vid2-scale-val');
+      
+      const tRange = document.getElementById('vid2-margin-t-range');
+      const tVal = document.getElementById('vid2-margin-t-val');
+      const bRange = document.getElementById('vid2-margin-b-range');
+      const bVal = document.getElementById('vid2-margin-b-val');
+      const lRange = document.getElementById('vid2-margin-l-range');
+      const lVal = document.getElementById('vid2-margin-l-val');
+      const rRange = document.getElementById('vid2-margin-r-range');
+      const rVal = document.getElementById('vid2-margin-r-val');
+
+      const scalePct = Math.round((mockLayer2.offsetWidth / mockBg.offsetWidth) * 100);
+      scaleRange.value = scalePct;
+      scaleVal.innerText = scalePct + '%';
+
+      const top = mockLayer2.offsetTop;
+      const left = mockLayer2.offsetLeft;
+      const bottom = mockBg.offsetHeight - (top + mockLayer2.offsetHeight);
+      const right = mockBg.offsetWidth - (left + mockLayer2.offsetWidth);
+
+      tRange.value = top;
+      tVal.innerText = top + 'px';
+      bRange.value = bottom;
+      bVal.innerText = bottom + 'px';
+      lRange.value = left;
+      lVal.innerText = left + 'px';
+      rRange.value = right;
+      rVal.innerText = right + 'px';
+    }
+
+    // Update Sliders when resizing the Crop Box
+    function updateSlidersFromMockCrop() {
+      const tRange = document.getElementById('crop-t-range');
+      const tVal = document.getElementById('crop-t-val');
+      const bRange = document.getElementById('crop-b-range');
+      const bVal = document.getElementById('crop-b-val');
+      const lRange = document.getElementById('crop-l-range');
+      const lVal = document.getElementById('crop-l-val');
+      const rRange = document.getElementById('crop-r-range');
+      const rVal = document.getElementById('crop-r-val');
+
+      const top = mockCrop.offsetTop;
+      const left = mockCrop.offsetLeft;
+      const bottom = mockBg.offsetHeight - (top + mockCrop.offsetHeight);
+      const right = mockBg.offsetWidth - (left + mockCrop.offsetWidth);
+
+      tRange.value = top;
+      tVal.innerText = top + 'px';
+      bRange.value = bottom;
+      bVal.innerText = bottom + 'px';
+      lRange.value = left;
+      lVal.innerText = left + 'px';
+      rRange.value = right;
+      rVal.innerText = right + 'px';
+    }
+
+    // Update Mock Layer 1 in preview when sliders are changed
+    function updateMockLayerFromSliders() {
+      const scaleRange = document.getElementById('vid-scale-range');
+      const scaleVal = document.getElementById('vid-scale-val');
+      const radiusRange = document.getElementById('vid-radius-range');
+      const radiusVal = document.getElementById('vid-radius-val');
+
+      const tRange = document.getElementById('vid-margin-t-range');
+      const tVal = document.getElementById('vid-margin-t-val');
+      const bRange = document.getElementById('vid-margin-b-range');
+      const bVal = document.getElementById('vid-margin-b-val');
+      const lRange = document.getElementById('vid-margin-l-range');
+      const lVal = document.getElementById('vid-margin-l-val');
+      const rRange = document.getElementById('vid-margin-r-range');
+      const rVal = document.getElementById('vid-margin-r-val');
+
+      scaleVal.innerText = scaleRange.value + '%';
+      radiusVal.innerText = radiusRange.value + 'px';
+      tVal.innerText = tRange.value + 'px';
+      bVal.innerText = bRange.value + 'px';
+      lVal.innerText = lRange.value + 'px';
+      rVal.innerText = rRange.value + 'px';
+
+      const width = Math.round(mockBg.offsetWidth * (parseInt(scaleRange.value, 10)/100));
+      const height = Math.round(width * 0.5625);
+      mockLayer.style.width = width + 'px';
+      mockLayer.style.height = height + 'px';
+      mockLayer.style.borderRadius = radiusRange.value + 'px';
+      
+      mockLayer.style.top = tRange.value + 'px';
+      mockLayer.style.left = lRange.value + 'px';
+    }
+
+    // Update Mock Layer 2 in preview when sliders are changed
+    function updateMockLayer2FromSliders() {
+      const scaleRange = document.getElementById('vid2-scale-range');
+      const scaleVal = document.getElementById('vid2-scale-val');
+      const radiusRange = document.getElementById('vid2-radius-range');
+      const radiusVal = document.getElementById('vid2-radius-val');
+
+      const tRange = document.getElementById('vid2-margin-t-range');
+      const tVal = document.getElementById('vid2-margin-t-val');
+      const bRange = document.getElementById('vid2-margin-b-range');
+      const bVal = document.getElementById('vid2-margin-b-val');
+      const lRange = document.getElementById('vid2-margin-l-range');
+      const lVal = document.getElementById('vid2-margin-l-val');
+      const rRange = document.getElementById('vid2-margin-r-range');
+      const rVal = document.getElementById('vid2-margin-r-val');
+
+      scaleVal.innerText = scaleRange.value + '%';
+      radiusVal.innerText = radiusRange.value + 'px';
+      tVal.innerText = tRange.value + 'px';
+      bVal.innerText = bRange.value + 'px';
+      lVal.innerText = lRange.value + 'px';
+      rVal.innerText = rRange.value + 'px';
+
+      const width = Math.round(mockBg.offsetWidth * (parseInt(scaleRange.value, 10)/100));
+      mockLayer2.style.width = width + 'px';
+      mockLayer2.style.height = width + 'px'; // 1:1
+      mockLayer2.style.borderRadius = radiusRange.value + 'px';
+      
+      mockLayer2.style.top = tRange.value + 'px';
+      mockLayer2.style.left = lRange.value + 'px';
+    }
+
+    function updateCropBoxFromSliders() {
+      const tRange = document.getElementById('crop-t-range');
+      const tVal = document.getElementById('crop-t-val');
+      const bRange = document.getElementById('crop-b-range');
+      const bVal = document.getElementById('crop-b-val');
+      const lRange = document.getElementById('crop-l-range');
+      const lVal = document.getElementById('crop-l-val');
+      const rRange = document.getElementById('crop-r-range');
+      const rVal = document.getElementById('crop-r-val');
+
+      tVal.innerText = tRange.value + 'px';
+      bVal.innerText = bRange.value + 'px';
+      lVal.innerText = lRange.value + 'px';
+      rVal.innerText = rRange.value + 'px';
+
+      const top = parseInt(tRange.value, 10);
+      const left = parseInt(lRange.value, 10);
+      const bottom = parseInt(bRange.value, 10);
+      const right = parseInt(rRange.value, 10);
+
+      mockCrop.style.top = top + 'px';
+      mockCrop.style.left = left + 'px';
+      mockCrop.style.width = (mockBg.offsetWidth - left - right) + 'px';
+      mockCrop.style.height = (mockBg.offsetHeight - top - bottom) + 'px';
+    }
+  </script>
 </body>
 </html>

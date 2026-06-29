@@ -13,8 +13,8 @@ import random
 import subprocess
 import shlex
 from pathlib import Path
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, List
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
@@ -94,6 +94,18 @@ class SubtitleStyle:
 
 
 @dataclass
+class ImageLayerConfig:
+    enabled: bool = False
+    path: str = ""
+    position: int = 0  # 0: BR, 1: BL, 2: TR, 3: TL, 4: TC
+    size: int = 100
+    opacity: float = 0.9
+    margin_t: int = 20
+    margin_b: int = 20
+    margin_l: int = 20
+    margin_r: int = 20
+
+@dataclass
 class RenderConfig:
     bg_folder: str = ""
     bg_videos: list[str] | None = None
@@ -106,6 +118,11 @@ class RenderConfig:
     codec: str = "hevc_nvenc"
     resolution: str = "1280x720"
     use_gpu: bool = True
+    logo_path: Optional[str] = None
+    logo_position: int = 0  # Legacy field
+    logo_size: int = 100     # Legacy field
+    logo_opacity: float = 0.8 # Legacy field
+    layers: list[ImageLayerConfig] = field(default_factory=lambda: [ImageLayerConfig() for _ in range(5)])
 
     def __post_init__(self):
         if self.subtitle_style is None:
@@ -267,8 +284,8 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
 
     # Background
     bg_color_ass = _hex_to_ass(style.bg_color, style.bg_opacity)
-    # Map rounded corners to BorderStyle=4, otherwise 3
-    border_style = 4 if (style.bg_enabled and style.bg_corner_radius > 0) else (3 if style.bg_enabled else 1)
+    # Use standard ASS BorderStyle=3 (opaque box) when background is enabled, otherwise 1 (outline + shadow)
+    border_style = 3 if style.bg_enabled else 1
 
     # Padding — translate to MarginL/R which extend the background box
     margin_l = style.margin_l + style.bg_padding_x
@@ -313,6 +330,27 @@ def build_ffmpeg_cmd(
 
     sub_filter = _build_subtitle_filter(srt_path, config.subtitle_style)
 
+    # Resolve active layers (supporting up to 3 layers)
+    active_layers = []
+    if hasattr(config, "layers") and config.layers:
+        for layer in config.layers:
+            if layer.enabled and layer.path and os.path.exists(layer.path):
+                active_layers.append(layer)
+                
+    # Fallback to legacy logo config if no active layers set
+    if not active_layers and config.logo_path and os.path.exists(config.logo_path):
+        active_layers.append(ImageLayerConfig(
+            enabled=True,
+            path=config.logo_path,
+            position=config.logo_position,
+            size=config.logo_size,
+            opacity=config.logo_opacity,
+            margin_t=20,
+            margin_b=20,
+            margin_l=20,
+            margin_r=20
+        ))
+
     if config.use_gpu:
         vcodec = config.codec
 
@@ -333,6 +371,8 @@ def build_ffmpeg_cmd(
             "-i", bg_video,
             "-i", audio_path,
         ]
+        for layer in active_layers:
+            cmd.extend(["-i", layer.path])
 
         quality_flags = ["-qp", "23"]
         preset_flags  = ["-preset", "fast"]
@@ -354,13 +394,50 @@ def build_ffmpeg_cmd(
             "-i", bg_video,
             "-i", audio_path,
         ]
+        for layer in active_layers:
+            cmd.extend(["-i", layer.path])
 
         quality_flags = ["-crf", "23"]
         preset_flags  = ["-preset", "fast"]
 
+    # Build filter complex for sequential overlays
+    filter_parts = [f"[0:v]{vf}[v_base]"]
+    current_base = "v_base"
+
+    for idx, layer in enumerate(active_layers):
+        input_index = 2 + idx
+        layer_output = f"v_layer_{idx}"
+        
+        # 1. Scale & Opacity filter for this layer
+        filter_parts.append(
+            f"[{input_index}:v]scale={layer.size}:-1,format=rgba,"
+            f"colorchannelmixer=aa={layer.opacity:.2f}[{layer_output}]"
+        )
+        
+        # 2. Position calculations with margins
+        if layer.position == 0:  # Bottom-Right
+            overlay_pos = f"x=W-w-{layer.margin_r}:y=H-h-{layer.margin_b}"
+        elif layer.position == 1:  # Bottom-Left
+            overlay_pos = f"x={layer.margin_l}:y=H-h-{layer.margin_b}"
+        elif layer.position == 2:  # Top-Right
+            overlay_pos = f"x=W-w-{layer.margin_r}:y={layer.margin_t}"
+        elif layer.position == 3:  # Top-Left
+            overlay_pos = f"x={layer.margin_l}:y={layer.margin_t}"
+        else:  # 4: Top-Center
+            overlay_pos = f"x=(W-w)/2:y={layer.margin_t}"
+            
+        next_base = f"v_base_next_{idx}" if idx < len(active_layers) - 1 else "vout"
+        filter_parts.append(f"[{current_base}][{layer_output}]overlay={overlay_pos}[{next_base}]")
+        current_base = next_base
+
+    if not active_layers:
+        filter_expr = f"[0:v]{vf}[vout]"
+    else:
+        filter_expr = ";".join(filter_parts)
+
     cmd += [
         "-filter_complex",
-        f"[0:v]{vf}[vout]",
+        filter_expr,
         "-map", "[vout]",
         "-map", "1:a",
         "-c:v", vcodec,
@@ -418,12 +495,12 @@ def render_pair(
     output_path = os.path.join(config.output_folder, output_filename)
 
     _progress(10, f"[{pair.index}] Chuẩn bị tệp phụ đề tạm thời...")
-    import tempfile
     import shutil
 
-    temp_dir = tempfile.mkdtemp()
-    # Use a clean ASCII name without spaces or single quotes
-    temp_srt_path = os.path.join(temp_dir, "temp_render.srt")
+    project_root = Path(__file__).resolve().parent.parent
+    temp_dir = project_root / ".temp_srt"
+    temp_dir.mkdir(exist_ok=True)
+    temp_srt_path = str(temp_dir / f"temp_{pair.index}.srt")
     try:
         shutil.copy2(pair.srt_path, temp_srt_path)
 
@@ -445,7 +522,11 @@ def render_pair(
         _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort)
     finally:
         try:
-            shutil.rmtree(temp_dir, ignore_errors=True)
+            if os.path.exists(temp_srt_path):
+                os.unlink(temp_srt_path)
+            # Clear directory if empty
+            if temp_dir.exists() and not any(temp_dir.iterdir()):
+                temp_dir.rmdir()
         except Exception:
             pass
 

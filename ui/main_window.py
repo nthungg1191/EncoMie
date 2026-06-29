@@ -24,9 +24,9 @@ from PyQt6.QtWidgets import (
     QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox,
     QPlainTextEdit, QProgressBar, QSplitter, QCheckBox,
     QSizePolicy, QSlider, QMessageBox, QStatusBar,
-    QFrame, QGridLayout, QAbstractItemView
+    QFrame, QGridLayout, QAbstractItemView, QTabWidget
 )
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt, QSize, pyqtSignal
 from PyQt6.QtGui import QColor, QFont, QIcon, QImage
 
 from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
@@ -156,6 +156,176 @@ class FolderPicker(QWidget):
             self.edit.setText(f"Đã chọn {len(files)} file")
 
 
+
+class ImageLayerControl(QWidget):
+    changed = pyqtSignal()
+
+    def __init__(self, index: int, parent=None):
+        super().__init__(parent)
+        self.index = index
+        self.init_ui()
+
+    def init_ui(self):
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
+
+        # Row 1: Kích hoạt + File logo
+        row1 = QHBoxLayout()
+        row1.setSpacing(10)
+        
+        self.chk_enabled = QCheckBox("Kích hoạt Layer")
+        self.chk_enabled.setStyleSheet("font-size: 11px; font-weight: bold;")
+        self.chk_enabled.stateChanged.connect(self._on_changed)
+        row1.addWidget(self.chk_enabled)
+
+        self.pick_logo = FolderPicker("File logo:", "Chọn ảnh logo (.png, .jpg)")
+        self.pick_logo.set_mode("files")
+        self.pick_logo.set_file_dialog(
+            "Chọn file ảnh logo",
+            "Image files (*.png *.jpg *.jpeg *.bmp);;All files (*.*)"
+        )
+        self.pick_logo.btn.setText("Chọn…")
+        self.pick_logo.lbl.setFixedWidth(50)
+        self.pick_logo.set_callback(self._on_file_changed)
+        row1.addWidget(self.pick_logo, 1)
+        lay.addLayout(row1)
+
+        # Row 2: Vị trí
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+        pos_lbl = QLabel("Vị trí:")
+        pos_lbl.setStyleSheet("font-size: 11px;")
+        pos_lbl.setFixedWidth(50)
+        row2.addWidget(pos_lbl)
+
+        self.cmb_logo_pos = QComboBox()
+        self.cmb_logo_pos.addItems([
+            "Góc dưới - Phải (Bottom-Right)",
+            "Góc dưới - Trái (Bottom-Left)",
+            "Góc trên - Phải (Top-Right)",
+            "Góc trên - Trái (Top-Left)",
+            "Ở giữa - Trên (Top-Center)"
+        ])
+        self.cmb_logo_pos.setStyleSheet("font-size: 11px;")
+        self.cmb_logo_pos.currentIndexChanged.connect(self._on_changed)
+        row2.addWidget(self.cmb_logo_pos, 1)
+        lay.addLayout(row2)
+
+        # Row 3: Cỡ (Size) & Độ mờ (Opacity)
+        row3 = QHBoxLayout()
+        row3.setSpacing(10)
+
+        sz_lbl = QLabel("Cỡ (px):")
+        sz_lbl.setStyleSheet("font-size: 11px;")
+        row3.addWidget(sz_lbl)
+
+        self.spn_logo_size = QSpinBox()
+        self.spn_logo_size.setRange(20, 500)
+        self.spn_logo_size.setValue(100)
+        self.spn_logo_size.setSingleStep(10)
+        self.spn_logo_size.setStyleSheet("font-size: 11px;")
+        self.spn_logo_size.valueChanged.connect(self._on_changed)
+        row3.addWidget(self.spn_logo_size, 1)
+
+        op_lbl = QLabel("Độ mờ (%):")
+        op_lbl.setStyleSheet("font-size: 11px;")
+        row3.addWidget(op_lbl)
+
+        self.spn_logo_opacity = QSpinBox()
+        self.spn_logo_opacity.setRange(10, 100)
+        self.spn_logo_opacity.setValue(90)
+        self.spn_logo_opacity.setSingleStep(5)
+        self.spn_logo_opacity.setStyleSheet("font-size: 11px;")
+        self.spn_logo_opacity.valueChanged.connect(self._on_changed)
+        row3.addWidget(self.spn_logo_opacity, 1)
+        lay.addLayout(row3)
+
+        # Row 4: Margins (Top, Bottom, Left, Right)
+        margin_grp = QGroupBox("Cân chỉnh khoảng lề (Margin - px)")
+        margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
+        margin_lay = QHBoxLayout(margin_grp)
+        margin_lay.setContentsMargins(6, 6, 6, 6)
+        margin_lay.setSpacing(6)
+
+        # Top
+        t_lay = QHBoxLayout()
+        t_lbl = QLabel("Trên:")
+        t_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
+        self.spn_margin_t = QSpinBox()
+        self.spn_margin_t.setRange(0, 300)
+        self.spn_margin_t.setValue(20)
+        self.spn_margin_t.setStyleSheet("font-size: 10px;")
+        self.spn_margin_t.valueChanged.connect(self._on_changed)
+        t_lay.addWidget(t_lbl)
+        t_lay.addWidget(self.spn_margin_t)
+        margin_lay.addLayout(t_lay)
+
+        # Bottom
+        b_lay = QHBoxLayout()
+        b_lbl = QLabel("Dưới:")
+        b_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
+        self.spn_margin_b = QSpinBox()
+        self.spn_margin_b.setRange(0, 300)
+        self.spn_margin_b.setValue(20)
+        self.spn_margin_b.setStyleSheet("font-size: 10px;")
+        self.spn_margin_b.valueChanged.connect(self._on_changed)
+        b_lay.addWidget(b_lbl)
+        b_lay.addWidget(self.spn_margin_b)
+        margin_lay.addLayout(b_lay)
+
+        # Left
+        l_lay_margin = QHBoxLayout()
+        l_lbl = QLabel("Trái:")
+        l_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
+        self.spn_margin_l = QSpinBox()
+        self.spn_margin_l.setRange(0, 500)
+        self.spn_margin_l.setValue(20)
+        self.spn_margin_l.setStyleSheet("font-size: 10px;")
+        self.spn_margin_l.valueChanged.connect(self._on_changed)
+        l_lay_margin.addWidget(l_lbl)
+        l_lay_margin.addWidget(self.spn_margin_l)
+        margin_lay.addLayout(l_lay_margin)
+
+        # Right
+        r_lay_margin = QHBoxLayout()
+        r_lbl = QLabel("Phải:")
+        r_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
+        self.spn_margin_r = QSpinBox()
+        self.spn_margin_r.setRange(0, 500)
+        self.spn_margin_r.setValue(20)
+        self.spn_margin_r.setStyleSheet("font-size: 10px;")
+        self.spn_margin_r.valueChanged.connect(self._on_changed)
+        r_lay_margin.addWidget(r_lbl)
+        r_lay_margin.addWidget(self.spn_margin_r)
+        margin_lay.addLayout(r_lay_margin)
+
+        lay.addSpacing(5)
+        lay.addWidget(margin_grp)
+
+    def _on_file_changed(self, files):
+        self._on_changed()
+
+    def _on_changed(self):
+        self.changed.emit()
+
+    def get_config(self) -> ImageLayerConfig:
+        from core.video_processor import ImageLayerConfig
+        files = self.pick_logo.selected_files()
+        path = files[0] if files else ""
+        return ImageLayerConfig(
+            enabled=self.chk_enabled.isChecked(),
+            path=path,
+            position=self.cmb_logo_pos.currentIndex(),
+            size=self.spn_logo_size.value(),
+            opacity=self.spn_logo_opacity.value() / 100.0,
+            margin_t=self.spn_margin_t.value(),
+            margin_b=self.spn_margin_b.value(),
+            margin_l=self.spn_margin_l.value(),
+            margin_r=self.spn_margin_r.value()
+        )
+
+
 class PairTable(QTableWidget):
     """Table showing matched audio↔SRT file pairs."""
 
@@ -269,6 +439,7 @@ class MainWindow(QMainWindow):
         self._presets: list[SubtitleStylePreset] = []
         self._active_preset: SubtitleStylePreset | None = None
         self._timing_undo: dict[str, list[SubtitleEntry]] = {}  # path → original entries
+        self.logo_layers: list[ImageLayerControl] = []
 
         self._build_ui()
         self._apply_saved_settings()
@@ -338,9 +509,9 @@ class MainWindow(QMainWindow):
         splitter.addWidget(middle)
         splitter.addWidget(right)
         splitter.setStretchFactor(0, 11)
-        splitter.setStretchFactor(1, 18)
-        splitter.setStretchFactor(2, 11)
-        splitter.setSizes([330, 540, 330])
+        splitter.setStretchFactor(1, 23)
+        splitter.setStretchFactor(2, 8)
+        splitter.setSizes([330, 670, 240])
 
         root_lay.addWidget(splitter, 1)
 
@@ -397,7 +568,8 @@ class MainWindow(QMainWindow):
         gpu_border = "#22543d" if gpu_ok else "#742a2a"
         self._gpu_lbl = QLabel(f"GPU: {si['gpu_name']}")
         if gpu_ok:
-            self._gpu_lbl.setText(f"GPU: {si['gpu_name']}  VRAM: {si['vram_free_mb']}/{si['vram_total_mb']} MB")
+            vram_used = si['vram_total_mb'] - si['vram_free_mb']
+            self._gpu_lbl.setText(f"GPU: {si['gpu_name']}  VRAM: {vram_used}/{si['vram_total_mb']} MB")
         self._gpu_lbl.setStyleSheet(
             f"color: {gpu_color}; font-size: 11px; "
             f"background: {gpu_bg}; border-radius: 4px; padding: 3px 8px; "
@@ -431,15 +603,16 @@ class MainWindow(QMainWindow):
         si = detect_system_info()
 
         # CPU load
-        self._cpu_load_lbl.setText(f"Load: {si['cpu_load_pct']}%")
+        self._cpu_load_lbl.setText(f"CPU: {si['cpu_load_pct']}%")
 
         # RAM usage
-        self._ram_pct_lbl.setText(f"Used: {si['ram_used_pct']}%")
+        self._ram_pct_lbl.setText(f"RAM: {si['ram_used_pct']}%")
 
         # VRAM
         if si["gpu_available"]:
+            vram_used = si['vram_total_mb'] - si['vram_free_mb']
             self._gpu_lbl.setText(
-                f"GPU: {si['gpu_name']}  VRAM: {si['vram_free_mb']}/{si['vram_total_mb']} MB"
+                f"GPU: {si['gpu_name']}  VRAM: {vram_used}/{si['vram_total_mb']} MB"
             )
             if self._pwr_lbl and si["gpu_power_w"] != "—":
                 self._pwr_lbl.setText(si["gpu_power_w"])
@@ -524,16 +697,23 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(10)
 
-        # --- Subtitle Style (controls only) ---
-        grp_style = QGroupBox("💬  Subtitle Style")
-        grp_style.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        style_lay = QVBoxLayout(grp_style)
-        style_lay.setSpacing(6)
+        # --- Tab Widget for Subtitle Style & Image Layers ---
+        self.main_tab_widget = QTabWidget()
+        self.main_tab_widget.setStyleSheet(
+            "QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 4px; background: white; }"
+            "QTabBar::tab { font-size: 11px; font-weight: 600; padding: 6px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; min-width: 120px; }"
+            "QTabBar::tab:selected { background: white; color: #2563eb; border-bottom: 2px solid #2563eb; }"
+        )
+
+        # Tab 1: Subtitle Style
+        tab_subtitle = QWidget()
+        tab_subtitle_lay = QVBoxLayout(tab_subtitle)
+        tab_subtitle_lay.setContentsMargins(6, 6, 6, 6)
+        tab_subtitle_lay.setSpacing(6)
 
         self.style_panel = SubtitleStyleEditor()
         self.style_panel.hide_preset_bar()
         self.style_panel._preview.setVisible(True)
-
         self.style_panel.style_changed.connect(self._on_style_changed)
 
         preset_bar = QWidget()
@@ -577,9 +757,33 @@ class MainWindow(QMainWindow):
             btn.clicked.connect(handler)
             pst_lay.addWidget(btn)
 
-        style_lay.addWidget(preset_bar)
-        style_lay.addWidget(self.style_panel._ctrl)
-        lay.addWidget(grp_style)
+        tab_subtitle_lay.addWidget(preset_bar)
+        tab_subtitle_lay.addWidget(self.style_panel._ctrl)
+        self.main_tab_widget.addTab(tab_subtitle, "💬 Subtitle Style")
+
+        # Tab 2: Image Layers
+        tab_layers = QWidget()
+        tab_layers_lay = QVBoxLayout(tab_layers)
+        tab_layers_lay.setContentsMargins(6, 6, 6, 6)
+        tab_layers_lay.setSpacing(6)
+
+        self.layer_tab_widget = QTabWidget()
+        self.layer_tab_widget.setStyleSheet(
+            "QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; }"
+            "QTabBar::tab { font-size: 10px; font-weight: bold; padding: 4px 10px; background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }"
+            "QTabBar::tab:selected { background: #f8fafc; color: #2563eb; border-bottom: 2px solid #2563eb; }"
+        )
+
+        self.logo_layers = []
+        for i in range(1, 6):
+            ctrl = ImageLayerControl(i)
+            ctrl.changed.connect(self._on_logo_settings_changed)
+            self.logo_layers.append(ctrl)
+            self.layer_tab_widget.addTab(ctrl, f"Layer {i}")
+
+        tab_layers_lay.addWidget(self.layer_tab_widget)
+        self.main_tab_widget.addTab(tab_layers, "🖼️ Image Layers")
+        lay.addWidget(self.main_tab_widget)
 
         # --- Preview ---
         grp_preview = QGroupBox("🖼  Preview")
@@ -619,10 +823,30 @@ class MainWindow(QMainWindow):
             self.preview_widget.set_style(style)
         self._active_preset = None  # mark as modified (not from preset)
 
+    def _on_logo_changed(self, files):
+        self._on_logo_settings_changed()
+
+    def _on_logo_settings_changed(self):
+        if not hasattr(self, "preview_widget") or not hasattr(self, "logo_layers") or not self.logo_layers:
+            return
+        
+        configs = []
+        for idx, ctrl in enumerate(self.logo_layers):
+            cfg_obj = ctrl.get_config()
+            configs.append(cfg_obj)
+            
+            # Update tab text with active dot indicator
+            status = " (•)" if cfg_obj.enabled and cfg_obj.path else ""
+            self.layer_tab_widget.setTabText(idx, f"Layer {idx+1}{status}")
+            
+        self.preview_widget.set_logo_layers(configs)
+        self._save_settings()
+
     # ---- Right panel — Render + Log + Controls ----
 
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
+        panel.setMaximumWidth(240)
         lay = QVBoxLayout(panel)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
@@ -630,35 +854,60 @@ class MainWindow(QMainWindow):
         # --- Render settings ---
         grp_render = QGroupBox("⚙️  Cài đặt Render")
         grp_render.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        r_lay = QGridLayout(grp_render)
-        r_lay.setSpacing(8)
+        r_lay = QVBoxLayout(grp_render)
+        r_lay.setSpacing(6)
+        r_lay.setContentsMargins(10, 10, 10, 10)
 
-        r_lay.addWidget(QLabel("Codec xuất:"), 0, 0)
+        codec_lbl = QLabel("Codec xuất:")
+        codec_lbl.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(codec_lbl)
+
         self.cmb_codec = QComboBox()
         for label, _ in CODECS:
             self.cmb_codec.addItem(label)
-        r_lay.addWidget(self.cmb_codec, 0, 1, 1, 3)
+        self.cmb_codec.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(self.cmb_codec)
 
-        r_lay.addWidget(QLabel("Tốc độ chậm min (%):"), 1, 0)
+        speed_lbl = QLabel("Tốc độ chậm của video nền:")
+        speed_lbl.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(speed_lbl)
+
+        speed_row = QHBoxLayout()
+        speed_row.setSpacing(6)
+
+        min_lbl = QLabel("Min:")
+        min_lbl.setStyleSheet("font-size: 11px;")
+        speed_row.addWidget(min_lbl)
+
         self.spn_slow_min = QDoubleSpinBox()
         self.spn_slow_min.setRange(10, 80)
         self.spn_slow_min.setValue(35.0)
         self.spn_slow_min.setSingleStep(1.0)
-        r_lay.addWidget(self.spn_slow_min, 1, 1)
+        self.spn_slow_min.setStyleSheet("font-size: 11px;")
+        speed_row.addWidget(self.spn_slow_min, 1)
 
-        r_lay.addWidget(QLabel("Tốc độ chậm max (%):"), 1, 2)
+        max_lbl = QLabel("Max:")
+        max_lbl.setStyleSheet("font-size: 11px;")
+        speed_row.addWidget(max_lbl)
+
         self.spn_slow_max = QDoubleSpinBox()
         self.spn_slow_max.setRange(10, 80)
         self.spn_slow_max.setValue(45.0)
         self.spn_slow_max.setSingleStep(1.0)
-        r_lay.addWidget(self.spn_slow_max, 1, 3)
+        self.spn_slow_max.setStyleSheet("font-size: 11px;")
+        speed_row.addWidget(self.spn_slow_max, 1)
+
+        r_lay.addLayout(speed_row)
 
         slow_hint = QLabel(
-            "ℹ️  Ví dụ: 40% = video nền chạy chậm 40% so với gốc (output dài bằng audio)"
+            "ℹ️  Ví dụ: 40% = video nền chạy chậm 40% so với gốc"
         )
-        slow_hint.setStyleSheet("font-size: 11px; color: #6b7280;")
-        r_lay.addWidget(slow_hint, 2, 0, 1, 4)
+        slow_hint.setWordWrap(True)
+        slow_hint.setStyleSheet("font-size: 10px; color: #6b7280;")
+        r_lay.addWidget(slow_hint)
         lay.addWidget(grp_render)
+
+
 
         # --- Timing Tools ---
         grp_timing = QGroupBox("⏱  Timing Tools")
@@ -667,7 +916,7 @@ class MainWindow(QMainWindow):
         timing_lay.setSpacing(6)
 
         self.btn_first_to_zero = QPushButton("⏮  Shift To 0s")
-        self.btn_first_to_zero.setFixedWidth(130)
+        self.btn_first_to_zero.setFixedWidth(115)
         self.btn_first_to_zero.setStyleSheet("font-size: 11px;")
         self.btn_first_to_zero.setToolTip(
             "Shift the entire subtitle timeline so the first subtitle starts at 0s."
@@ -676,7 +925,7 @@ class MainWindow(QMainWindow):
         timing_lay.addWidget(self.btn_first_to_zero)
 
         self.btn_undo_timing = QPushButton("↩  Undo")
-        self.btn_undo_timing.setFixedWidth(65)
+        self.btn_undo_timing.setFixedWidth(55)
         self.btn_undo_timing.setStyleSheet("font-size: 11px;")
         self.btn_undo_timing.setToolTip("Undo the last timing change.")
         self.btn_undo_timing.setEnabled(False)
@@ -710,9 +959,6 @@ class MainWindow(QMainWindow):
         ctrl_lay = QVBoxLayout(grp_ctrl)
         ctrl_lay.setSpacing(8)
 
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
-
         self.btn_render = QPushButton("▶  Bắt đầu Render")
         self.btn_render.setMinimumHeight(38)
         self.btn_render.setStyleSheet(
@@ -722,44 +968,44 @@ class MainWindow(QMainWindow):
             "QPushButton:disabled { background: #93c5fd; }"
         )
         self.btn_render.clicked.connect(self._start_render)
-        btn_row.addWidget(self.btn_render)
+        ctrl_lay.addWidget(self.btn_render)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(6)
 
         self.btn_export = QPushButton("📤  Xuất JSON")
-        self.btn_export.setMinimumHeight(38)
-        self.btn_export.setMinimumWidth(100)
+        self.btn_export.setMinimumHeight(32)
         self.btn_export.setStyleSheet(
-            "QPushButton { background: #059669; color: white; font-size: 13px; "
-            "font-weight: 600; border-radius: 6px; border: none; }"
+            "QPushButton { background: #059669; color: white; font-size: 11px; "
+            "font-weight: 600; border-radius: 5px; border: none; }"
             "QPushButton:hover { background: #047857; }"
         )
         self.btn_export.clicked.connect(self._export_json)
-        btn_row.addWidget(self.btn_export)
+        btn_row.addWidget(self.btn_export, 1)
 
         self.btn_pause = QPushButton("⏸  Tạm dừng")
-        self.btn_pause.setMinimumHeight(38)
-        self.btn_pause.setMinimumWidth(90)
+        self.btn_pause.setMinimumHeight(32)
         self.btn_pause.setEnabled(False)
         self.btn_pause.setStyleSheet(
-            "QPushButton { background: #f59e0b; color: white; font-size: 13px; "
-            "border-radius: 6px; border: none; }"
+            "QPushButton { background: #f59e0b; color: white; font-size: 11px; "
+            "border-radius: 5px; border: none; }"
             "QPushButton:hover { background: #d97706; }"
             "QPushButton:disabled { background: #fcd34d; }"
         )
         self.btn_pause.clicked.connect(self._toggle_pause_render)
-        btn_row.addWidget(self.btn_pause)
+        btn_row.addWidget(self.btn_pause, 1)
 
         self.btn_stop = QPushButton("⏹  Dừng")
-        self.btn_stop.setMinimumHeight(38)
-        self.btn_stop.setMinimumWidth(70)
+        self.btn_stop.setMinimumHeight(32)
         self.btn_stop.setEnabled(False)
         self.btn_stop.setStyleSheet(
-            "QPushButton { background: #dc2626; color: white; font-size: 13px; "
-            "border-radius: 6px; border: none; }"
+            "QPushButton { background: #dc2626; color: white; font-size: 11px; "
+            "border-radius: 5px; border: none; }"
             "QPushButton:hover { background: #b91c1c; }"
             "QPushButton:disabled { background: #fca5a5; }"
         )
         self.btn_stop.clicked.connect(self._stop_render)
-        btn_row.addWidget(self.btn_stop)
+        btn_row.addWidget(self.btn_stop, 1)
 
         ctrl_lay.addLayout(btn_row)
 
@@ -922,6 +1168,29 @@ class MainWindow(QMainWindow):
 
         self._load_presets()
 
+        # Restore logo settings (3 layers)
+        for idx, ctrl in enumerate(self.logo_layers):
+            layer_num = idx + 1
+            ctrl.chk_enabled.setChecked(s.get(f"logo_enabled_{layer_num}", False))
+            
+            logo_path = s.get(f"logo_path_{layer_num}", "")
+            if logo_path:
+                ctrl.pick_logo.set_selected_files([logo_path])
+                ctrl.pick_logo.edit.setText(Path(logo_path).name)
+            else:
+                ctrl.pick_logo.set_selected_files([])
+                ctrl.pick_logo.edit.clear()
+                
+            ctrl.cmb_logo_pos.setCurrentIndex(s.get(f"logo_position_{layer_num}", 0))
+            ctrl.spn_logo_size.setValue(s.get(f"logo_size_{layer_num}", 100))
+            ctrl.spn_logo_opacity.setValue(s.get(f"logo_opacity_{layer_num}", 90))
+            ctrl.spn_margin_t.setValue(s.get(f"logo_margin_t_{layer_num}", 20))
+            ctrl.spn_margin_b.setValue(s.get(f"logo_margin_b_{layer_num}", 20))
+            ctrl.spn_margin_l.setValue(s.get(f"logo_margin_l_{layer_num}", 20))
+            ctrl.spn_margin_r.setValue(s.get(f"logo_margin_r_{layer_num}", 20))
+            
+        self._on_logo_settings_changed()
+
         # Auto-scan if files already set
         if self.pick_audio.selected_files() and self.pick_srt.selected_files():
             self._scan_pairs()
@@ -962,7 +1231,7 @@ class MainWindow(QMainWindow):
 
     def _save_settings(self):
         style = self.style_panel.get_style()
-        cfg.save({
+        settings_dict = {
             "bg_folder": self.pick_bg.value(),
             "bg_files": self.pick_bg.selected_files(),
             "audio_files": self.pick_audio.selected_files(),
@@ -995,7 +1264,32 @@ class MainWindow(QMainWindow):
             "codec": CODECS[self.cmb_codec.currentIndex()][1],
             "use_gpu": True,
             "subtitle_alignment": style.alignment,
-        })
+        }
+
+        # Save 3 layers logo settings
+        for idx, ctrl in enumerate(self.logo_layers):
+            layer_num = idx + 1
+            cfg_obj = ctrl.get_config()
+            settings_dict[f"logo_enabled_{layer_num}"] = cfg_obj.enabled
+            settings_dict[f"logo_path_{layer_num}"] = cfg_obj.path
+            settings_dict[f"logo_position_{layer_num}"] = cfg_obj.position
+            settings_dict[f"logo_size_{layer_num}"] = cfg_obj.size
+            settings_dict[f"logo_opacity_{layer_num}"] = int(cfg_obj.opacity * 100)
+            settings_dict[f"logo_margin_t_{layer_num}"] = cfg_obj.margin_t
+            settings_dict[f"logo_margin_b_{layer_num}"] = cfg_obj.margin_b
+            settings_dict[f"logo_margin_l_{layer_num}"] = cfg_obj.margin_l
+            settings_dict[f"logo_margin_r_{layer_num}"] = cfg_obj.margin_r
+
+        # Legacy fallback
+        if self.logo_layers:
+            layer1 = self.logo_layers[0].get_config()
+            settings_dict["logo_path"] = layer1.path
+            settings_dict["logo_files"] = [layer1.path] if layer1.path else []
+            settings_dict["logo_position"] = layer1.position
+            settings_dict["logo_size"] = layer1.size
+            settings_dict["logo_opacity"] = int(layer1.opacity * 100)
+
+        cfg.save(settings_dict)
         self._auto_export_json()
 
     def _export_json(self):
@@ -1215,6 +1509,13 @@ class MainWindow(QMainWindow):
         codec_val = CODECS[self.cmb_codec.currentIndex()][1]
         preset = self.style_panel.get_style()
         style = SubtitleStyle.from_preset(preset)
+        
+        configs = []
+        for ctrl in self.logo_layers:
+            configs.append(ctrl.get_config())
+            
+        layer1 = configs[0] if configs else None
+        
         return RenderConfig(
             bg_folder=self.pick_bg.value(),
             bg_videos=self.pick_bg.selected_files(),
@@ -1226,6 +1527,11 @@ class MainWindow(QMainWindow):
             slow_max=self.spn_slow_max.value(),
             codec=codec_val,
             use_gpu="nvenc" in codec_val,
+            logo_path=layer1.path if (layer1 and layer1.enabled) else None,
+            logo_position=layer1.position if layer1 else 0,
+            logo_size=layer1.size if layer1 else 100,
+            logo_opacity=layer1.opacity if layer1 else 0.8,
+            layers=configs
         )
 
     def _validate(self) -> bool:

@@ -868,8 +868,7 @@ class SubtitlePreviewWidget(QWidget):
         self._sample_text = "Day la phu de mau\nNhiep anh dep trai"
         self._entries: list[SubtitleEntry] = []
         self._srt_path: str | None = None
-        self.setMinimumHeight(160)
-        self.setMaximumHeight(200)
+        self.setMinimumHeight(180)  # Expand default height for better visibility
         self.setStyleSheet(
             f"background: {C_PREVIEW_BG}; border-radius: 6px; "
             f"border: 1px solid {C_PREVIEW_BORDER};"
@@ -1065,8 +1064,41 @@ class SubtitlePreviewWidget(QWidget):
     # Shared paint pipeline
     # ------------------------------------------------------------------
 
-    def _paint_subtitle(self, p: QPainter, cw: int, ch: int):
-        style = self._style
+    def _paint_subtitle(self, p: QPainter, cw: int, ch: int, video_w: int = 1280, video_h: int = 720):
+        # Since the output video is scaled to the target render resolution (default 1280x720),
+        # the subtitle canvas in FFmpeg is always 720px tall. Therefore, we scale the preview
+        # coordinates relative to the 720px reference height to ensure a 1:1 match.
+        scale = ch / 720.0
+        if scale <= 0:
+            scale = 1.0
+
+        # Create scaled style clone specifically for QPainter drawing in preview
+        style = SubtitleStylePreset(
+            name=self._style.name,
+            font_name=self._style.font_name,
+            font_size=max(6, int(self._style.font_size * scale)),
+            font_color=self._style.font_color,
+            stroke_color=self._style.stroke_color,
+            stroke_width=self._style.stroke_width * scale,
+            stroke_enabled=self._style.stroke_enabled,
+            bg_color=self._style.bg_color,
+            bg_opacity=self._style.bg_opacity,
+            bg_padding_x=max(0, int(self._style.bg_padding_x * scale)),
+            bg_padding_y=max(0, int(self._style.bg_padding_y * scale)),
+            bg_corner_radius=max(0, int(self._style.bg_corner_radius * scale)),
+            bg_enabled=self._style.bg_enabled,
+            shadow_color=self._style.shadow_color,
+            shadow_opacity=self._style.shadow_opacity,
+            shadow_angle=self._style.shadow_angle,
+            shadow_distance=self._style.shadow_distance * scale,
+            shadow_blur=self._style.shadow_blur * scale,
+            shadow_enabled=self._style.shadow_enabled,
+            alignment=self._style.alignment,
+            margin_v=max(0, int(self._style.margin_v * scale)),
+            margin_l=max(0, int(self._style.margin_l * scale)),
+            margin_r=max(0, int(self._style.margin_r * scale)),
+        )
+
         margin_l = style.margin_l
         margin_r = style.margin_r
         margin_v = style.margin_v
@@ -1140,11 +1172,23 @@ class SubtitlePreviewWidget(QWidget):
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        cw = self.width()
+        ch = self.height()
+        p.fillRect(0, 0, cw, ch, QColor(C_PREVIEW_BG))
         
-        # Fill standard preview background
-        p.fillRect(self.rect(), QColor(C_PREVIEW_BG))
+        # Fallback 16:9 virtual frame centering
+        video_w = 1280
+        video_h = 720
+        scale_factor = min(cw / video_w, ch / video_h)
+        vw = int(video_w * scale_factor)
+        vh = int(video_h * scale_factor)
+        vx = (cw - vw) // 2
+        vy = (ch - vh) // 2
         
-        self._paint_subtitle(p, self.width(), self.height())
+        p.save()
+        p.translate(vx, vy)
+        self._paint_subtitle(p, vw, vh, video_w, video_h)
+        p.restore()
 
 
 # ---------------------------------------------------------------------------
@@ -1161,6 +1205,13 @@ class LiveFramePreview(SubtitlePreviewWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._frame_img: QImage | None = None
+        self._logo_img: QImage | None = None
+        self._logo_path: str | None = None
+        self._logo_position: int = 0
+        self._logo_size: int = 100
+        self._logo_opacity: float = 0.8
+        self._logo_layers = []
+        self._logo_images = {}
         self.setStyleSheet(
             f"background: #0a0a0a; border-radius: 6px; "
             f"border: 1px solid {C_PREVIEW_BORDER};"
@@ -1174,6 +1225,102 @@ class LiveFramePreview(SubtitlePreviewWidget):
             self._frame_img = frame
         self.update()
 
+    def set_logo(self, logo_path: str | None, position: int, size: int, opacity: float):
+        """Legacy compatibility setter."""
+        self._logo_path = logo_path
+        self._logo_position = position
+        self._logo_size = size
+        self._logo_opacity = opacity
+        import os
+        if logo_path and os.path.exists(logo_path):
+            self._logo_img = QImage(logo_path)
+        else:
+            self._logo_img = None
+        self.update()
+
+    def set_logo_layers(self, layers: list):
+        """Set the logo layers and load their images for rendering."""
+        self._logo_layers = []
+        import os
+        for layer in layers:
+            self._logo_layers.append(layer)
+            if layer.path and os.path.exists(layer.path):
+                if layer.path not in self._logo_images:
+                    self._logo_images[layer.path] = QImage(layer.path)
+        self.update()
+
+    def _draw_logo(self, p: QPainter, vx: int, vy: int, vw: int, vh: int, scale_factor: float):
+        if not hasattr(self, "_logo_layers") or not self._logo_layers:
+            # Fallback to single legacy logo if it exists
+            if self._logo_img and not self._logo_img.isNull():
+                p.save()
+                p.translate(vx, vy)
+                lw = self._logo_size * scale_factor
+                lh = lw * (self._logo_img.height() / float(self._logo_img.width()))
+                margin = 20 * scale_factor
+                if self._logo_position == 0:
+                    lx = vw - lw - margin
+                    ly = vh - lh - margin
+                elif self._logo_position == 1:
+                    lx = margin
+                    ly = vh - lh - margin
+                elif self._logo_position == 2:
+                    lx = vw - lw - margin
+                    ly = margin
+                elif self._logo_position == 3:
+                    lx = margin
+                    ly = margin
+                else:
+                    lx = (vw - lw) / 2
+                    ly = margin
+                p.setOpacity(self._logo_opacity)
+                p.drawImage(QRect(int(lx), int(ly), int(lw), int(lh)), self._logo_img)
+                p.restore()
+            return
+            
+        p.save()
+        p.translate(vx, vy)
+        
+        for layer in self._logo_layers:
+            if not layer.enabled or not layer.path:
+                continue
+            
+            img = self._logo_images.get(layer.path)
+            if not img or img.isNull():
+                continue
+                
+            # Logo size and scaling
+            lw = layer.size * scale_factor
+            lh = lw * (img.height() / float(img.width()))
+            
+            # Margins scaling
+            mt = layer.margin_t * scale_factor
+            mb = layer.margin_b * scale_factor
+            ml = layer.margin_l * scale_factor
+            mr = layer.margin_r * scale_factor
+            
+            # 0: bottom-right, 1: bottom-left, 2: top-right, 3: top-left, 4: top-center
+            if layer.position == 0:  # Bottom-Right
+                lx = vw - lw - mr
+                ly = vh - lh - mb
+            elif layer.position == 1:  # Bottom-Left
+                lx = ml
+                ly = vh - lh - mb
+            elif layer.position == 2:  # Top-Right
+                lx = vw - lw - mr
+                ly = mt
+            elif layer.position == 3:  # Top-Left
+                lx = ml
+                ly = mt
+            else:  # 4: Top-Center
+                lx = (vw - lw) / 2
+                ly = mt
+                
+            p.setOpacity(layer.opacity)
+            p.drawImage(QRect(int(lx), int(ly), int(lw), int(lh)), img)
+            
+        p.restore()
+
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1185,16 +1332,22 @@ class LiveFramePreview(SubtitlePreviewWidget):
 
         # 1. Draw background frame (aspect-ratio-preserved, centered)
         if self._frame_img and not self._frame_img.isNull():
+            video_w = self._frame_img.width()
+            video_h = self._frame_img.height()
+            
+            # Calculate aspect ratio scale factor using min()
+            scale_factor = min(cw / float(video_w), ch / float(video_h))
+            vw = int(video_w * scale_factor)
+            vh = int(video_h * scale_factor)
+            vx = (cw - vw) // 2
+            vy = (ch - vh) // 2
+
+            # Draw background frame matching computed dimensions
             scaled = self._frame_img.scaled(
-                cw, ch,
-                Qt.AspectRatioMode.KeepAspectRatio,
+                vw, vh,
+                Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            vx = (cw - scaled.width()) // 2
-            vy = (ch - scaled.height()) // 2
-            vw = scaled.width()
-            vh = scaled.height()
-
             p.drawImage(QPoint(vx, vy), scaled)
 
             # 2. Overlay semi-transparent vignette (clipped to video frame)
@@ -1207,14 +1360,31 @@ class LiveFramePreview(SubtitlePreviewWidget):
             p.fillRect(vx, vy, vw, vh, vignette)
             p.restore()
 
+            # 2.5 Draw logo
+            self._draw_logo(p, vx, vy, vw, vh, scale_factor)
+
             # 3. Draw subtitle relative to the video frame geometry (translate painter)
             p.save()
             p.translate(vx, vy)
-            self._paint_subtitle(p, vw, vh)
+            self._paint_subtitle(p, vw, vh, video_w, video_h)
             p.restore()
         else:
-            # Fallback if no frame loaded: draw centered in widget canvas
-            self._paint_subtitle(p, cw, ch)
+            # Fallback if no frame loaded: draw centered in 16:9 virtual canvas
+            video_w = 1280
+            video_h = 720
+            scale_factor = min(cw / float(video_w), ch / float(video_h))
+            vw = int(video_w * scale_factor)
+            vh = int(video_h * scale_factor)
+            vx = (cw - vw) // 2
+            vy = (ch - vh) // 2
+            
+            # Draw logo on fallback
+            self._draw_logo(p, vx, vy, vw, vh, scale_factor)
+
+            p.save()
+            p.translate(vx, vy)
+            self._paint_subtitle(p, vw, vh, video_w, video_h)
+            p.restore()
 
 
 # ---------------------------------------------------------------------------
