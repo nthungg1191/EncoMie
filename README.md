@@ -1,6 +1,6 @@
-# Auto Video Editor (Bộ Biên Tập Video Tự Động)
+# EncoMie - Auto Video Editor (Bộ Biên Tập Video Tự Động)
 
-**Auto Video Editor** là một ứng dụng Desktop chuyên nghiệp được phát triển bằng **Python + PyQt6** và bộ công cụ **FFmpeg/FFprobe**, hỗ trợ tối ưu tăng tốc phần cứng GPU (NVIDIA NVENC). 
+**EncoMie** là một ứng dụng Desktop chuyên nghiệp được phát triển bằng **Python + PyQt6** và bộ công cụ **FFmpeg/FFprobe**, hỗ trợ tối ưu tăng tốc phần cứng GPU (NVIDIA NVENC). 
 
 Ứng dụng giúp bạn tự động hóa quy trình sản xuất video bằng cách ghép phụ đề (SRT), chèn logo thương hiệu, chèn nhiều lớp video đè (Video Layers) đè lên một video nền (Background Video) với các công cụ căn chỉnh vị trí trực quan theo thời gian thực.
 

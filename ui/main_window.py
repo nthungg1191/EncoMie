@@ -448,7 +448,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Auto Video Editor")
+        self.setWindowTitle("EncoMie")
         self.setMinimumSize(1100, 720)
         self.resize(1280, 800)
 
@@ -586,14 +586,9 @@ class MainWindow(QMainWindow):
         # App identity
         icon_lbl = QLabel("▶")
         icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
-        title_lbl = QLabel("Auto Video Editor ")
+        title_lbl = QLabel("EncoMie")
         title_lbl.setStyleSheet("color: #f8fafc; font-size: 14px; font-weight: 600;")
         lay.addWidget(icon_lbl)
-        lay.addWidget(title_lbl)
-        lay.addSpacing(16)
-
-        title_lbl = QLabel("Author: Thịnh.G ")
-        title_lbl.setStyleSheet("color: #f8fafc; font-size: 14px; font-weight: 600;")
         lay.addWidget(title_lbl)
         lay.addSpacing(16)
         
