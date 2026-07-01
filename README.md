@@ -84,7 +84,7 @@ auto_video_editor/
 
 ## 📖 Hướng Dẫn Sử Dụng Giao Diện
 
-Giao diện chính được chia thành **3 cột lớn (3-panel)** nằm ngang rất chuyên nghiệp:
+Giao diện chính được chia thành **3 cột lớn (3-panel)**
 
 1.  **Panel Trái (Dữ liệu & Hàng đợi):** 
     *   Chứa các công cụ chọn thư mục video nguồn, video nền, nhạc và phụ đề SRT.
