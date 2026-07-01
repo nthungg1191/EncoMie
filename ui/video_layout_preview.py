@@ -231,8 +231,28 @@ class VideoLayoutPreview(QWidget):
             if layer_img and not layer_img.isNull():
                 p.save()
                 p.setOpacity(layer_opacity)
-                p.setClipRect(cropped_rect)
-                p.drawImage(rect, layer_img)
+                
+                # Proportional crop calculation: map virtual crop to original resolution
+                lw = layer_img.width()
+                lh = layer_img.height()
+                
+                # Uncropped virtual dimensions
+                layer_w_virt = rect.width() / scale_x
+                layer_h_virt = rect.height() / scale_y
+                
+                src_l = int(lw * (crop_l / float(layer_w_virt))) if layer_w_virt > 0 else 0
+                src_r = int(lw * (crop_r / float(layer_w_virt))) if layer_w_virt > 0 else 0
+                src_t = int(lh * (crop_t / float(layer_h_virt))) if layer_h_virt > 0 else 0
+                src_b = int(lh * (crop_b / float(layer_h_virt))) if layer_h_virt > 0 else 0
+                
+                # Clamp crop to avoid empty source rect
+                src_l = max(0, min(lw - 10, src_l))
+                src_r = max(0, min(lw - src_l - 10, src_r))
+                src_t = max(0, min(lh - 10, src_t))
+                src_b = max(0, min(lh - src_t - 10, src_b))
+                
+                source_rect = QRect(src_l, src_t, lw - src_l - src_r, lh - src_t - src_b)
+                p.drawImage(cropped_rect, layer_img, source_rect)
                 p.restore()
                 # Semi-transparent overlay to indicate selected layer status
                 p.setBrush(QBrush(QColor(bg_color.red(), bg_color.green(), bg_color.blue(), 25 if i == self._selected_index else 0)))

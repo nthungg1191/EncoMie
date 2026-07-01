@@ -11,7 +11,12 @@ from typing import Optional
 
 from core.subtitle_model import SubtitleStylePreset
 
-PRESETS_DIR = Path(__file__).parent.parent / "presets"
+import sys
+
+if getattr(sys, 'frozen', False):
+    PRESETS_DIR = Path(sys.executable).parent / "presets"
+else:
+    PRESETS_DIR = Path(__file__).parent.parent / "presets"
 PRESETS_FILE = PRESETS_DIR / "subtitle_presets.json"
 
 DEFAULT_PRESETS = [
@@ -89,6 +94,18 @@ class StylePresetService:
     def load_all(cls) -> list[SubtitleStylePreset]:
         cls.ensure_presets_dir()
         if not PRESETS_FILE.exists():
+            # If frozen, copy the bundled presets from sys._MEIPASS if available
+            bundled_presets = Path(__file__).parent.parent / "presets" / "subtitle_presets.json"
+            if getattr(sys, 'frozen', False) and bundled_presets.exists():
+                try:
+                    import shutil
+                    shutil.copy2(bundled_presets, PRESETS_FILE)
+                    # Load from the copied file
+                    with open(PRESETS_FILE, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    return [SubtitleStylePreset.from_dict(p) for p in data]
+                except Exception:
+                    pass
             cls._write_default_presets()
             return list(DEFAULT_PRESETS)
 

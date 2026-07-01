@@ -1,1720 +1,2044 @@
 <!DOCTYPE html>
 <html lang="vi">
+
 <head>
-<meta charset="UTF-8">
-<title>Wireframe Box B - Middle Panel</title>
-<style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: 'Segoe UI', Tahoma, sans-serif;
-    background: #f3f4f6;
-    margin: 0;
-    padding: 24px;
-    color: #111827;
-  }
-  h1 { text-align: center; margin-bottom: 4px; font-size: 22px; }
-  .subtitle { text-align: center; color: #6b7280; margin-bottom: 20px; font-size: 14px; }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EncoMie - Auto Video Editor Mockup</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #0B0F19;
+            --bg-card: #151D30;
+            --bg-inner: #1C2640;
+            --border-color: #263359;
+            --text-main: #F8FAFC;
+            --text-muted: #64748B;
+            --accent-green: #10B981;
+            --accent-blue: #3B82F6;
+            --accent-orange: #F59E0B;
+            --accent-indigo: #6366F1;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
 
-  .app {
-    max-width: 1100px;
-    margin: 0 auto;
-    background: #e5e7eb;
-    border: 2px solid #9ca3af;
-    border-radius: 8px;
-    padding: 12px;
-  }
-  .title-bar {
-    background: #1e1e2e;
-    color: white;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 13px;
-    display: flex;
-    gap: 14px;
-    align-items: center;
-    margin-bottom: 12px;
-  }
-  .badge {
-    background: #374151;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-  }
-  .split {
-    display: flex;
-    gap: 0;
-    min-height: 540px;
-    user-select: none;
-  }
-  .resizer {
-    width: 6px;
-    cursor: col-resize;
-    background: #d1d5db;
-    border-radius: 3px;
-    margin: 0 2px;
-    flex-shrink: 0;
-    transition: background 0.15s;
-    position: relative;
-  }
-  .resizer:hover,
-  .resizer.active {
-    background: #5b8def;
-  }
-  .resizer::after {
-    content: '';
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    width: 2px;
-    height: 24px;
-    background: #9ca3af;
-    border-radius: 2px;
-  }
-  .resizer:hover::after,
-  .resizer.active::after {
-    background: white;
-  }
-  .panel {
-    background: #fafafa;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-  }
-  .panel-left { flex: 11; min-width: 0; overflow: hidden; }
-  .panel-middle { flex: 18; min-width: 0; overflow: hidden; }
-  .panel-right { flex: 11; min-width: 0; overflow: hidden; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
 
-  .box {
-    border: 1px solid #9ca3af;
-    border-radius: 4px;
-    padding: 8px;
-    margin-bottom: 10px;
-    background: white;
-  }
-  .box-title {
-    font-weight: 600;
-    font-size: 12px;
-    margin-bottom: 6px;
-    color: #374151;
-    border-bottom: 1px solid #e5e7eb;
-    padding-bottom: 4px;
-  }
-  .row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-bottom: 4px;
-  }
-  .field {
-    background: #e5e7eb;
-    border: 1px solid #d1d5db;
-    border-radius: 3px;
-    padding: 3px 6px;
-    font-size: 10px;
-    color: #6b7280;
-    text-align: center;
-    min-width: 50px;
-  }
-  .field-label { font-size: 10px; color: #6b7280; min-width: 40px; }
-  .field-long { flex: 1; min-width: 90px; }
-  .field-short { min-width: 36px; }
-  .btn {
-    background: #e5e7eb;
-    border: 1px solid #9ca3af;
-    border-radius: 3px;
-    padding: 3px 7px;
-    font-size: 10px;
-    color: #374151;
-  }
-  .btn-primary {
-    background: #2563eb;
-    color: white;
-    border-color: #1d4ed8;
-  }
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
 
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 10px;
-    margin-top: 4px;
-  }
-  th, td {
-    border: 1px solid #d1d5db;
-    padding: 3px 5px;
-    text-align: left;
-  }
-  th { background: #f3f4f6; font-weight: 600; }
-  td { background: white; height: 16px; }
+        /* Header Bar */
+        header {
+            background-color: var(--bg-card);
+            border-bottom: 1px solid var(--border-color);
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 10;
+        }
 
-  /* Box B */
-  .middle { display: flex; flex-direction: column; height: 100%; gap: 10px; }
-  .subtitle-box { flex: 0 0 auto; }
-  .preview-box { flex: 1; display: flex; flex-direction: column; }
-  .preview-canvas {
-    flex: 1;
-    background: #0a0b10;
-    border: 1px solid #1e2235;
-    border-radius: 4px;
-    min-height: 150px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #6b7280;
-    font-size: 11px;
-    position: relative;
-  }
-  .preview-canvas::after {
-    content: "Video frame + subtitle overlay";
-    position: absolute;
-    color: #4b5563;
-  }
-  .preview-controls {
-    margin-top: 6px;
-    display: flex;
-    justify-content: center;
-  }
-  .subtitle-content {
-    display: flex;
-    flex-direction: row;
-    gap: 8px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    flex: 1;
-    align-items: flex-start;
-  }
-  .subtitle-content .section {
-    flex: 0 0 auto;
-    min-width: 220px;
-    margin-bottom: 0;
-  }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
 
-  .section {
-    background: #181b26;
-    border: 1px solid #2e3347;
-    border-radius: 4px;
-    padding: 5px 7px;
-    margin-bottom: 5px;
-  }
-  .section-title {
-    color: #dde3f0;
-    font-size: 10px;
-    font-weight: 600;
-    margin-bottom: 3px;
-  }
-  .grid-2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 4px;
-  }
-  .grid-3 {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 4px;
-  }
-  .toggle {
-    display: inline-block;
-    width: 26px;
-    height: 14px;
-    background: #9ca3af;
-    border-radius: 7px;
-    position: relative;
-  }
-  .toggle.on { background: #5b8def; }
-  .toggle::after {
-    content: '';
-    position: absolute;
-    width: 10px; height: 10px;
-    background: white;
-    border-radius: 50%;
-    top: 2px; left: 2px;
-  }
-  .toggle.on::after { left: 14px; }
-  .swatch {
-    width: 28px; height: 15px;
-    border-radius: 3px;
-    border: 1px solid #d1d5db;
-    display: inline-block;
-  }
-  .align-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 22px);
-    grid-template-rows: repeat(3, 16px);
-    gap: 2px;
-    margin-top: 3px;
-  }
-  .align-btn {
-    background: #e5e7eb;
-    border: 1px solid #d1d5db;
-    border-radius: 2px;
-    font-size: 9px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .align-btn.active {
-    background: #5b8def;
-    color: white;
-    border-color: #3a5299;
-  }
+        .logo-icon {
+            color: var(--accent-blue);
+            font-size: 20px;
+            animation: pulse 2s infinite;
+        }
 
-  .notes {
-    max-width: 1100px;
-    margin: 14px auto 0;
-    background: white;
-    border: 1px solid #d1d5db;
-    border-radius: 4px;
-    padding: 10px;
-    font-size: 12px;
-  }
-  .notes h3 { margin: 0 0 6px; font-size: 13px; }
-  .notes ul { margin: 4px 0; padding-left: 18px; }
-  .notes li { margin-bottom: 3px; }
-  .hl { background: #fef3c7; padding: 1px 4px; border-radius: 2px; font-weight: 600; }
-</style>
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+
+            50% {
+                transform: scale(1.1);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 16px;
+            background: linear-gradient(135deg, var(--text-main) 0%, var(--accent-blue) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 15px;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+
+        .window-controls i:hover {
+            color: var(--text-main);
+            cursor: pointer;
+        }
+
+        /* App Layout */
+        .app-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 56px;
+            background-color: var(--bg-card);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding-top: 15px;
+            gap: 20px;
+        }
+
+        .sidebar-item {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .sidebar-item:hover,
+        .sidebar-item.active {
+            color: var(--text-main);
+            background-color: var(--bg-inner);
+            box-shadow: var(--shadow);
+        }
+
+        .sidebar-item.active {
+            border-left: 2px solid var(--accent-blue);
+            color: var(--accent-blue);
+        }
+
+        /* Main Dashboard Grid */
+        .dashboard {
+            flex: 1;
+            display: grid;
+            grid-template-rows: 1.3fr 1fr;
+            overflow: hidden;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        .dashboard-top {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        .panel-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        /* Project Media Bin */
+        .media-header-tools {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            gap: 6px;
+        }
+
+        .dropdown-btn {
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 11px;
+            padding: 4px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .badge-info {
+            background-color: rgba(99, 102, 241, 0.1);
+            color: var(--accent-indigo);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .media-item {
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .media-item:hover {
+            border-color: var(--accent-blue);
+            transform: translateY(-2px);
+        }
+
+        .media-item.checked {
+            border-color: var(--accent-orange);
+            background-color: rgba(245, 158, 11, 0.03);
+        }
+
+        .media-checkbox {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 14px;
+            height: 14px;
+            accent-color: var(--accent-orange);
+        }
+
+        .media-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 6px;
+            background-color: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .media-item.video .media-icon {
+            color: #f59e0b;
+        }
+
+        .media-item.srt .media-icon {
+            color: #3b82f6;
+        }
+
+        .media-item.image .media-icon {
+            color: #10b981;
+        }
+
+        .media-title {
+            font-size: 11px;
+            color: var(--text-main);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        .media-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: auto;
+        }
+
+        .btn-action-grey {
+            flex: 1;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            border-radius: 6px;
+            padding: 8px 4px;
+            font-size: 10px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .btn-action-grey:hover {
+            color: var(--text-main);
+            border-color: var(--text-muted);
+        }
+
+        .btn-action-green {
+            flex: 1.2;
+            background-color: var(--accent-green);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 8px 4px;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: opacity 0.2s;
+        }
+
+        .btn-action-green:hover {
+            opacity: 0.9;
+        }
+
+        /* Preview Canvas */
+        .preview-container {
+            position: relative;
+            background-color: #05070B;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .preview-canvas {
+            position: relative;
+            width: 533px;
+            height: 300px;
+            background: linear-gradient(to bottom, #111827, #030712);
+            border: 1px solid #1e293b;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+
+        /* Guide lines */
+        .guide-line-x {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background-color: rgba(16, 185, 129, 0.35);
+            pointer-events: none;
+            display: none;
+        }
+
+        .guide-line-y {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: rgba(16, 185, 129, 0.35);
+            pointer-events: none;
+            display: none;
+        }
+
+        .coordinate-badge {
+            position: absolute;
+            background-color: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--accent-green);
+            color: var(--accent-green);
+            font-size: 10px;
+            padding: 3px 6px;
+            border-radius: 4px;
+            pointer-events: none;
+            font-family: monospace;
+            display: none;
+            z-index: 100;
+        }
+
+        /* Draggable Video Layers */
+        .draggable-layer {
+            position: absolute;
+            border: 2px dashed rgba(255, 255, 255, 0.4);
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            background-size: cover;
+            background-position: center;
+            transition: opacity 0.2s;
+        }
+
+        .draggable-layer.active {
+            border-color: var(--accent-green);
+        }
+
+        .layer-label {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            background-color: rgba(15, 23, 42, 0.75);
+            color: var(--text-main);
+            font-size: 9px;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+
+        /* Resize handles */
+        .handle {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background-color: var(--text-main);
+            border: 1px solid var(--accent-green);
+            display: none;
+        }
+
+        .draggable-layer.active .handle {
+            display: block;
+        }
+
+        .handle-nw {
+            top: -4px;
+            left: -4px;
+            cursor: nw-resize;
+        }
+
+        .handle-ne {
+            top: -4px;
+            right: -4px;
+            cursor: ne-resize;
+        }
+
+        .handle-sw {
+            bottom: -4px;
+            left: -4px;
+            cursor: sw-resize;
+        }
+
+        .handle-se {
+            bottom: -4px;
+            right: -4px;
+            cursor: se-resize;
+        }
+
+        .handle-n {
+            top: -4px;
+            left: calc(50% - 4px);
+            cursor: n-resize;
+        }
+
+        .handle-s {
+            bottom: -4px;
+            left: calc(50% - 4px);
+            cursor: s-resize;
+        }
+
+        .handle-w {
+            left: -4px;
+            top: calc(50% - 4px);
+            cursor: w-resize;
+        }
+
+        .handle-e {
+            right: -4px;
+            top: calc(50% - 4px);
+            cursor: e-resize;
+        }
+
+        /* Floating Window: Async Frame Loader (ThreadPool) */
+        .async-loader-window {
+            position: absolute;
+            width: 300px;
+            background-color: rgba(15, 23, 42, 0.95);
+            border: 1px solid var(--accent-blue);
+            border-radius: 10px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            display: none;
+            /* Collapsed by default, toggleable by clicking the header badge */
+            flex-direction: column;
+            z-index: 200;
+            overflow: hidden;
+            cursor: default;
+        }
+
+        .window-header {
+            background-color: #1E293B;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 600;
+            border-bottom: 1px solid var(--border-color);
+            cursor: move;
+        }
+
+        .window-body {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .window-title-sub {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+
+        .thread-row {
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+        }
+
+        .thread-bar-container {
+            height: 8px;
+            background-color: #334155;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .thread-bar-fill {
+            height: 100%;
+            background-color: var(--accent-green);
+            border-radius: 4px;
+            width: 0%;
+            transition: width 0.3s ease-in-out;
+        }
+
+        .thumb-preview-card {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: #1E293B;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 6px;
+            margin-top: 5px;
+        }
+
+        .thumb-preview-img {
+            width: 48px;
+            height: 32px;
+            border-radius: 4px;
+            object-fit: cover;
+        }
+
+        /* Subtitles Overlay */
+        .subtitle-overlay {
+            position: absolute;
+            bottom: 30px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            color: #FFFFFF;
+            font-size: 16px;
+            font-weight: 500;
+            pointer-events: none;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
+            z-index: 50;
+        }
+
+        .sub-bg-style {
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+
+        /* Playback Controls */
+        .preview-controls {
+            height: 48px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            background-color: var(--bg-card);
+        }
+
+        .control-btns {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-size: 16px;
+            color: var(--text-muted);
+        }
+
+        .control-btns i {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .control-btns i:hover {
+            color: var(--text-main);
+        }
+
+        .control-btns .play-btn {
+            color: var(--accent-green);
+            font-size: 20px;
+        }
+
+        /* Timeline Blocks styles */
+        .timeline-block {
+            transition: opacity 0.2s;
+            opacity: 0.7;
+        }
+
+        .timeline-block:hover {
+            opacity: 1.0;
+        }
+
+        /* Rendering Queue Card */
+        .queue-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 10px;
+        }
+
+        .queue-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+        }
+
+        .queue-item input {
+            accent-color: var(--accent-green);
+        }
+
+        .btn-render {
+            width: 100%;
+            background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            padding: 12px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+            margin-top: 12px;
+        }
+
+        .btn-render:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        /* Bottom Dashboard Layout */
+        .dashboard-bottom {
+            display: grid;
+            grid-template-columns: 230px 210px 1.2fr 1.2fr 210px;
+            gap: 10px;
+            min-height: 0;
+        }
+
+        /* Preset select box inside subtitle list */
+        .preset-select-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .sub-list {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            overflow-y: auto;
+            max-height: 100px;
+            padding-right: 4px;
+        }
+
+        .sub-row {
+            background-color: var(--bg-inner);
+            border: 1px solid transparent;
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .sub-row:hover {
+            border-color: var(--border-color);
+        }
+
+        .sub-row.active {
+            border-color: var(--accent-blue);
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+
+        .sub-time {
+            color: var(--accent-green);
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        .sub-txt {
+            flex: 1;
+            margin-left: 10px;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .sub-actions {
+            display: flex;
+            gap: 8px;
+            color: var(--text-muted);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .sub-row:hover .sub-actions {
+            opacity: 1;
+        }
+
+        /* Footer info box */
+        .footer-info-text {
+            font-size: 9px;
+            color: var(--text-muted);
+            margin-top: 10px;
+            line-height: 1.2;
+        }
+
+        /* Subtitle style */
+        .alignment-selector {
+            display: flex;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .align-btn {
+            flex: 1;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .align-btn:hover {
+            color: var(--text-main);
+        }
+
+        .align-btn.active {
+            color: var(--accent-blue);
+            background-color: var(--bg-card);
+        }
+
+        .color-picker-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 5px 10px;
+        }
+
+        .color-box {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: pointer;
+        }
+
+        /* Layer list styling */
+        .layer-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            overflow-y: auto;
+            max-height: 142px;
+            padding-right: 4px;
+        }
+
+        .layer-item {
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .layer-item:hover {
+            border-color: var(--accent-blue);
+        }
+
+        .layer-item.active {
+            border-color: var(--accent-green);
+            background-color: rgba(16, 185, 129, 0.05);
+        }
+
+        .layer-item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .drag-handle {
+            color: var(--text-muted);
+            cursor: grab;
+        }
+
+        .layer-item-left img {
+            width: 24px;
+            height: 16px;
+            border-radius: 2px;
+            object-fit: cover;
+        }
+
+        /* Spinbox input wrapping */
+        .spinbox-row {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+
+        .spin-input-wrap {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 4px 8px;
+        }
+
+        .spin-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            width: 16px;
+        }
+
+        .spin-input-wrap input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-size: 11px;
+            outline: none;
+            text-align: right;
+            width: 100%;
+        }
+
+        /* Performance Monitor style sheet */
+        .perf-container {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: 100%;
+        }
+
+        .perf-chart-box {
+            flex: 1;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            position: relative;
+        }
+
+        .perf-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .perf-label {
+            color: var(--text-muted);
+        }
+
+        .perf-value {
+            color: var(--accent-blue);
+            font-family: monospace;
+            font-weight: 600;
+        }
+
+        .perf-chart-box.gpu .perf-value {
+            color: var(--accent-green);
+        }
+
+        .perf-svg {
+            width: 100%;
+            height: 36px;
+        }
+
+        .perf-path {
+            fill: none;
+            stroke-width: 1.5;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .cpu .perf-path {
+            stroke: var(--accent-blue);
+        }
+
+        .gpu .perf-path {
+            stroke: var(--accent-green);
+        }
+
+        .perf-fill {
+            stroke: none;
+            opacity: 0.1;
+        }
+
+        .cpu .perf-fill {
+            fill: var(--accent-blue);
+        }
+
+        .gpu .perf-fill {
+            fill: var(--accent-green);
+        }
+
+        .form-select,
+        .form-input {
+            width: 100%;
+            background-color: var(--bg-inner);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-main);
+            padding: 8px 12px;
+            font-size: 12px;
+            outline: none;
+        }
+
+        .form-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .form-item label {
+            font-size: 11px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        /* Simple Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+    </style>
 </head>
+
 <body>
-  <h1>📐 Wireframe Box B — Middle Panel</h1>
-  <p class="subtitle">Thiết kế lại phần giữa: bỏ Preset Style, thêm Preview bên dưới Subtitle Style</p>
 
-  <div class="app">
-    <div class="title-bar">
-      <span>▶ Auto Video Editor</span>
-      <span class="badge">CPU: 45%</span>
-      <span class="badge">RAM: 62%</span>
-      <span class="badge">GPU: RTX 3060</span>
+    <!-- Header bar -->
+    <header>
+        <div class="header-left">
+            <svg class="logo-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="10 8 16 12 10 16 10 8"></polygon>
+            </svg>
+            <span class="logo-text">EncoMie - Auto Video Editor</span>
+        </div>
+        <div class="window-controls">
+            <span title="Trợ giúp" style="margin-right: 10px;">❓</span>
+            <span>➖</span>
+            <span>🔲</span>
+            <span style="color: #ef4444;">❌</span>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <div class="sidebar">
+            <div class="sidebar-item active" title="Dự án">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+            </div>
+            <div class="sidebar-item" title="Phụ đề">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="13" y2="16"></line>
+                </svg>
+            </div>
+            <div class="sidebar-item" title="Cài đặt">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Dashboard Workspace -->
+        <div class="dashboard">
+            <!-- Top Dashboard: Media Bin, Preview Window, Output settings -->
+            <div class="dashboard-top">
+                <!-- Media Bin -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Project Media</span>
+                    </div>
+                    <div class="panel-content">
+                        <!-- Top actions inside media bin -->
+                        <div class="media-header-tools">
+                            <div class="dropdown-btn">📁 Chọn Tất Cả ▾</div>
+                            <span class="badge-info">Shift+click</span>
+                            <span class="badge-info">Control+click</span>
+                        </div>
+                        <div class="media-grid">
+                            <div class="media-item video checked" onclick="toggleMediaCheck(this)">
+                                <input type="checkbox" class="media-checkbox" checked onclick="event.stopPropagation()">
+                                <div class="media-icon">🎬</div>
+                                <span class="media-title">Main Video.mp4</span>
+                            </div>
+                            <div class="media-item srt checked" onclick="toggleMediaCheck(this)">
+                                <input type="checkbox" class="media-checkbox" checked onclick="event.stopPropagation()">
+                                <div class="media-icon">📄</div>
+                                <span class="media-title">Subtitle.srt</span>
+                            </div>
+                            <div class="media-item image checked" onclick="toggleMediaCheck(this)">
+                                <input type="checkbox" class="media-checkbox" checked onclick="event.stopPropagation()">
+                                <div class="media-icon">🖼️</div>
+                                <span class="media-title">Logo.png</span>
+                            </div>
+                            <div class="media-item video" onclick="toggleMediaCheck(this)">
+                                <input type="checkbox" class="media-checkbox" onclick="event.stopPropagation()">
+                                <div class="media-icon">🎬</div>
+                                <span class="media-title">Layer_1.mov</span>
+                            </div>
+                            <div class="media-item video" onclick="toggleMediaCheck(this)">
+                                <input type="checkbox" class="media-checkbox" onclick="event.stopPropagation()">
+                                <div class="media-icon">🎬</div>
+                                <span class="media-title">Layer_2.avi</span>
+                            </div>
+                        </div>
+                        <!-- Bottom Action buttons -->
+                        <div class="media-actions">
+                            <button class="btn-action-green" onclick="selectAllMedia(true)">Chọn Tất Cả</button>
+                            <button class="btn-action-grey" onclick="selectAllMedia(false)">Bỏ Chọn</button>
+                            <button class="btn-action-grey" onclick="invertMediaSelection()">Đảo Ngược</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Preview Window -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Preview</span>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <!-- Minimized Thread status bar badge: Click to expand details -->
+                            <span id="asyncBadge" class="badge-info"
+                                style="cursor: pointer; background-color: rgba(59, 130, 246, 0.15); color: var(--accent-blue); animation: pulse 2s infinite;"
+                                onclick="toggleAsyncWindow()">
+                                ⚡ 3/5 luồng đang chạy...
+                            </span>
+                            <span style="color: var(--text-muted); font-size: 11px;">Quản lý Bố cục Đa lớp</span>
+                        </div>
+                    </div>
+                    <div class="preview-container" style="flex: 1;">
+                        <!-- Canvas -->
+                        <div class="preview-canvas" id="previewCanvas">
+                            <div class="guide-line-x" id="guideLineX"></div>
+                            <div class="guide-line-y" id="guideLineY"></div>
+                            <div class="coordinate-badge" id="coordBadge">X: 0, Y: 0</div>
+
+                            <!-- Layer 1: Reaction 1 -->
+                            <div class="draggable-layer active" id="layer1"
+                                style="width: 140px; height: 90px; top: 100px; left: 50px; background-image: url('https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=140&q=80');">
+                                <span class="layer-label">Reaction 1</span>
+                                <div class="handle handle-nw"></div>
+                                <div class="handle handle-ne"></div>
+                                <div class="handle handle-sw"></div>
+                                <div class="handle handle-se"></div>
+                                <div class="handle handle-n"></div>
+                                <div class="handle handle-s"></div>
+                                <div class="handle handle-w"></div>
+                                <div class="handle handle-e"></div>
+                            </div>
+
+                            <!-- Layer 2: Reaction 2 -->
+                            <div class="draggable-layer" id="layer2"
+                                style="width: 140px; height: 90px; top: 100px; right: 50px; background-image: url('https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=140&q=80');">
+                                <span class="layer-label">Reaction 2</span>
+                                <div class="handle handle-nw"></div>
+                                <div class="handle handle-ne"></div>
+                                <div class="handle handle-sw"></div>
+                                <div class="handle handle-se"></div>
+                                <div class="handle handle-n"></div>
+                                <div class="handle handle-s"></div>
+                                <div class="handle handle-w"></div>
+                                <div class="handle handle-e"></div>
+                            </div>
+
+                            <!-- Floating Window: Async Frame Loader (ThreadPool) -->
+                            <div class="async-loader-window" id="asyncWindow" style="top: 20px; left: 160px;">
+                                <div class="window-header" id="windowHeader">
+                                    <span>Async Frame Loader</span>
+                                    <span style="cursor: pointer;"
+                                        onclick="document.getElementById('asyncWindow').style.display='none'">✕</span>
+                                </div>
+                                <div class="window-body">
+                                    <div class="window-title-sub">QThreadPool Async Processing</div>
+
+                                    <!-- Thread rows -->
+                                    <div class="thread-row">
+                                        <span>Thread 1</span>
+                                        <div class="thread-bar-container">
+                                            <div class="thread-bar-fill" id="t1" style="width: 80%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="thread-row">
+                                        <span>Thread 2</span>
+                                        <div class="thread-bar-container">
+                                            <div class="thread-bar-fill" id="t2" style="width: 65%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="thread-row">
+                                        <span>Thread 3</span>
+                                        <div class="thread-bar-container">
+                                            <div class="thread-bar-fill" id="t3" style="width: 90%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="thread-row">
+                                        <span>Thread 4</span>
+                                        <div class="thread-bar-container">
+                                            <div class="thread-bar-fill" id="t4" style="width: 40%;"></div>
+                                        </div>
+                                    </div>
+                                    <div class="thread-row">
+                                        <span>Thread 5</span>
+                                        <div class="thread-bar-container">
+                                            <div class="thread-bar-fill" id="t5" style="width: 55%;"></div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bottom sliders & thumb -->
+                                    <div
+                                        style="display: flex; justify-content: space-between; align-items: center; font-size: 10px; margin-top: 4px;">
+                                        <span>Opacity</span>
+                                        <input type="range" style="width: 120px; accent-color: var(--accent-blue);"
+                                            min="10" max="100" value="80"
+                                            oninput="document.getElementById('asyncWindow').style.opacity = this.value/100.0">
+                                    </div>
+
+                                    <!-- Thumbnail complete card -->
+                                    <div class="thumb-preview-card">
+                                        <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=60&q=80"
+                                            alt="thumb" class="thumb-preview-img">
+                                        <div style="display: flex; flex-direction: column;">
+                                            <span
+                                                style="font-size: 10px; font-weight: bold; color: var(--accent-green);">Thumbnails
+                                                complete</span>
+                                            <span style="font-size: 8px; color: var(--text-muted);">Cached: 5
+                                                clips</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Dynamic subtitles -->
+                            <div class="subtitle-overlay" id="subOverlay">
+                                <span class="sub-bg-style" id="subText">Chèn phụ đề (SRT)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mini Timeline Track overlay underneath the canvas -->
+                    <div
+                        style="background-color: #0A0F1D; border-top: 1px solid var(--border-color); height: 28px; display: flex; align-items: center; padding: 0 16px; position: relative;">
+                        <span
+                            style="font-size: 9px; color: var(--text-muted); width: 68px; font-weight: 600; letter-spacing: 0.5px;">TIMELINE
+                            SUB</span>
+                        <div
+                            style="flex: 1; height: 12px; background-color: #151D30; border-radius: 4px; position: relative; overflow: hidden; display: flex; align-items: center;">
+                            <!-- Subtitle Time blocks -->
+                            <div class="timeline-block"
+                                style="position: absolute; left: 10%; width: 25%; height: 100%; background-color: rgba(59, 130, 246, 0.25); border-left: 2px solid var(--accent-blue); cursor: pointer;"
+                                title="00:13.8 Chào mừng bạn..." onclick="jumpToSub(0)"></div>
+                            <div class="timeline-block"
+                                style="position: absolute; left: 40%; width: 20%; height: 100%; background-color: rgba(16, 185, 129, 0.25); border-left: 2px solid var(--accent-green); cursor: pointer;"
+                                title="00:17.8 Chèn phụ đề..." onclick="jumpToSub(1)"></div>
+                            <div class="timeline-block"
+                                style="position: absolute; left: 68%; width: 28%; height: 100%; background-color: rgba(245, 158, 11, 0.25); border-left: 2px solid var(--accent-orange); cursor: pointer;"
+                                title="00:21.0 Cấu hình..." onclick="jumpToSub(2)"></div>
+                            <!-- Current Playhead marker -->
+                            <div id="playhead"
+                                style="position: absolute; left: 22%; width: 2px; height: 100%; background-color: #EF4444; z-index: 10;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Playback Controls -->
+                    <div class="preview-controls">
+                        <div class="control-btns">
+                            <span title="Lùi lại">⏮</span>
+                            <span title="Phát" class="play-btn" id="playBtn" onclick="togglePlay()">▶</span>
+                            <span title="Dừng">⏹</span>
+                            <span title="Tiến lên">⏭</span>
+                            <span style="font-size: 12px; margin-left: 10px; color: var(--text-muted);">00:00:13 /
+                                00:04:32</span>
+                        </div>
+                        <div class="control-btns">
+                            <span title="Âm lượng">🔊</span>
+                            <span title="Toàn màn hình">📺</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Output Settings & Rendering Queue -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Output Settings</span>
+                    </div>
+                    <div class="panel-content">
+                        <div class="settings-group">
+                            <div class="form-item">
+                                <label>File format</label>
+                                <select class="form-select">
+                                    <option>MP4</option>
+                                    <option>MKV</option>
+                                    <option>MOV</option>
+                                </select>
+                            </div>
+                            <div class="form-item">
+                                <label>Resolution</label>
+                                <select class="form-select">
+                                    <option>1080p (Full HD)</option>
+                                    <option>720p (HD)</option>
+                                    <option>4K (Ultra HD)</option>
+                                </select>
+                            </div>
+                            <div class="switch-row">
+                                <div class="switch-info">
+                                    <span class="switch-title">Hardware Acceleration</span>
+                                    <span class="switch-subtitle">NVIDIA NVENC</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" checked>
+                                    <span class="slider"></span>
+                                </label>
+                            </div>
+
+                            <!-- Rendering Queue Section -->
+                            <div class="queue-list">
+                                <div
+                                    style="font-size: 10px; font-weight: bold; color: var(--text-muted); margin-bottom: 4px;">
+                                    Rendering Queue</div>
+                                <div class="queue-item">
+                                    <input type="checkbox" checked id="q1">
+                                    <label for="q1" style="color: var(--text-main);">Main Video.mp4</label>
+                                </div>
+                                <div class="queue-item">
+                                    <input type="checkbox" checked id="q2">
+                                    <label for="q2" style="color: var(--text-main);">Subtitle_1.mp4</label>
+                                </div>
+                                <div class="queue-item">
+                                    <input type="checkbox" checked id="q3">
+                                    <label for="q3" style="color: var(--text-main);">Rensder Hàng Loạt</label>
+                                </div>
+                            </div>
+
+                            <button class="btn-render" onclick="startRender()">Render</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Dashboard -->
+            <div class="dashboard-bottom">
+                <!-- Subtitle List -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Subtitle</span>
+                    </div>
+                    <div class="panel-content" style="padding: 8px;">
+                        <!-- Preset styling selector -->
+                        <div class="preset-select-bar">
+                            <span style="font-size: 10px; color: var(--text-muted); font-weight: 500;">Bộ lọc phụ
+                                đề:</span>
+                            <select class="form-select" id="presetSelect" onchange="applyPresetStyle(this.value)"
+                                style="padding: 4px 8px; font-size: 10px; flex: 1;">
+                                <option value="default">Mặc định</option>
+                                <option value="large">Chữ to</option>
+                                <option value="bright">Chữ sáng</option>
+                            </select>
+                        </div>
+                        <div class="sub-list" id="subList">
+                            <div class="sub-row active"
+                                onclick="selectSubtitle(this, 'Chào mừng bạn đến với EncoMie!')">
+                                <span class="sub-time">00:13.8</span>
+                                <span class="sub-txt">Chào mừng bạn đến với EncoMie!</span>
+                            </div>
+                            <div class="sub-row" onclick="selectSubtitle(this, 'Chèn phụ đề (SRT)')">
+                                <span class="sub-time">00:17.8</span>
+                                <span class="sub-txt">Chèn phụ đề (SRT)</span>
+                            </div>
+                            <div class="sub-row" onclick="selectSubtitle(this, 'Cấu hình căn chỉnh video tiện lợi!')">
+                                <span class="sub-time">00:21.0</span>
+                                <span class="sub-txt">Cấu hình căn chỉnh video tiện lợi!</span>
+                            </div>
+                        </div>
+                        <!-- Footer coordinates explanation -->
+                        <div class="footer-info-text">
+                            Coordinate system virtual 400x225 (previ 400x225, full 1280x720 for render indepen)
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Subtitle Style Config -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Subtitle Style</span>
+                    </div>
+                    <div class="panel-content" style="display: flex; flex-direction: column; gap: 12px;">
+                        <div class="form-item">
+                            <label>Font</label>
+                            <select class="form-select" id="fontSelect" onchange="updateSubStyle()">
+                                <option>Arial</option>
+                                <option>Inter</option>
+                                <option>Courier New</option>
+                            </select>
+                        </div>
+                        <div class="form-item">
+                            <label>Size</label>
+                            <select class="form-select" id="fontSizeSelect" onchange="updateSubStyle()">
+                                <option value="14px">14px</option>
+                                <option value="16px">16px</option>
+                                <option value="20px">20px</option>
+                                <option value="24px" selected>24px</option>
+                            </select>
+                        </div>
+                        <div class="form-item"
+                            style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
+                            <label style="margin-bottom: 0;">Color</label>
+                            <div class="color-picker-row" style="border: none; padding: 0; background: transparent;">
+                                <div class="color-box" id="colorBox"
+                                    style="background-color: #FFFFFF; width: 28px; height: 28px; border-radius: 6px;"
+                                    onclick="changeColor()"></div>
+                            </div>
+                        </div>
+                        <div class="form-item" style="margin-top: 4px;">
+                            <label>Alignment</label>
+                            <div class="alignment-selector" style="border-radius: 8px;">
+                                <div class="align-btn" onclick="setAlign('left', this)">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="17" y1="10" x2="3" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="17" y1="18" x2="3" y2="18"></line>
+                                    </svg>
+                                </div>
+                                <div class="align-btn active" onclick="setAlign('center', this)">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="19" y1="10" x2="5" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="19" y1="18" x2="5" y2="18"></line>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="setAlign('right', this)">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="21" y1="10" x2="7" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="21" y1="18" x2="7" y2="18"></line>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="setAlign('justify', this)">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="21" y1="10" x2="3" y2="10"></line>
+                                        <line x1="21" y1="6" x2="3" y2="6"></line>
+                                        <line x1="21" y1="14" x2="3" y2="14"></line>
+                                        <line x1="21" y1="18" x2="3" y2="18"></line>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layers & Alignment List -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Layers & Alignment</span>
+                    </div>
+                    <div class="panel-content" style="padding: 6px;">
+                        <div class="layer-list" id="layerList">
+                            <!-- Background Layer -->
+                            <div class="layer-item" id="layerItemBg" onclick="selectLayerItem('bg', this)">
+                                <div class="layer-item-left">
+                                    <span class="drag-handle">⠿</span>
+                                    <img src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=60&q=80"
+                                        alt="bg">
+                                    <span>Background</span>
+                                </div>
+                            </div>
+                            <!-- Logo Layer -->
+                            <div class="layer-item" id="layerItemLogo" onclick="selectLayerItem('logo', this)">
+                                <div class="layer-item-left">
+                                    <span class="drag-handle">⠿</span>
+                                    <div
+                                        style="width: 24px; height: 16px; background-color: var(--accent-blue); border-radius: 2px; display: flex; align-items: center; justify-content: center; font-size: 8px;">
+                                        Logo</div>
+                                    <span>Logo</span>
+                                </div>
+                                <div style="display: flex; gap: 8px; color: var(--text-muted); align-items: center;">
+                                    <span class="action-icon lock-btn" onclick="toggleLockLayer('logo', event)"
+                                        style="cursor: pointer;" title="Khóa Layer">🔓</span>
+                                    <span
+                                        style="background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 500;">Margin</span>
+                                </div>
+                            </div>
+                            <!-- Layer 1 -->
+                            <div class="layer-item active" id="layerItem1" onclick="selectLayerItem('layer1', this)">
+                                <div class="layer-item-left">
+                                    <span class="drag-handle">⠿</span>
+                                    <img src="https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=60&q=80"
+                                        alt="layer1">
+                                    <span>Layer 1</span>
+                                </div>
+                                <div style="display: flex; gap: 8px; color: var(--text-muted); align-items: center;">
+                                    <span class="action-icon lock-btn" onclick="toggleLockLayer('layer1', event)"
+                                        style="cursor: pointer;" title="Khóa Layer">🔓</span>
+                                    <span style="cursor: pointer;" title="Ẩn/Hiện">👁️</span>
+                                    <span style="cursor: pointer;" title="Hạ bậc">⬇️</span>
+                                </div>
+                            </div>
+                            <!-- Layer 2 -->
+                            <div class="layer-item" id="layerItem2" onclick="selectLayerItem('layer2', this)">
+                                <div class="layer-item-left">
+                                    <span class="drag-handle">⠿</span>
+                                    <img src="https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=60&q=80"
+                                        alt="layer2">
+                                    <span>Layer 2</span>
+                                </div>
+                                <div style="display: flex; gap: 8px; color: var(--text-muted); align-items: center;">
+                                    <span class="action-icon lock-btn" onclick="toggleLockLayer('layer2', event)"
+                                        style="cursor: pointer;" title="Khóa Layer">🔓</span>
+                                    <span style="cursor: pointer;" title="Ẩn/Hiện">👁️</span>
+                                    <span style="cursor: pointer;" title="Hạ bậc">⬇️</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Alignment & Real-time Positioning -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Alignment & Positioning</span>
+                    </div>
+                    <div class="panel-content" style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- Alignment section -->
+                        <div class="form-item">
+                            <label>Alignment</label>
+                            <div class="alignment-selector" style="border-radius: 8px;">
+                                <div class="align-btn" onclick="alignActiveLayer('left', this)" title="Left">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="4" y1="21" x2="4" y2="3"></line>
+                                        <rect x="8" y="6" width="12" height="4" rx="1"></rect>
+                                        <rect x="8" y="14" width="8" height="4" rx="1"></rect>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="alignActiveLayer('center', this)" title="Center">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="12" y1="21" x2="12" y2="3"></line>
+                                        <rect x="6" y="6" width="12" height="4" rx="1"></rect>
+                                        <rect x="8" y="14" width="8" height="4" rx="1"></rect>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="alignActiveLayer('top', this)" title="Top">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="3" y1="4" x2="21" y2="4"></line>
+                                        <rect x="6" y="8" width="4" height="12" rx="1"></rect>
+                                        <rect x="14" y="8" width="4" height="8" rx="1"></rect>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="alignActiveLayer('middle', this)" title="Middle">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                                        <rect x="6" y="6" width="4" height="12" rx="1"></rect>
+                                        <rect x="14" y="8" width="4" height="8" rx="1"></rect>
+                                    </svg>
+                                </div>
+                                <div class="align-btn" onclick="alignActiveLayer('bottom', this)" title="Bottom">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2.5">
+                                        <line x1="3" y1="20" x2="21" y2="20"></line>
+                                        <rect x="6" y="4" width="4" height="12" rx="1"></rect>
+                                        <rect x="14" y="8" width="4" height="8" rx="1"></rect>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Positioning section -->
+                        <div class="form-item">
+                            <label>Real-time Positioning</label>
+                            <div class="spinbox-row" style="margin-bottom: 8px;">
+                                <div class="spin-input-wrap">
+                                    <span class="spin-label">X:</span>
+                                    <input type="number" id="spinX" value="50" onchange="updateLayerFromInputs()">
+                                </div>
+                                <div class="spin-input-wrap">
+                                    <span class="spin-label">Y:</span>
+                                    <input type="number" id="spinY" value="100" onchange="updateLayerFromInputs()">
+                                </div>
+                                <div class="spin-input-wrap">
+                                    <span class="spin-label">W:</span>
+                                    <input type="number" id="spinW" value="140" onchange="updateLayerFromInputs()">
+                                </div>
+                                <div class="spin-input-wrap">
+                                    <span class="spin-label">H:</span>
+                                    <input type="number" id="spinH" value="90" onchange="updateLayerFromInputs()">
+                                </div>
+                            </div>
+                            <!-- Scale slider -->
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <span style="font-size: 11px; color: var(--text-muted);">Scale:</span>
+                                <input type="range" id="scaleSlider" min="10" max="200" value="100"
+                                    style="flex: 1; accent-color: var(--accent-green);"
+                                    oninput="updateScaleFromSlider(this.value)">
+                                <div style="background-color: var(--bg-inner); border: 1px solid var(--border-color); border-radius: 4px; padding: 2px 6px; font-size: 11px; font-family: monospace;"
+                                    id="scaleValue">100</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Performance Monitor -->
+                <div class="panel-card">
+                    <div class="panel-header">
+                        <span>Performance Monitor</span>
+                    </div>
+                    <div class="panel-content" style="padding: 6px;">
+                        <div class="perf-container">
+                            <!-- CPU with Priority Dropdown -->
+                            <div class="perf-chart-box cpu">
+                                <div class="perf-header">
+                                    <span class="perf-label">CPU Priority</span>
+                                    <select class="form-select" id="cpuPrioritySelect"
+                                        style="padding: 2px 6px; font-size: 9px; width: auto; background-color: var(--bg-card); border-color: var(--border-color); color: var(--text-main);">
+                                        <option value="below">Dưới Bình Thường</option>
+                                        <option value="normal">Bình Thường</option>
+                                        <option value="high">Cao</option>
+                                    </select>
+                                    <span class="perf-value" id="cpuVal">0%</span>
+                                </div>
+                                <svg class="perf-svg" id="cpuSvg" viewBox="0 0 200 40" preserveAspectRatio="none">
+                                    <path class="perf-fill" id="cpuFill" d="M 0 40 L 0 40 L 200 40 Z"></path>
+                                    <path class="perf-path" id="cpuPath" d="M 0 40 L 200 40"></path>
+                                </svg>
+                            </div>
+                            <!-- GPU with NVENC Toggle -->
+                            <div class="perf-chart-box gpu">
+                                <div class="perf-header" style="justify-content: space-between; gap: 4px;">
+                                    <span class="perf-label"
+                                        style="font-size: 9px; display: flex; align-items: center; gap: 4px;">
+                                        GPU NVENC
+                                        <label class="switch" style="width: 28px; height: 14px;">
+                                            <input type="checkbox" id="gpuToggle" checked>
+                                            <span class="slider" style="border-radius: 14px;"></span>
+                                        </label>
+                                    </span>
+                                    <span class="perf-value" id="gpuVal" style="margin-left: auto;">0%</span>
+                                </div>
+                                <svg class="perf-svg" id="gpuSvg" viewBox="0 0 200 40" preserveAspectRatio="none">
+                                    <path class="perf-fill" id="gpuFill" d="M 0 40 L 0 40 L 200 40 Z"></path>
+                                    <path class="perf-path" id="gpuPath" d="M 0 40 L 200 40"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Main Tab Headers (Edit Sub vs Edit Video) -->
-    <div class="main-tab-header" style="display: flex; background: #d1d5db; border: 1px solid #9ca3af; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; overflow: hidden; margin-bottom: 0;">
-      <button class="main-tab-btn active" onclick="switchMainTab(event, 'main-tab-sub')" style="flex: 1; padding: 10px 16px; border: none; background: white; font-size: 12px; font-weight: bold; cursor: pointer; color: #2563eb; border-bottom: 2px solid #2563eb; border-right: 1px solid #9ca3af; outline: none; transition: all 0.2s;">✍️ Edit Sub (Biên tập phụ đề)</button>
-      <button class="main-tab-btn" onclick="switchMainTab(event, 'main-tab-video')" style="flex: 1; padding: 10px 16px; border: none; background: #e5e7eb; font-size: 12px; font-weight: bold; cursor: pointer; color: #4b5563; outline: none; transition: all 0.2s;">🎬 Edit Video (Biên tập video)</button>
-    </div>
+    <!-- JS Logic for interaction -->
+    <script>
+        // Active draggable layer selection
+        let activeLayer = document.getElementById('layer1');
 
-    <div class="split" style="border: 1px solid #9ca3af; border-top: none; background: #f3f4f6; padding: 10px; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px;">
-      <!-- LEFT PANEL -->
-      <div class="panel panel-left">
-        <!-- Group 1: Edit Sub folder and list -->
-        <div id="left-sub-container" style="display: flex; flex-direction: column; gap: 10px; height: 100%;">
-          <div class="box">
-            <div class="box-title">📁 Thư mục (Biên tập phụ đề)</div>
-            <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">video.mp4</span><button class="btn">Chọn file…</button></div>
-            <div class="row"><span class="field-label">Nguồn media:</span><span class="field field-long">audio_1.mp3</span><button class="btn">Chọn file…</button></div>
-            <div class="row"><span class="field-label">Subtitle SRT:</span><span class="field field-long">sub_1.srt</span><button class="btn">Chọn file…</button></div>
-            <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output</span><button class="btn">Chọn…</button></div>
-            <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại file</button>
-          </div>
-          <div class="box" style="flex:1;">
-            <div class="box-title">📋 Danh sách file (audio ↔ SRT)</div>
-            <table>
-              <tr><th>#</th><th>Audio file</th><th>SRT file</th><th>Trạng thái</th></tr>
-              <tr><td>1</td><td>audio_1.mp3</td><td>sub_1.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
-              <tr><td>2</td><td>audio_2.mp3</td><td>sub_2.srt</td><td style="color:#16a34a;">✓ Khớp</td></tr>
-              <tr><td>3</td><td>audio_3.mp3</td><td>—</td><td style="color:#dc2626;">✗ Thiếu</td></tr>
-            </table>
-            <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 file — 2 khớp ✓ — 1 thiếu ✗</div>
-          </div>
-        </div>
+        document.querySelectorAll('.draggable-layer').forEach(layer => {
+            layer.addEventListener('mousedown', function (e) {
+                // If element is locked, ignore drag
+                if (this.style.pointerEvents === 'none') return;
 
-        <!-- Group 2: Edit Video folder and list -->
-        <div id="left-video-container" style="display: none; flex-direction: column; gap: 10px; height: 100%;">
-          <div class="box">
-            <div class="box-title">📁 Thư mục (Biên tập video)</div>
-            <div class="row"><span class="field-label" style="font-size: 9px; line-height: 1.1;">Video nguồn (.mp4):</span><span class="field field-long">D:\input_videos</span><button class="btn">Chọn thư mục…</button></div>
-            <div class="row"><span class="field-label">Video nền:</span><span class="field field-long">7p07.mp4 (Tùy chọn)</span><button class="btn">Chọn file…</button></div>
-            <div class="row"><span class="field-label">Output:</span><span class="field field-long">D:\output_scaled</span><button class="btn">Chọn…</button></div>
-            <button class="btn" style="width:100%; margin-top:4px;">🔄 Quét lại thư mục</button>
-          </div>
-          <div class="box" style="flex:1;">
-            <div class="box-title">📋 Danh sách Video cần Scale hàng loạt</div>
-            <table>
-              <tr><th>#</th><th>Tên video nguồn</th><th>Độ phân giải đích</th><th>Trạng thái</th></tr>
-              <tr><td>1</td><td>talking_head_1.mp4</td><td>1080x1920 (9:16)</td><td style="color:#2563eb;">Sẵn sàng</td></tr>
-              <tr><td>2</td><td>vlog_outdoor.mp4</td><td>1080x1920 (9:16)</td><td style="color:#2563eb;">Sẵn sàng</td></tr>
-              <tr><td>3</td><td>tutorial_screen.mp4</td><td>1080x1920 (9:16)</td><td style="color:#16a34a;">✓ Đã scale</td></tr>
-            </table>
-            <div style="font-size:10px; color:#6b7280; margin-top:3px;">Tìm thấy 3 video — 1 đã xử lý ✓ — 2 sẵn sàng</div>
-          </div>
-        </div>
-      </div>
+                // Remove active class from others
+                document.querySelectorAll('.draggable-layer').forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                activeLayer = this;
 
-      <div class="resizer" data-target="panel-left" data-next="panel-middle"></div>
+                // Sync inputs
+                document.getElementById('spinX').value = parseInt(this.style.left) || 0;
+                document.getElementById('spinY').value = parseInt(this.style.top) || 0;
+                document.getElementById('spinW').value = parseInt(this.style.width) || 0;
+                document.getElementById('spinH').value = parseInt(this.style.height) || 0;
 
-      <!-- MIDDLE PANEL — BOX B -->
-      <div class="panel panel-middle" style="background: transparent; border: none; padding: 0;">
-        <div class="middle">
-          <!-- Main Tab 1 Content -->
-          <div id="main-tab-sub" class="main-tab-pane" style="display: block;">
-            <!-- Subtitle Style & Image Layers Tab widget -->
-            <div class="box subtitle-box" style="padding: 0; background: transparent; border: none; margin-bottom: 0;">
-              <!-- Tab headers -->
-              <div class="tab-header" style="display: flex; background: #e5e7eb; border: 1px solid #9ca3af; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; overflow: hidden;">
-                <button class="tab-btn active" onclick="switchTab(event, 'tab-subtitle')" style="flex: 1; padding: 6px 12px; border: none; background: white; font-size: 11px; font-weight: 600; cursor: pointer; color: #2563eb; border-bottom: 2px solid #2563eb; border-right: 1px solid #d1d5db; outline: none; transition: all 0.2s;">💬 Subtitle Style</button>
-                <button class="tab-btn" onclick="switchTab(event, 'tab-layers')" style="flex: 1; padding: 6px 12px; border: none; background: #f3f4f6; font-size: 11px; font-weight: 600; cursor: pointer; color: #4b5563; outline: none; transition: all 0.2s;">🖼️ Image Layers</button>
-              </div>
-              
-              <!-- Tab contents container -->
-              <div class="tab-content-container" style="background: white; border: 1px solid #9ca3af; border-bottom-left-radius: 4px; border-bottom-right-radius: 4px; padding: 8px;">
-                <!-- Tab 1: Subtitle Style -->
-                <div id="tab-subtitle" class="tab-pane" style="display: block;">
-                <!-- Preset bar (internal to editor) -->
-                <div class="section" style="padding:4px 7px; margin-bottom:5px;">
-                  <div class="row" style="align-items:center;">
-                    <span style="color:#7b849c; font-size:10px; font-weight:600;">Presets</span>
-                    <select class="field field-long" style="height:22px; font-size:10px;">
-                      <option>Classic</option>
-                      <option>Cinematic</option>
-                      <option>Clean</option>
-                    </select>
-                    <button class="btn" style="font-size:10px;">💾</button>
-                    <button class="btn" style="font-size:10px;">🗑</button>
-                    <button class="btn" style="font-size:10px;">↺</button>
-                  </div>
-                </div>
+                // Start dragging
+                startDrag(this, e);
+            });
+        });
 
-                <div class="subtitle-content">
-                  <!-- Text -->
-                  <div class="section">
-                    <div class="section-title">TEXT</div>
-                    <div class="grid-2">
-                      <div class="row"><span class="field-label">Font</span><span class="field field-long">Arial</span></div>
-                      <div class="row"><span class="field-label">Size</span><span class="field field-short">36</span></div>
-                    </div>
-                    <div class="row" style="margin-top:3px;">
-                      <span class="field-label">Color</span>
-                      <span class="swatch" style="background:#FFFFFF;"></span>
-                      <span class="field field-long" style="font-family:monospace;">#FFFFFF</span>
-                    </div>
-                  </div>
+        // Draggable Logic for Layers
+        function startDrag(element, event) {
+            event.preventDefault();
+            const canvas = document.getElementById('previewCanvas');
+            const guideX = document.getElementById('guideLineX');
+            const guideY = document.getElementById('guideLineY');
+            const coord = document.getElementById('coordBadge');
 
-                  <!-- Appearance -->
-                  <div class="section">
-                    <div class="section-title">APPEARANCE</div>
-                    <div class="grid-3">
-                      <div class="row"><span class="field-label">Stroke</span><span class="toggle on"></span></div>
-                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                      <div class="row"><span class="field-label">Width</span><span class="field field-short">2.0px</span></div>
-                    </div>
-                    <div class="grid-3" style="margin-top:3px;">
-                      <div class="row"><span class="field-label">BG</span><span class="toggle on"></span></div>
-                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                      <div class="row"><span class="field-label">Opacity</span><span class="field field-short">70%</span></div>
-                    </div>
-                    <div class="grid-3" style="margin-top:3px;">
-                      <div class="row"><span class="field-label">Pad X</span><span class="field field-short">12</span></div>
-                      <div class="row"><span class="field-label">Pad Y</span><span class="field field-short">6</span></div>
-                      <div class="row"><span class="field-label">Radius</span><span class="field field-short">4px</span></div>
-                    </div>
-                    <div class="grid-3" style="margin-top:3px;">
-                      <div class="row"><span class="field-label">Shadow</span><span class="toggle"></span></div>
-                      <div class="row"><span class="field-label">Color</span><span class="swatch" style="background:#000000;"></span></div>
-                      <div class="row"><span class="field-label">Opacity</span><span class="field field-short">80%</span></div>
-                    </div>
-                  </div>
+            guideX.style.display = 'block';
+            guideY.style.display = 'block';
+            coord.style.display = 'block';
 
-                  <!-- Layout -->
-                  <div class="section">
-                    <div class="section-title">LAYOUT — Position</div>
-                    <div class="align-grid">
-                      <div class="align-btn">↖</div><div class="align-btn">↑</div><div class="align-btn">↗</div>
-                      <div class="align-btn">←</div><div class="align-btn active">•</div><div class="align-btn">→</div>
-                      <div class="align-btn">↙</div><div class="align-btn">↓</div><div class="align-btn">↘</div>
-                    </div>
-                    <div class="grid-3" style="margin-top:5px;">
-                      <div class="row"><span class="field-label">Margin V</span><span class="field field-short">50px</span></div>
-                      <div class="row"><span class="field-label">Margin L</span><span class="field field-short">20px</span></div>
-                      <div class="row"><span class="field-label">Margin R</span><span class="field field-short">20px</span></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            let startX = event.clientX;
+            let startY = event.clientY;
+            let initialLeft = element.offsetLeft;
+            let initialTop = element.offsetTop;
 
-              <!-- Tab 2: Image Layers -->
-              <div id="tab-layers" class="tab-pane" style="display: none;">
-                <!-- Layer selector buttons -->
-                <div style="display: flex; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid #2e3347; padding-bottom: 6px;">
-                  <button class="layer-tab-btn active" onclick="switchLayer(event, 'layer-1')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #2563eb; color: white; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                    <span style="display: inline-block; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
-                    Layer 1
-                  </button>
-                  <button class="layer-tab-btn" onclick="switchLayer(event, 'layer-2')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                    <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
-                    Layer 2
-                  </button>
-                  <button class="layer-tab-btn" onclick="switchLayer(event, 'layer-3')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                    <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
-                    Layer 3
-                  </button>
-                </div>
+            function doDrag(e) {
+                let dx = e.clientX - startX;
+                let dy = e.clientY - startY;
 
-                <!-- Layer 1 Config -->
-                <div id="layer-1" class="layer-pane" style="display: block;">
-                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 1</div>
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                        <span class="toggle on" onclick="toggleLayerActivation(this, 'layer-1')"></span>
-                      </div>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 8px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
-                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">logo_main.png</span>
-                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 12px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
-                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                        <option>Góc dưới - Phải (Bottom-Right)</option>
-                        <option>Góc dưới - Trái (Bottom-Left)</option>
-                        <option selected>Góc trên - Phải (Top-Right)</option>
-                        <option>Góc trên - Trái (Top-Left)</option>
-                        <option>Ở giữa - Trên (Top-Center)</option>
-                      </select>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="20" max="500" value="120" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">120px</span>
-                        </div>
-                      </div>
-                      
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="10" max="100" value="90" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">90%</span>
-                        </div>
-                      </div>
-                    </div>
+                let newLeft = Math.max(0, Math.min(canvas.clientWidth - element.clientWidth, initialLeft + dx));
+                let newTop = Math.max(0, Math.min(canvas.clientHeight - element.clientHeight, initialTop + dy));
 
-                    <!-- Margin adjustments -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                element.style.left = newLeft + 'px';
+                element.style.top = newTop + 'px';
 
-                <!-- Layer 2 Config -->
-                <div id="layer-2" class="layer-pane" style="display: none;">
-                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 2</div>
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                        <span class="toggle" onclick="toggleLayerActivation(this, 'layer-2')"></span>
-                      </div>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 8px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
-                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
-                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 12px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
-                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                        <option>Góc dưới - Phải (Bottom-Right)</option>
-                        <option>Góc dưới - Trái (Bottom-Left)</option>
-                        <option>Góc trên - Phải (Top-Right)</option>
-                        <option>Góc trên - Trái (Top-Left)</option>
-                        <option>Ở giữa - Trên (Top-Center)</option>
-                      </select>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="20" max="500" value="80" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">80px</span>
-                        </div>
-                      </div>
-                      
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="10" max="100" value="50" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">50%</span>
-                        </div>
-                      </div>
-                    </div>
+                // Sync inputs
+                document.getElementById('spinX').value = newLeft;
+                document.getElementById('spinY').value = newTop;
 
-                    <!-- Margin adjustments -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                // Update guidelines positions
+                let centerX = newLeft + element.clientWidth / 2;
+                let centerY = newTop + element.clientHeight / 2;
 
-                <!-- Layer 3 Config -->
-                <div id="layer-3" class="layer-pane" style="display: none;">
-                  <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                      <div class="section-title" style="color: #dde3f0; font-size: 11px; font-weight: 600; margin-bottom: 0;">CẤU HÌNH LAYER 3</div>
-                      <div style="display: flex; align-items: center; gap: 6px;">
-                        <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                        <span class="toggle" onclick="toggleLayerActivation(this, 'layer-3')"></span>
-                      </div>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 8px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">File logo:</span>
-                      <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
-                      <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
-                    </div>
-                    
-                    <div class="row" style="margin-bottom: 12px;">
-                      <span class="field-label" style="color: #7b849c; min-width: 70px; font-size: 11px;">Vị trí:</span>
-                      <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                        <option>Góc dưới - Phải (Bottom-Right)</option>
-                        <option>Góc dưới - Trái (Bottom-Left)</option>
-                        <option>Góc trên - Phải (Top-Right)</option>
-                        <option>Góc trên - Trái (Top-Left)</option>
-                        <option>Ở giữa - Trên (Top-Center)</option>
-                      </select>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Kích cỡ (Width):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="20" max="500" value="80" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 40px; text-align: right;">80px</span>
-                        </div>
-                      </div>
-                      
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 11px;">Độ mờ (Opacity):</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                          <input type="range" min="10" max="100" value="50" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">50%</span>
-                        </div>
-                      </div>
-                    </div>
+                guideX.style.top = centerY + 'px';
+                guideY.style.left = centerX + 'px';
 
-                    <!-- Margin adjustments -->
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="300" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input type="range" min="0" max="500" value="20" oninput="this.nextElementSibling.innerText = this.value + 'px'" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                          <span style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Main Tab 2 Content: Edit Video -->
-          <div id="main-tab-video" class="main-tab-pane" style="display: none;">
-            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px;">
-              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">TỶ LỆ KHUNG HÌNH & SCALE</div>
-              
-              <div class="row" style="margin-bottom: 8px;">
-                <span class="field-label" style="color: #7b849c; min-width: 90px; font-size: 11px; text-align: left;">Độ phân giải:</span>
-                <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                  <option selected>1920x1080 (16:9 - Ngang chuẩn)</option>
-                  <option>1080x1920 (9:16 - Dọc TikTok/Reels)</option>
-                  <option>1080x1080 (1:1 - Vuông Instagram)</option>
-                  <option>1280x720 (16:9 - HD)</option>
-                </select>
-              </div>
-
-              <div class="row" style="margin-bottom: 8px;">
-                <span class="field-label" style="color: #7b849c; min-width: 90px; font-size: 11px; text-align: left;">Chế độ Scale:</span>
-                <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                  <option selected>Fit with Black padding (Viền đen)</option>
-                  <option>Fit with Blur padding (Mờ nền)</option>
-                  <option>Crop to Fill (Cắt đổ đầy)</option>
-                  <option>Stretch (Kéo giãn)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px; margin-top: 8px;">
-              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">ĐIỀU CHỈNH ÂM LƯỢNG & TỐC ĐỘ</div>
-              
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                  <span class="field-label" style="color: #7b849c; font-size: 11px;">Âm lượng gốc:</span>
-                  <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                    <input type="range" min="0" max="200" value="100" oninput="this.nextElementSibling.innerText = this.value + '%'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                    <span style="color: #dde3f0; font-size: 11px; min-width: 36px; text-align: right;">100%</span>
-                  </div>
-                </div>
-                
-                <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                  <span class="field-label" style="color: #7b849c; font-size: 11px;">Tốc độ phát:</span>
-                  <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                    <input type="range" min="50" max="200" value="100" oninput="this.nextElementSibling.innerText = (this.value/100).toFixed(1) + 'x'" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                    <span style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">1.0x</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="box" style="padding: 10px; background: white; border: 1px solid #9ca3af; border-radius: 4px; margin-top: 8px;">
-              <div class="box-title" style="color: #374151; font-size: 11px; font-weight: 600; margin-bottom: 8px;">CẤU HÌNH CÁC LỚP VIDEO (VIDEO LAYERS)</div>
-              
-              <!-- Video Layer selector sub-tabs -->
-              <div style="display: flex; gap: 6px; margin-bottom: 8px; border-bottom: 1px solid #2e3347; padding-bottom: 6px;">
-                <button class="vid-tab-btn active" onclick="switchVidLayer(event, 'vid-layer-1')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #2563eb; color: white; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                  <span style="display: inline-block; width: 6px; height: 6px; background: #4ade80; border-radius: 50%;"></span>
-                  Video Layer 1
-                </button>
-                <button class="vid-tab-btn" onclick="switchVidLayer(event, 'vid-layer-2')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                  <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
-                  Video Layer 2
-                </button>
-                <button class="vid-tab-btn" onclick="switchVidLayer(event, 'vid-layer-3')" style="flex: 1; padding: 4px; border: 1px solid #2e3347; border-radius: 4px; background: #1e2235; color: #7b849c; font-size: 10px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; outline: none;">
-                  <span style="display: inline-block; width: 6px; height: 6px; background: #9ca3af; border-radius: 50%;"></span>
-                  Video Layer 3
-                </button>
-              </div>
-
-              <!-- Vid Layer 1 Config -->
-              <div id="vid-layer-1" class="vid-pane" style="display: block;">
-                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 1</div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                      <span class="toggle on" onclick="toggleVidActivation(this, 'vid-layer-1')"></span>
-                    </div>
-                  </div>
-
-                  <div class="row" style="margin-bottom: 8px;">
-                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video:</span>
-                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                      <option selected>Theo danh sách chạy (Batch Source File)</option>
-                      <option>File cố định (Static file...)</option>
-                    </select>
-                  </div>
-
-                  <div class="row" style="margin-bottom: 8px;">
-                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Vị trí đè:</span>
-                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                      <option selected>Ở giữa (Center)</option>
-                      <option>Góc dưới - Phải (Bottom-Right)</option>
-                      <option>Góc dưới - Trái (Bottom-Left)</option>
-                      <option>Góc trên - Phải (Top-Right)</option>
-                      <option>Góc trên - Trái (Top-Left)</option>
-                    </select>
-                  </div>
-
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Tỉ lệ Scale (Cỡ):</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                        <input id="vid-scale-range" type="range" min="10" max="100" value="30" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-scale-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">30%</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Bo góc (Corners):</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                        <input id="vid-radius-range" type="range" min="0" max="50" value="10" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 4px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-radius-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">10px</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Margins -->
-                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid-margin-t-range" type="range" min="0" max="225" value="67" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-margin-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">67px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid-margin-b-range" type="range" min="0" max="225" value="68" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-margin-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">68px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid-margin-l-range" type="range" min="0" max="400" value="140" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-margin-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">140px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid-margin-r-range" type="range" min="0" max="400" value="140" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #5b8def; cursor: pointer;">
-                        <span id="vid-margin-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">140px</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Layer 1 Crop Section -->
-                  <div style="margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold; margin-bottom: 6px;">CẮT CÚP LAYER 1 (CROP)</div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trên:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid1-crop-t" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid1-crop-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Dưới:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid1-crop-b" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid1-crop-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trái:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid1-crop-l" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid1-crop-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Phải:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid1-crop-r" type="range" min="0" max="50" value="0" oninput="updateMockLayerFromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid1-crop-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Vid Layer 2 Config -->
-              <div id="vid-layer-2" class="vid-pane" style="display: none;">
-                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 2</div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                      <span class="toggle on" onclick="toggleVidActivation(this, 'vid-layer-2')"></span>
-                    </div>
-                  </div>
-
-                  <div class="row" style="margin-bottom: 8px;">
-                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video/Ảnh:</span>
-                    <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">logo.png</span>
-                    <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
-                  </div>
-
-                  <div class="row" style="margin-bottom: 8px;">
-                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Vị trí đè:</span>
-                    <select class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px; flex: 1; text-align: left; padding: 0 4px;">
-                      <option>Ở giữa (Center)</option>
-                      <option selected>Góc dưới - Phải (Bottom-Right)</option>
-                      <option>Góc dưới - Trái (Bottom-Left)</option>
-                      <option>Góc trên - Phải (Top-Right)</option>
-                      <option>Góc trên - Trái (Top-Left)</option>
-                    </select>
-                  </div>
-
-                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Tỉ lệ Scale (Cỡ):</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                        <input id="vid2-scale-range" type="range" min="10" max="100" value="15" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 4px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-scale-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">15%</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 11px;">Bo góc (Corners):</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 8px;">
-                        <input id="vid2-radius-range" type="range" min="0" max="50" value="4" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 4px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-radius-val" style="color: #dde3f0; font-size: 11px; min-width: 32px; text-align: right;">4px</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Margins -->
-                  <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trên:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid2-margin-t-range" type="range" min="0" max="225" value="145" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-margin-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">145px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Dưới:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid2-margin-b-range" type="range" min="0" max="225" value="20" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-margin-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Trái:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid2-margin-l-range" type="range" min="0" max="400" value="320" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-margin-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">320px</span>
-                      </div>
-                    </div>
-                    <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                      <span class="field-label" style="color: #7b849c; font-size: 9px;">Lề Phải:</span>
-                      <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                        <input id="vid2-margin-r-range" type="range" min="0" max="400" value="20" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #10b981; cursor: pointer;">
-                        <span id="vid2-margin-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">20px</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Layer 2 Crop Section -->
-                  <div style="margin-top: 10px; border-top: 1px solid #2e3347; padding-top: 10px;">
-                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold; margin-bottom: 6px;">CẮT CÚP LAYER 2 (CROP)</div>
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trên:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid2-crop-t" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid2-crop-t-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Dưới:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid2-crop-b" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid2-crop-b-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Trái:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid2-crop-l" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid2-crop-l-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                      <div class="row" style="flex-direction: column; align-items: flex-start; gap: 2px;">
-                        <span class="field-label" style="color: #7b849c; font-size: 9px;">Cắt Phải:</span>
-                        <div style="display: flex; align-items: center; width: 100%; gap: 4px;">
-                          <input id="vid2-crop-r" type="range" min="0" max="30" value="0" oninput="updateMockLayer2FromSliders()" style="flex: 1; height: 3px; accent-color: #f59e0b; cursor: pointer;">
-                          <span id="vid2-crop-r-val" style="color: #dde3f0; font-size: 9px; min-width: 24px; text-align: right;">0px</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Vid Layer 3 Config -->
-              <div id="vid-layer-3" class="vid-pane" style="display: none;">
-                <div class="section" style="background: #181b26; border: 1px solid #2e3347; border-radius: 4px; padding: 10px;">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="color: #dde3f0; font-size: 10px; font-weight: bold;">CẤU HÌNH VIDEO LAYER 3</div>
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                      <span style="color: #7b849c; font-size: 10px;">Kích hoạt:</span>
-                      <span class="toggle" onclick="toggleVidActivation(this, 'vid-layer-3')"></span>
-                    </div>
-                  </div>
-                  <div class="row" style="margin-bottom: 8px;">
-                    <span class="field-label" style="color: #7b849c; min-width: 80px; font-size: 11px;">Nguồn Video:</span>
-                    <span class="field field-long" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; text-align: left; padding: 4px 8px; flex: 1; height: 24px; font-size: 11px; display: flex; align-items: center;">— Chưa chọn —</span>
-                    <button class="btn" style="background: #2e3347; color: #dde3f0; border-color: #2e3347; height: 24px; font-size: 11px;">Chọn...</button>
-                  </div>
-                  <div style="font-size: 10px; color: #7b849c; text-align: center; padding: 10px 0;">(Cài đặt vị trí, kích cỡ, bo góc và margins tương tự Layer 1)</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Preview -->
-          <div class="box preview-box" style="flex: 1; display: flex; flex-direction: column;">
-            <div class="box-title" style="display: flex; justify-content: space-between; align-items: center;">
-              <span>🖼 Preview (Kéo/Thả/Scale & Cắt khung trực tiếp)</span>
-              <button id="btn-crop-mode" onclick="toggleCropMode()" style="display: none; background: #1e293b; color: #f59e0b; border: 1px solid #f59e0b; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; cursor: pointer; transition: all 0.2s; outline: none;">✂ Bật Crop Mode</button>
-            </div>
-            
-            <div class="preview-canvas" style="position: relative; height: 260px; background: #0f172a; display: flex; align-items: center; justify-content: center; overflow: hidden; border: 1px solid #1e293b; border-radius: 4px; padding: 0;">
-              <!-- Background Canvas -->
-              <div id="preview-workspace" style="position: relative; width: 400px; height: 225px; background: #1e293b; border: 1px solid #334155; user-select: none;">
-                <div style="position: absolute; color: #475569; font-size: 11px; font-weight: bold; width: 100%; text-align: center; top: 10px; pointer-events: none;">VIDEO NỀN (BACKGROUND)</div>
-                
-                <!-- Main Subtitle Style Overlay -->
-                <div id="mock-subtitle" style="position: absolute; bottom: 20px; width: 80%; left: 10%; background: rgba(0,0,0,0.6); color: white; padding: 6px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.2); font-size: 11px; text-align: center; pointer-events: none;">
-                  Mẫu phụ đề hiển thị: " Martha: and he let it go. "
-                </div>
-
-                <!-- Crop Box (Orange border dashed, resizable, only active in Crop Mode) -->
-                <div id="crop-box" style="display: none; position: absolute; border: 2px dashed #f59e0b; background: rgba(245, 158, 11, 0.15); cursor: move; left: 20px; top: 15px; width: 360px; height: 195px; box-sizing: border-box;">
-                  <div style="position: absolute; top: 2px; left: 4px; color: #f59e0b; font-size: 9px; font-weight: bold; pointer-events: none;">Khung Cắt (Crop Box)</div>
-                  <!-- Handles for resizing crop box -->
-                  <div class="crop-handle n" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; top: -3px; left: 50%; margin-left: -3px; cursor: ns-resize;"></div>
-                  <div class="crop-handle s" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; bottom: -3px; left: 50%; margin-left: -3px; cursor: ns-resize;"></div>
-                  <div class="crop-handle w" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; left: -3px; top: 50%; margin-top: -3px; cursor: ew-resize;"></div>
-                  <div class="crop-handle e" style="position: absolute; width: 6px; height: 6px; background: #f59e0b; right: -3px; top: 50%; margin-top: -3px; cursor: ew-resize;"></div>
-                </div>
-
-                <!-- Resizable & Draggable Video Layer 1 Box (Blue) -->
-                <div id="mock-video-layer" style="display: none; position: absolute; width: 120px; height: 67px; background: rgba(37, 99, 235, 0.25); border: 2px solid #2563eb; border-radius: 10px; cursor: move; left: 140px; top: 60px; display: flex; align-items: center; justify-content: center; box-sizing: border-box; transition: border-radius 0.1s;">
-                  <div style="text-align: center; color: #60a5fa; font-size: 9px; font-weight: bold; line-height: 1.1; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">Video Layer 1<br>(Kéo/Co giãn)</div>
-                  
-                  <!-- Handles for resizing video layer -->
-                  <div class="resize-handle nw" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; top: -3px; left: -3px; cursor: nwse-resize;"></div>
-                  <div class="resize-handle ne" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; top: -3px; right: -3px; cursor: nesw-resize;"></div>
-                  <div class="resize-handle sw" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; bottom: -3px; left: -3px; cursor: nesw-resize;"></div>
-                  <div class="resize-handle se" style="position: absolute; width: 6px; height: 6px; background: #2563eb; border: 1px solid white; bottom: -3px; right: -3px; cursor: nwse-resize;"></div>
-                </div>
-
-                <!-- Resizable & Draggable Video Layer 2 Box (Green) -->
-                <div id="mock-video-layer-2" style="display: none; position: absolute; width: 60px; height: 60px; background: rgba(16, 185, 129, 0.25); border: 2px solid #10b981; border-radius: 4px; cursor: move; left: 320px; top: 145px; display: flex; align-items: center; justify-content: center; box-sizing: border-box;">
-                  <div style="text-align: center; color: #34d399; font-size: 8px; font-weight: bold; line-height: 1.1; pointer-events: none; text-shadow: 0 1px 2px rgba(0,0,0,0.8);">logo.png<br>(Layer 2)</div>
-                  <!-- Handles for resizing layer 2 -->
-                  <div class="resize-handle nw" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; top: -3px; left: -3px; cursor: nwse-resize;"></div>
-                  <div class="resize-handle ne" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; top: -3px; right: -3px; cursor: nesw-resize;"></div>
-                  <div class="resize-handle sw" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; bottom: -3px; left: -3px; cursor: nesw-resize;"></div>
-                  <div class="resize-handle se" style="position: absolute; width: 6px; height: 6px; background: #10b981; border: 1px solid white; bottom: -3px; right: -3px; cursor: nwse-resize;"></div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="preview-controls">
-              <button class="btn btn-primary">🔄 Load frame từ video nguồn</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT PANEL -->
-      <div class="panel panel-right">
-        <div class="box" style="flex:0 0 auto;">
-          <div class="box-title">⚙️ Cài đặt Render</div>
-          <div class="row"><span class="field-label">Codec:</span><span class="field field-long">H.265 HEVC — GPU (NVENC)</span></div>
-          <div class="row"><span class="field-label">Slow min:</span><span class="field field-short">35%</span><span class="field-label">Slow max:</span><span class="field field-short">45%</span></div>
-        </div>
-        <div style="display:flex; gap:10px; flex:1; min-height:0;">
-          <div class="box" style="flex:1; min-width:0;">
-            <div class="box-title">⏱ Timing Tools</div>
-            <div class="row" style="flex-wrap:wrap;">
-              <button class="btn">⏮ Shift To 0s</button>
-              <button class="btn">↩ Undo</button>
-            </div>
-          </div>
-          <div class="box" style="flex:1; min-width:0; display:flex; flex-direction:column;">
-            <div class="box-title">📝 Log FFmpeg</div>
-            <div style="background:#111827; color:#d1fae5; font-family:monospace; font-size:10px; padding:5px; border-radius:3px; flex:1; min-height:0; overflow:hidden;">
-              [INFO] Bắt đầu render 2 video...<br>
-              [INFO] Codec: hevc_nvenc | GPU: True<br>
-              [INFO] [1/2] Đang render...
-            </div>
-            <button class="btn" style="margin-top:4px;">Xóa log</button>
-          </div>
-        </div>
-        <div class="box" style="flex:0 0 auto;">
-          <div class="box-title">▶ Render</div>
-          <div class="row" style="flex-wrap:wrap;">
-            <button class="btn btn-primary">▶ Bắt đầu Render</button>
-            <button class="btn">📤 Xuất JSON</button>
-            <button class="btn">⏸ Tạm dừng</button>
-            <button class="btn">⏹ Dừng</button>
-          </div>
-          <div style="background:#e2e8f0; border-radius:3px; height:14px; margin-top:5px; border:1px solid #cbd5e1;">
-            <div style="background:#2563eb; width:0%; height:100%; border-radius:2px;"></div>
-          </div>
-          <div style="font-size:10px; color:#64748b; margin-top:2px;">Sẵn sàng</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="notes">
-    <h3>📋 Ghi chú thiết kế</h3>
-    <ul>
-      <li><span class="hl">Bỏ:</span> Nhóm <em>Preset Style</em> cũ (combobox + Lưu preset + Áp toàn bộ + Frame).</li>
-      <li><span class="hl">Giữ:</span> Preset bar có sẵn trong <em>Subtitle Style Editor</em> (Classic / Cinematic / Clean + Save/Delete/Reset).</li>
-      <li><span class="hl">Thêm:</span> Vùng <strong>Preview</strong> ngay bên dưới Subtitle Style, chứa canvas render phụ đề + nút <em>Load frame from video</em>.</li>
-      <li>Thứ tự mới trong Box B: <strong>Subtitle Style → Preview</strong>.</li>
-      <li>Không thay đổi gì các panel trái và phải.</li>
-    </ul>
-  </div>
-
-  <script>
-    function switchMainTab(event, tabId) {
-      // Hide all main tab panes
-      document.querySelectorAll('.main-tab-pane').forEach(el => el.style.display = 'none');
-      // Show active main tab pane
-      document.getElementById(tabId).style.display = 'block';
-      
-      // Reset all main tab buttons
-      document.querySelectorAll('.main-tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.background = '#f3f4f6';
-        btn.style.color = '#4b5563';
-        btn.style.borderBottom = 'none';
-      });
-      
-      // Set active main tab button style
-      const activeBtn = event.currentTarget;
-      activeBtn.classList.add('active');
-      activeBtn.style.background = 'white';
-      activeBtn.style.color = '#2563eb';
-      activeBtn.style.borderBottom = '2px solid #2563eb';
-
-      // Toggle left panel containers & preview controls
-      if (tabId === 'main-tab-sub') {
-        document.getElementById('left-sub-container').style.display = 'flex';
-        document.getElementById('left-video-container').style.display = 'none';
-        
-        // Hide video editor overlay boxes and crop button in Edit Sub mode
-        document.getElementById('mock-video-layer').style.display = 'none';
-        document.getElementById('mock-video-layer-2').style.display = 'none';
-        document.getElementById('btn-crop-mode').style.display = 'none';
-        document.getElementById('crop-box').style.display = 'none';
-        
-        // Show subtitle preview
-        document.getElementById('mock-subtitle').style.display = 'block';
-      } else {
-        document.getElementById('left-sub-container').style.display = 'none';
-        document.getElementById('left-video-container').style.display = 'flex';
-        
-        // Show video editor overlay boxes (if enabled) and crop button in Edit Video mode
-        document.getElementById('mock-video-layer').style.display = 'flex';
-        document.getElementById('mock-video-layer-2').style.display = 'flex';
-        document.getElementById('btn-crop-mode').style.display = 'block';
-        
-        // Hide subtitle preview to focus on video scale
-        document.getElementById('mock-subtitle').style.display = 'none';
-      }
-    }
-
-    function switchTab(event, tabId) {
-      // Hide all tab panes
-      document.querySelectorAll('.tab-pane').forEach(el => el.style.display = 'none');
-      // Show active tab pane
-      document.getElementById(tabId).style.display = 'block';
-      
-      // Reset all tab button classes and styles
-      document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.background = '#f3f4f6';
-        btn.style.color = '#4b5563';
-        btn.style.borderBottom = 'none';
-      });
-      
-      // Set active button style
-      const activeBtn = event.currentTarget;
-      activeBtn.classList.add('active');
-      activeBtn.style.background = 'white';
-      activeBtn.style.color = '#2563eb';
-      activeBtn.style.borderBottom = '2px solid #2563eb';
-    }
-
-    function switchLayer(event, layerId) {
-      // Hide all layer panes
-      document.querySelectorAll('.layer-pane').forEach(el => el.style.display = 'none');
-      // Show active layer pane
-      document.getElementById(layerId).style.display = 'block';
-      
-      // Reset all layer tab buttons
-      document.querySelectorAll('.layer-tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.background = '#1e2235';
-        btn.style.color = '#7b849c';
-      });
-      
-      // Set active button style
-      const activeBtn = event.currentTarget;
-      activeBtn.classList.add('active');
-      activeBtn.style.background = '#2563eb';
-      activeBtn.style.color = 'white';
-    }
-
-    function toggleLayerActivation(el, layerId) {
-      el.classList.toggle('on');
-      const dot = document.querySelector(`button[onclick*="${layerId}"] span`);
-      if (el.classList.contains('on')) {
-        dot.style.background = '#4ade80';
-      } else {
-        dot.style.background = '#9ca3af';
-      }
-    }
-
-    function switchVidLayer(event, paneId) {
-      // Hide all vid panes
-      document.querySelectorAll('.vid-pane').forEach(el => el.style.display = 'none');
-      // Show active vid pane
-      document.getElementById(paneId).style.display = 'block';
-      
-      // Reset all vid tab buttons
-      document.querySelectorAll('.vid-tab-btn').forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.background = '#1e2235';
-        btn.style.color = '#7b849c';
-      });
-      
-      // Set active button style
-      let activeBtn;
-      if (event) {
-        activeBtn = event.currentTarget;
-      } else {
-        activeBtn = document.querySelector(`button[onclick*="${paneId}"]`);
-      }
-      if (activeBtn) {
-        activeBtn.classList.add('active');
-        activeBtn.style.background = '#2563eb';
-        activeBtn.style.color = 'white';
-      }
-
-      // Sync canvas selection (avoiding recursion)
-      if (isManualSelection) return;
-      if (paneId === 'vid-layer-1') {
-        selectPreviewLayer(document.getElementById('mock-video-layer'), true);
-      } else if (paneId === 'vid-layer-2') {
-        selectPreviewLayer(document.getElementById('mock-video-layer-2'), true);
-      }
-    }
-
-    function toggleVidActivation(el, paneId) {
-      el.classList.toggle('on');
-      const dot = document.querySelector(`button[onclick*="${paneId}"] span`);
-      if (el.classList.contains('on')) {
-        dot.style.background = '#4ade80';
-        if (paneId === 'vid-layer-1') {
-          document.getElementById('mock-video-layer').style.display = 'flex';
-        }
-        if (paneId === 'vid-layer-2') {
-          document.getElementById('mock-video-layer-2').style.display = 'flex';
-        }
-      } else {
-        dot.style.background = '#9ca3af';
-        if (paneId === 'vid-layer-1') {
-          document.getElementById('mock-video-layer').style.display = 'none';
-        }
-        if (paneId === 'vid-layer-2') {
-          document.getElementById('mock-video-layer-2').style.display = 'none';
-        }
-      }
-    }
-
-    // --- INTERACTIVE PREVIEW INTERFACE DEMO ---
-    let isCropMode = false;
-    let selectedLayerId = 'vid-layer-1'; // Default selected layer
-    let isManualSelection = false;
-
-    const mockLayer = document.getElementById('mock-video-layer');
-    const mockLayer2 = document.getElementById('mock-video-layer-2');
-    const mockBg = document.getElementById('preview-workspace');
-    const mockCrop = document.getElementById('crop-box');
-
-    // Function to visually select a layer and update tabs
-    function selectPreviewLayer(el, fromTab = false) {
-      if (!el) return;
-      
-      // Update selectedLayerId
-      selectedLayerId = el.id === 'mock-video-layer' ? 'vid-layer-1' : 'vid-layer-2';
-      
-      // Visual feedback
-      if (selectedLayerId === 'vid-layer-1') {
-        mockLayer.style.border = '2px dashed #3b82f6';
-        mockLayer2.style.border = '2px solid #10b981';
-      } else {
-        mockLayer.style.border = '2px solid #2563eb';
-        mockLayer2.style.border = '2px dashed #34d399';
-      }
-
-      // Switch tab on the left if not triggered from tab click
-      if (!fromTab) {
-        isManualSelection = true;
-        switchVidLayer(null, selectedLayerId);
-        isManualSelection = false;
-      }
-
-      // If already in Crop Mode, reposition crop box over newly selected layer
-      if (isCropMode) {
-        positionCropBoxOverSelectedLayer();
-      }
-    }
-
-    function toggleCropMode() {
-      isCropMode = !isCropMode;
-      const btn = document.getElementById('btn-crop-mode');
-      const cropBox = document.getElementById('crop-box');
-      
-      if (isCropMode) {
-        btn.innerText = '✓ Đang Crop (Tắt)';
-        btn.style.background = '#f59e0b';
-        btn.style.color = '#000';
-        cropBox.style.display = 'block';
-        
-        // Disable dragging of layers while cropping
-        mockLayer.style.pointerEvents = 'none';
-        mockLayer2.style.pointerEvents = 'none';
-        
-        positionCropBoxOverSelectedLayer();
-      } else {
-        btn.innerText = '✂ Bật Crop Mode';
-        btn.style.background = '#1e293b';
-        btn.style.color = '#f59e0b';
-        cropBox.style.display = 'none';
-        
-        mockLayer.style.pointerEvents = 'auto';
-        mockLayer2.style.pointerEvents = 'auto';
-        mockLayer.style.opacity = '1';
-        mockLayer2.style.opacity = '1';
-      }
-    }
-
-    // Position crop box exactly over the selected layer bounds
-    function positionCropBoxOverSelectedLayer() {
-      const activeLayer = selectedLayerId === 'vid-layer-1' ? mockLayer : mockLayer2;
-      const otherLayer = selectedLayerId === 'vid-layer-1' ? mockLayer2 : mockLayer;
-      
-      activeLayer.style.opacity = '1';
-      otherLayer.style.opacity = '0.3';
-      
-      // Align crop box to the selected layer's bounds
-      mockCrop.style.left = activeLayer.offsetLeft + 'px';
-      mockCrop.style.top = activeLayer.offsetTop + 'px';
-      mockCrop.style.width = activeLayer.offsetWidth + 'px';
-      mockCrop.style.height = activeLayer.offsetHeight + 'px';
-
-      updateCropBoxFromSliders();
-    }
-
-    // Initialize selection
-    setTimeout(() => { selectPreviewLayer(mockLayer); }, 100);
-
-    let activeEl = null;
-    let dragMode = null; // 'move', 'resize', 'crop-resize'
-    let currentResizeHandle = null;
-    let startMouseX = 0, startMouseY = 0;
-    let startW = 0, startH = 0;
-    let startL = 0, startT = 0;
-
-    // Video Layer 1 Mouse Downs
-    mockLayer.addEventListener('mousedown', function(e) {
-      if (isCropMode) return;
-      selectPreviewLayer(mockLayer);
-      activeEl = mockLayer;
-      if (e.target.classList.contains('resize-handle')) {
-        dragMode = 'resize';
-        currentResizeHandle = e.target;
-        startW = mockLayer.offsetWidth;
-        startH = mockLayer.offsetHeight;
-      } else {
-        dragMode = 'move';
-      }
-      startMouseX = e.clientX;
-      startMouseY = e.clientY;
-      startL = mockLayer.offsetLeft;
-      startT = mockLayer.offsetTop;
-      e.preventDefault();
-    });
-
-    // Video Layer 2 Mouse Downs
-    mockLayer2.addEventListener('mousedown', function(e) {
-      if (isCropMode) return;
-      selectPreviewLayer(mockLayer2);
-      activeEl = mockLayer2;
-      if (e.target.classList.contains('resize-handle')) {
-        dragMode = 'resize';
-        currentResizeHandle = e.target;
-        startW = mockLayer2.offsetWidth;
-        startH = mockLayer2.offsetHeight;
-      } else {
-        dragMode = 'move';
-      }
-      startMouseX = e.clientX;
-      startMouseY = e.clientY;
-      startL = mockLayer2.offsetLeft;
-      startT = mockLayer2.offsetTop;
-      e.preventDefault();
-    });
-
-    // Crop Box Mouse Downs
-    mockCrop.addEventListener('mousedown', function(e) {
-      if (!isCropMode) return;
-      activeEl = mockCrop;
-      if (e.target.classList.contains('crop-handle')) {
-        dragMode = 'crop-resize';
-        currentResizeHandle = e.target;
-        startW = mockCrop.offsetWidth;
-        startH = mockCrop.offsetHeight;
-      } else {
-        dragMode = 'move';
-      }
-      startMouseX = e.clientX;
-      startMouseY = e.clientY;
-      startL = mockCrop.offsetLeft;
-      startT = mockCrop.offsetTop;
-      e.preventDefault();
-    });
-
-    // Global Mouse Move
-    document.addEventListener('mousemove', function(e) {
-      if (!activeEl || !dragMode) return;
-
-      const dx = e.clientX - startMouseX;
-      const dy = e.clientY - startMouseY;
-
-      if (dragMode === 'move') {
-        let newL = startL + dx;
-        let newT = startT + dy;
-        newL = Math.max(0, Math.min(newL, mockBg.offsetWidth - activeEl.offsetWidth));
-        newT = Math.max(0, Math.min(newT, mockBg.offsetHeight - activeEl.offsetHeight));
-        
-        activeEl.style.left = newL + 'px';
-        activeEl.style.top = newT + 'px';
-
-        if (activeEl === mockLayer) {
-          updateSlidersFromMockLayer();
-        } else if (activeEl === mockLayer2) {
-          updateSlidersFromMockLayer2();
-        } else if (activeEl === mockCrop) {
-          updateSlidersFromMockCrop();
-        }
-      } 
-      else if (dragMode === 'resize') {
-        if (activeEl === mockLayer) {
-          if (currentResizeHandle.classList.contains('se')) {
-            let newW = startW + dx;
-            newW = Math.max(40, Math.min(newW, mockBg.offsetWidth - mockLayer.offsetLeft));
-            let newH = Math.round(newW * 0.5625);
-            mockLayer.style.width = newW + 'px';
-            mockLayer.style.height = newH + 'px';
-          }
-          else if (currentResizeHandle.classList.contains('sw')) {
-            let newW = startW - dx;
-            let newL = startL + dx;
-            if (newL >= 0 && newW >= 40) {
-              mockLayer.style.left = newL + 'px';
-              mockLayer.style.width = newW + 'px';
-              mockLayer.style.height = Math.round(newW * 0.5625) + 'px';
+                coord.style.left = (newLeft + 5) + 'px';
+                coord.style.top = (newTop - 25) + 'px';
+                coord.innerText = `X: ${newLeft}, Y: ${newTop}`;
             }
-          }
-          updateSlidersFromMockLayer();
-        } 
-        else if (activeEl === mockLayer2) {
-          if (currentResizeHandle.classList.contains('se')) {
-            let newW = startW + dx;
-            newW = Math.max(20, Math.min(newW, mockBg.offsetWidth - mockLayer2.offsetLeft));
-            mockLayer2.style.width = newW + 'px';
-            mockLayer2.style.height = newW + 'px'; // 1:1 aspect ratio
-          }
-          else if (currentResizeHandle.classList.contains('sw')) {
-            let newW = startW - dx;
-            let newL = startL + dx;
-            if (newL >= 0 && newW >= 20) {
-              mockLayer2.style.left = newL + 'px';
-              mockLayer2.style.width = newW + 'px';
-              mockLayer2.style.height = newW + 'px';
+
+            function stopDrag() {
+                document.removeEventListener('mousemove', doDrag);
+                document.removeEventListener('mouseup', stopDrag);
+                guideX.style.display = 'none';
+                guideY.style.display = 'none';
+                coord.style.display = 'none';
             }
-          }
-          updateSlidersFromMockLayer2();
+
+            document.addEventListener('mousemove', doDrag);
+            document.addEventListener('mouseup', stopDrag);
         }
-      }
-      else if (dragMode === 'crop-resize') {
-        if (currentResizeHandle.classList.contains('e')) {
-          let newW = startW + dx;
-          newW = Math.max(40, Math.min(newW, mockBg.offsetWidth - mockCrop.offsetLeft));
-          mockCrop.style.width = newW + 'px';
+
+        // Draggable Logic for the Async Loader Window
+        const asyncHeader = document.getElementById('windowHeader');
+        const asyncWindow = document.getElementById('asyncWindow');
+
+        asyncHeader.addEventListener('mousedown', function (e) {
+            e.preventDefault();
+            let startX = e.clientX;
+            let startY = e.clientY;
+            let initialLeft = asyncWindow.offsetLeft;
+            let initialTop = asyncWindow.offsetTop;
+
+            function doDragWindow(e) {
+                let dx = e.clientX - startX;
+                let dy = e.clientY - startY;
+                asyncWindow.style.left = (initialLeft + dx) + 'px';
+                asyncWindow.style.top = (initialTop + dy) + 'px';
+            }
+
+            function stopDragWindow() {
+                document.removeEventListener('mousemove', doDragWindow);
+                document.removeEventListener('mouseup', stopDragWindow);
+            }
+
+            document.addEventListener('mousemove', doDragWindow);
+            document.addEventListener('mouseup', stopDragWindow);
+        });
+
+        // Toggle visibility of Async Frame Loader window
+        function toggleAsyncWindow() {
+            const win = document.getElementById('asyncWindow');
+            if (win.style.display === 'none' || win.style.display === '') {
+                win.style.display = 'flex';
+            } else {
+                win.style.display = 'none';
+            }
         }
-        else if (currentResizeHandle.classList.contains('s')) {
-          let newH = startH + dy;
-          newH = Math.max(40, Math.min(newH, mockBg.offsetHeight - mockCrop.offsetTop));
-          mockCrop.style.height = newH + 'px';
+
+        // Lock/Unlock layer handler
+        function toggleLockLayer(layerId, e) {
+            e.stopPropagation();
+            const layerEl = document.getElementById(layerId);
+            const icon = e.target;
+            if (layerEl) {
+                if (layerEl.style.pointerEvents === 'none') {
+                    layerEl.style.pointerEvents = 'auto';
+                    layerEl.style.opacity = '1.0';
+                    icon.innerText = '🔓';
+                    icon.title = 'Khóa Layer';
+                } else {
+                    layerEl.style.pointerEvents = 'none';
+                    layerEl.style.opacity = '0.5';
+                    icon.innerText = '🔒';
+                    icon.title = 'Mở Khóa Layer';
+                    layerEl.classList.remove('active');
+                }
+            }
         }
-        else if (currentResizeHandle.classList.contains('w')) {
-          let newW = startW - dx;
-          let newL = startL + dx;
-          if (newL >= 0 && newW >= 40) {
-            mockCrop.style.left = newL + 'px';
-            mockCrop.style.width = newW + 'px';
-          }
+
+        // Timeline click / jump to sub handler
+        function jumpToSub(index) {
+            const rows = document.querySelectorAll('.sub-row');
+            if (rows[index]) {
+                rows[index].click();
+            }
+            // Move playhead indicator
+            const playhead = document.getElementById('playhead');
+            if (index === 0) playhead.style.left = '22%';
+            else if (index === 1) playhead.style.left = '50%';
+            else if (index === 2) playhead.style.left = '82%';
         }
-        else if (currentResizeHandle.classList.contains('n')) {
-          let newH = startH - dy;
-          let newT = startT + dy;
-          if (newT >= 0 && newH >= 40) {
-            mockCrop.style.top = newT + 'px';
-            mockCrop.style.height = newH + 'px';
-          }
+
+        // Layer selection from list
+        function selectLayerItem(layerId, item) {
+            document.querySelectorAll('.layer-item').forEach(li => li.classList.remove('active'));
+            item.classList.add('active');
+
+            if (layerId === 'bg') {
+                document.querySelectorAll('.draggable-layer').forEach(l => l.classList.remove('active'));
+                activeLayer = null;
+                document.getElementById('spinX').value = 0;
+                document.getElementById('spinY').value = 0;
+                document.getElementById('spinW').value = 533;
+                document.getElementById('spinH').value = 300;
+            } else if (layerId === 'logo') {
+                // Focus logo or mock select
+            } else {
+                const layerEl = document.getElementById(layerId);
+                if (layerEl) {
+                    // Ignore selecting if locked
+                    if (layerEl.style.pointerEvents === 'none') return;
+
+                    document.querySelectorAll('.draggable-layer').forEach(l => l.classList.remove('active'));
+                    layerEl.classList.add('active');
+                    activeLayer = layerEl;
+                    document.getElementById('spinX').value = parseInt(layerEl.style.left) || 0;
+                    document.getElementById('spinY').value = parseInt(layerEl.style.top) || 0;
+                    document.getElementById('spinW').value = parseInt(layerEl.style.width) || 0;
+                    document.getElementById('spinH').value = parseInt(layerEl.style.height) || 0;
+                }
+            }
         }
-        updateSlidersFromMockCrop();
-      }
-    });
 
-    document.addEventListener('mouseup', function() {
-      activeEl = null;
-      dragMode = null;
-      currentResizeHandle = null;
-    });
+        // Align positioning handler
+        function alignActiveLayer(dir, btn) {
+            if (!activeLayer) return;
+            const canvas = document.getElementById('previewCanvas');
+            let w = activeLayer.clientWidth;
+            let h = activeLayer.clientHeight;
+            let cw = canvas.clientWidth;
+            let ch = canvas.clientHeight;
+            let left = activeLayer.offsetLeft;
+            let top = activeLayer.offsetTop;
 
-    // Update Sliders when dragging Layer 1
-    function updateSlidersFromMockLayer() {
-      const scaleRange = document.getElementById('vid-scale-range');
-      const scaleVal = document.getElementById('vid-scale-val');
-      
-      const tRange = document.getElementById('vid-margin-t-range');
-      const tVal = document.getElementById('vid-margin-t-val');
-      const bRange = document.getElementById('vid-margin-b-range');
-      const bVal = document.getElementById('vid-margin-b-val');
-      const lRange = document.getElementById('vid-margin-l-range');
-      const lVal = document.getElementById('vid-margin-l-val');
-      const rRange = document.getElementById('vid-margin-r-range');
-      const rVal = document.getElementById('vid-margin-r-val');
+            if (dir === 'left') left = 20;
+            else if (dir === 'center') left = (cw - w) / 2;
+            else if (dir === 'top') top = 20;
+            else if (dir === 'middle') top = (ch - h) / 2;
+            else if (dir === 'bottom') top = ch - h - 20;
 
-      const scalePct = Math.round((mockLayer.offsetWidth / mockBg.offsetWidth) * 100);
-      scaleRange.value = scalePct;
-      scaleVal.innerText = scalePct + '%';
+            activeLayer.style.left = left + 'px';
+            activeLayer.style.top = top + 'px';
 
-      const top = mockLayer.offsetTop;
-      const left = mockLayer.offsetLeft;
-      const bottom = mockBg.offsetHeight - (top + mockLayer.offsetHeight);
-      const right = mockBg.offsetWidth - (left + mockLayer.offsetWidth);
+            document.getElementById('spinX').value = left;
+            document.getElementById('spinY').value = top;
+        }
 
-      tRange.value = top;
-      tVal.innerText = top + 'px';
-      bRange.value = bottom;
-      bVal.innerText = bottom + 'px';
-      lRange.value = left;
-      lVal.innerText = left + 'px';
-      rRange.value = right;
-      rVal.innerText = right + 'px';
-    }
+        function updateScaleFromSlider(val) {
+            document.getElementById('scaleValue').innerText = val;
+            if (!activeLayer) return;
+            let baseW = 140;
+            let baseH = 90;
+            let scale = parseFloat(val) / 100.0;
+            let newW = Math.round(baseW * scale);
+            let newH = Math.round(baseH * scale);
+            activeLayer.style.width = newW + 'px';
+            activeLayer.style.height = newH + 'px';
 
-    // Update Sliders when dragging Layer 2
-    function updateSlidersFromMockLayer2() {
-      const scaleRange = document.getElementById('vid2-scale-range');
-      const scaleVal = document.getElementById('vid2-scale-val');
-      
-      const tRange = document.getElementById('vid2-margin-t-range');
-      const tVal = document.getElementById('vid2-margin-t-val');
-      const bRange = document.getElementById('vid2-margin-b-range');
-      const bVal = document.getElementById('vid2-margin-b-val');
-      const lRange = document.getElementById('vid2-margin-l-range');
-      const lVal = document.getElementById('vid2-margin-l-val');
-      const rRange = document.getElementById('vid2-margin-r-range');
-      const rVal = document.getElementById('vid2-margin-r-val');
+            document.getElementById('spinW').value = newW;
+            document.getElementById('spinH').value = newH;
+        }
 
-      const scalePct = Math.round((mockLayer2.offsetWidth / mockBg.offsetWidth) * 100);
-      scaleRange.value = scalePct;
-      scaleVal.innerText = scalePct + '%';
+        function updateLayerFromInputs() {
+            if (!activeLayer) return;
+            let x = parseInt(document.getElementById('spinX').value) || 0;
+            let y = parseInt(document.getElementById('spinY').value) || 0;
+            let w = parseInt(document.getElementById('spinW').value) || 20;
+            let h = parseInt(document.getElementById('spinH').value) || 20;
 
-      const top = mockLayer2.offsetTop;
-      const left = mockLayer2.offsetLeft;
-      const bottom = mockBg.offsetHeight - (top + mockLayer2.offsetHeight);
-      const right = mockBg.offsetWidth - (left + mockLayer2.offsetWidth);
+            activeLayer.style.left = x + 'px';
+            activeLayer.style.top = y + 'px';
+            activeLayer.style.width = w + 'px';
+            activeLayer.style.height = h + 'px';
+        }
 
-      tRange.value = top;
-      tVal.innerText = top + 'px';
-      bRange.value = bottom;
-      bVal.innerText = bottom + 'px';
-      lRange.value = left;
-      lVal.innerText = left + 'px';
-      rRange.value = right;
-      rVal.innerText = right + 'px';
-    }
+        // Subtitle & Preset Logic
+        function selectSubtitle(row, text) {
+            document.querySelectorAll('.sub-row').forEach(r => r.classList.remove('active'));
+            row.classList.add('active');
+            document.getElementById('subText').innerText = text;
+        }
 
-    // Update Sliders when resizing the Crop Box
-    function updateSlidersFromMockCrop() {
-      const tRange = document.getElementById('crop-t-range');
-      const tVal = document.getElementById('crop-t-val');
-      const bRange = document.getElementById('crop-b-range');
-      const bVal = document.getElementById('crop-b-val');
-      const lRange = document.getElementById('crop-l-range');
-      const lVal = document.getElementById('crop-l-val');
-      const rRange = document.getElementById('crop-r-range');
-      const rVal = document.getElementById('crop-r-val');
+        function updateSubStyle() {
+            const font = document.getElementById('fontSelect').value;
+            const size = document.getElementById('fontSizeSelect').value;
+            const subText = document.getElementById('subText');
 
-      const top = mockCrop.offsetTop;
-      const left = mockCrop.offsetLeft;
-      const bottom = mockBg.offsetHeight - (top + mockCrop.offsetHeight);
-      const right = mockBg.offsetWidth - (left + mockCrop.offsetWidth);
+            subText.style.fontFamily = font;
+            subText.style.fontSize = size;
+        }
 
-      tRange.value = top;
-      tVal.innerText = top + 'px';
-      bRange.value = bottom;
-      bVal.innerText = bottom + 'px';
-      lRange.value = left;
-      lVal.innerText = left + 'px';
-      rRange.value = right;
-      rVal.innerText = right + 'px';
-    }
+        function applyPresetStyle(preset) {
+            const font = document.getElementById('fontSelect');
+            const size = document.getElementById('fontSizeSelect');
+            const subText = document.getElementById('subText');
+            const colorBox = document.getElementById('colorBox');
 
-    // Update Mock Layer 1 in preview when sliders are changed
-    function updateMockLayerFromSliders() {
-      const scaleRange = document.getElementById('vid-scale-range');
-      const scaleVal = document.getElementById('vid-scale-val');
-      const radiusRange = document.getElementById('vid-radius-range');
-      const radiusVal = document.getElementById('vid-radius-val');
+            if (preset === 'default') {
+                font.value = 'Arial';
+                size.value = '24px';
+                subText.style.color = '#FFFFFF';
+                colorBox.style.backgroundColor = '#FFFFFF';
+            } else if (preset === 'large') {
+                font.value = 'Inter';
+                size.value = '24px';
+                subText.style.color = '#F59E0B';
+                colorBox.style.backgroundColor = '#F59E0B';
+            } else if (preset === 'bright') {
+                font.value = 'Courier New';
+                size.value = '20px';
+                subText.style.color = '#10B981';
+                colorBox.style.backgroundColor = '#10B981';
+            }
+            updateSubStyle();
+        }
 
-      const tRange = document.getElementById('vid-margin-t-range');
-      const tVal = document.getElementById('vid-margin-t-val');
-      const bRange = document.getElementById('vid-margin-b-range');
-      const bVal = document.getElementById('vid-margin-b-val');
-      const lRange = document.getElementById('vid-margin-l-range');
-      const lVal = document.getElementById('vid-margin-l-val');
-      const rRange = document.getElementById('vid-margin-r-range');
-      const rVal = document.getElementById('vid-margin-r-val');
+        function setAlign(align, btn) {
+            document.querySelectorAll('.alignment-selector .align-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('subOverlay').style.textAlign = align;
+        }
 
-      scaleVal.innerText = scaleRange.value + '%';
-      radiusVal.innerText = radiusRange.value + 'px';
-      tVal.innerText = tRange.value + 'px';
-      bVal.innerText = bRange.value + 'px';
-      lVal.innerText = lRange.value + 'px';
-      rVal.innerText = rRange.value + 'px';
+        const colors = ['#FFFFFF', '#F59E0B', '#EF4444', '#10B981', '#3B82F6', '#8B5CF6'];
+        let colorIdx = 0;
+        function changeColor() {
+            colorIdx = (colorIdx + 1) % colors.length;
+            const c = colors[colorIdx];
+            document.getElementById('colorBox').style.backgroundColor = c;
+            document.getElementById('subText').style.color = c;
+        }
 
-      const width = Math.round(mockBg.offsetWidth * (parseInt(scaleRange.value, 10)/100));
-      const height = Math.round(width * 0.5625);
-      mockLayer.style.width = width + 'px';
-      mockLayer.style.height = height + 'px';
-      mockLayer.style.borderRadius = radiusRange.value + 'px';
-      
-      mockLayer.style.top = tRange.value + 'px';
-      mockLayer.style.left = lRange.value + 'px';
-    }
+        // Media Bin Interactions
+        function toggleMediaCheck(item) {
+            item.classList.toggle('checked');
+            const checkbox = item.querySelector('.media-checkbox');
+            if (checkbox) checkbox.checked = item.classList.contains('checked');
+        }
 
-    // Update Mock Layer 2 in preview when sliders are changed
-    function updateMockLayer2FromSliders() {
-      const scaleRange = document.getElementById('vid2-scale-range');
-      const scaleVal = document.getElementById('vid2-scale-val');
-      const radiusRange = document.getElementById('vid2-radius-range');
-      const radiusVal = document.getElementById('vid2-radius-val');
+        function selectAllMedia(select) {
+            document.querySelectorAll('.media-item').forEach(item => {
+                const checkbox = item.querySelector('.media-checkbox');
+                if (select) {
+                    item.classList.add('checked');
+                    if (checkbox) checkbox.checked = true;
+                } else {
+                    item.classList.remove('checked');
+                    if (checkbox) checkbox.checked = false;
+                }
+            });
+        }
 
-      const tRange = document.getElementById('vid2-margin-t-range');
-      const tVal = document.getElementById('vid2-margin-t-val');
-      const bRange = document.getElementById('vid2-margin-b-range');
-      const bVal = document.getElementById('vid2-margin-b-val');
-      const lRange = document.getElementById('vid2-margin-l-range');
-      const lVal = document.getElementById('vid2-margin-l-val');
-      const rRange = document.getElementById('vid2-margin-r-range');
-      const rVal = document.getElementById('vid2-margin-r-val');
+        function invertMediaSelection() {
+            document.querySelectorAll('.media-item').forEach(item => {
+                item.classList.toggle('checked');
+                const checkbox = item.querySelector('.media-checkbox');
+                if (checkbox) checkbox.checked = item.classList.contains('checked');
+            });
+        }
 
-      scaleVal.innerText = scaleRange.value + '%';
-      radiusVal.innerText = radiusRange.value + 'px';
-      tVal.innerText = tRange.value + 'px';
-      bVal.innerText = bRange.value + 'px';
-      lVal.innerText = lRange.value + 'px';
-      rVal.innerText = rRange.value + 'px';
+        function togglePlay() {
+            const btn = document.getElementById('playBtn');
+            if (btn.innerText === '▶') {
+                btn.innerText = '⏸';
+                btn.style.color = '#3b82f6';
+            } else {
+                btn.innerText = '▶';
+                btn.style.color = 'var(--accent-green)';
+            }
+        }
 
-      const width = Math.round(mockBg.offsetWidth * (parseInt(scaleRange.value, 10)/100));
-      mockLayer2.style.width = width + 'px';
-      mockLayer2.style.height = width + 'px'; // 1:1
-      mockLayer2.style.borderRadius = radiusRange.value + 'px';
-      
-      mockLayer2.style.top = tRange.value + 'px';
-      mockLayer2.style.left = lRange.value + 'px';
-    }
+        function startRender() {
+            alert('EncoMie: Bắt đầu kết xuất video theo hàng đợi hiện tại!');
+        }
 
-    function updateCropBoxFromSliders() {
-      const tRange = document.getElementById('crop-t-range');
-      const tVal = document.getElementById('crop-t-val');
-      const bRange = document.getElementById('crop-b-range');
-      const bVal = document.getElementById('crop-b-val');
-      const lRange = document.getElementById('crop-l-range');
-      const lVal = document.getElementById('crop-l-val');
-      const rRange = document.getElementById('crop-r-range');
-      const rVal = document.getElementById('crop-r-val');
+        // Real-time chart monitor fluctuations
+        const cpuHistory = Array(20).fill(15);
+        const gpuHistory = Array(20).fill(10);
 
-      tVal.innerText = tRange.value + 'px';
-      bVal.innerText = bRange.value + 'px';
-      lVal.innerText = lRange.value + 'px';
-      rVal.innerText = rRange.value + 'px';
+        // Slow updates on thread progress bars
+        let tProgress = [80, 65, 90, 40, 55];
 
-      const top = parseInt(tRange.value, 10);
-      const left = parseInt(lRange.value, 10);
-      const bottom = parseInt(bRange.value, 10);
-      const right = parseInt(rRange.value, 10);
+        function updateCharts() {
+            // CPU fluctuation based on priority
+            const prio = document.getElementById('cpuPrioritySelect').value;
+            let targetCpuRange = 25;
+            if (prio === 'below') targetCpuRange = 15;
+            else if (prio === 'high') targetCpuRange = 55;
 
-      mockCrop.style.top = top + 'px';
-      mockCrop.style.left = left + 'px';
-      mockCrop.style.width = (mockBg.offsetWidth - left - right) + 'px';
-      mockCrop.style.height = (mockBg.offsetHeight - top - bottom) + 'px';
-    }
-  </script>
+            const newCpu = Math.max(5, Math.min(95, targetCpuRange + (Math.random() - 0.5) * 15));
+
+            // GPU NVENC load fluctuation
+            const nvencActive = document.getElementById('gpuToggle').checked;
+            const newGpu = nvencActive
+                ? Math.max(30, Math.min(95, gpuHistory[gpuHistory.length - 1] + (Math.random() - 0.5) * 12))
+                : Math.max(0, Math.min(5, gpuHistory[gpuHistory.length - 1] + (Math.random() - 0.5) * 2));
+
+            cpuHistory.push(newCpu);
+            cpuHistory.shift();
+
+            gpuHistory.push(newGpu);
+            gpuHistory.shift();
+
+            document.getElementById('cpuVal').innerText = Math.round(newCpu) + '%';
+            document.getElementById('gpuVal').innerText = Math.round(newGpu) + '%';
+
+            drawPath('cpuPath', 'cpuFill', cpuHistory);
+            drawPath('gpuPath', 'gpuFill', gpuHistory);
+
+            // Fluctuate thread bars
+            for (let i = 1; i <= 5; i++) {
+                tProgress[i - 1] = Math.max(10, Math.min(100, tProgress[i - 1] + (Math.random() - 0.5) * 8));
+                const el = document.getElementById('t' + i);
+                if (el) el.style.width = tProgress[i - 1] + '%';
+            }
+        }
+
+        function drawPath(pathId, fillId, data) {
+            const step = 200 / (data.length - 1);
+            let pathD = `M 0 ${40 - data[0] * 0.35}`;
+
+            for (let i = 1; i < data.length; i++) {
+                pathD += ` L ${i * step} ${40 - data[i] * 0.35}`;
+            }
+
+            document.getElementById(pathId).setAttribute('d', pathD);
+
+            let fillD = pathD + ` L 200 40 L 0 40 Z`;
+            document.getElementById(fillId).setAttribute('d', fillD);
+        }
+
+        setInterval(updateCharts, 400);
+        updateCharts();
+    </script>
 </body>
+
 </html>

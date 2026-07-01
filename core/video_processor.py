@@ -20,7 +20,14 @@ from typing import Optional, List
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".aac"}
 
+import sys
+
 LOCAL_BIN_DIR = Path(__file__).parent.parent / "bin"
+if getattr(sys, 'frozen', False):
+    exe_bin_dir = Path(sys.executable).parent / "bin"
+    if (exe_bin_dir / "ffmpeg.exe").exists():
+        LOCAL_BIN_DIR = exe_bin_dir
+
 FFMPEG_PATH = str(LOCAL_BIN_DIR / "ffmpeg.exe") if (LOCAL_BIN_DIR / "ffmpeg.exe").exists() else "ffmpeg"
 FFPROBE_PATH = str(LOCAL_BIN_DIR / "ffprobe.exe") if (LOCAL_BIN_DIR / "ffprobe.exe").exists() else "ffprobe"
 

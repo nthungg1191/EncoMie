@@ -15,5 +15,10 @@ __pycache__/
 *.pyd
 
 /output
-/temp_srt
+/.temp_srt
 .temp_srt/temp_1.srt
+
+.wireframe_box_b.html
+build.bat
+EncoMie.bat
+EncoMie.spec

@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QFrame, QGridLayout, QAbstractItemView, QTabWidget
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
-from PyQt6.QtGui import QColor, QFont, QIcon, QImage
+from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap
 
 from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
 from core.worker import RenderWorker
@@ -41,8 +41,12 @@ from ui.video_layout_preview import VideoLayoutPreview
 from utils import settings as cfg
 from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
 
-EXPORT_PATH = Path(__file__).parent.parent / "selections.json"
-DEBUG_LOG_PATH = Path(__file__).parent.parent / "debug_ui.log"
+if getattr(sys, 'frozen', False):
+    EXPORT_PATH = Path(sys.executable).parent / "selections.json"
+    DEBUG_LOG_PATH = Path(sys.executable).parent / "debug_ui.log"
+else:
+    EXPORT_PATH = Path(__file__).parent.parent / "selections.json"
+    DEBUG_LOG_PATH = Path(__file__).parent.parent / "debug_ui.log"
 HARDCODED_AUDIO_DIR = r"D:\TBN 1\video goc"
 MEDIA_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
 
@@ -449,6 +453,12 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("EncoMie")
+        
+        # Thiết lập Icon cho cửa sổ ứng dụng
+        logo_path = _root / "Asset" / "Img" / "Logo.png"
+        if logo_path.exists():
+            self.setWindowIcon(QIcon(str(logo_path)))
+
         self.setMinimumSize(1100, 720)
         self.resize(1280, 800)
 
@@ -584,8 +594,23 @@ class MainWindow(QMainWindow):
         lay.setSpacing(8)
 
         # App identity
-        icon_lbl = QLabel("▶")
-        icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
+        icon_lbl = QLabel()
+        logo_path = _root / "Asset" / "Img" / "Logo.png"
+        if logo_path.exists():
+            pixmap = QPixmap(str(logo_path))
+            if not pixmap.isNull():
+                icon_lbl.setPixmap(pixmap.scaled(
+                    24, 24, 
+                    Qt.AspectRatioMode.KeepAspectRatio, 
+                    Qt.TransformationMode.SmoothTransformation
+                ))
+            else:
+                icon_lbl.setText("▶")
+                icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
+        else:
+            icon_lbl.setText("▶")
+            icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
+
         title_lbl = QLabel("EncoMie")
         title_lbl.setStyleSheet("color: #f8fafc; font-size: 14px; font-weight: 600;")
         lay.addWidget(icon_lbl)

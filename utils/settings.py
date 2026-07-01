@@ -4,7 +4,12 @@ import json
 import os
 from pathlib import Path
 
-SETTINGS_PATH = Path(__file__).parent.parent / "settings.json"
+import sys
+
+if getattr(sys, 'frozen', False):
+    SETTINGS_PATH = Path(sys.executable).parent / "settings.json"
+else:
+    SETTINGS_PATH = Path(__file__).parent.parent / "settings.json"
 
 DEFAULTS = {
     "bg_folder": "",
