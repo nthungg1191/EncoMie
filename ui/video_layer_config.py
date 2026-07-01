@@ -4,13 +4,119 @@ Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QCheckBox, QPushButton,
-    QGroupBox, QFrame, QLineEdit
+    QGroupBox, QFrame, QLineEdit, QToolButton
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from pathlib import Path
 import os
 
 from core.video_processor import ImageLayerConfig
+
+class CollapsibleSection(QWidget):
+    toggled = pyqtSignal(bool) # Emitted when expanded/collapsed
+
+    def __init__(self, title: str, checkable: bool = False, checked: bool = False, parent=None):
+        super().__init__(parent)
+        self.is_expanded = False
+        self.checkable = checkable
+
+        # Main layout
+        self.main_lay = QVBoxLayout(self)
+        self.main_lay.setContentsMargins(0, 0, 0, 1) # 1px gap below section
+        self.main_lay.setSpacing(0)
+
+        # Header bar (clickable horizontal widget)
+        self.header = QFrame()
+        self.header.setObjectName("HeaderFrame")
+        self.header.setFixedHeight(30)
+        self.header.setStyleSheet("""
+            QFrame#HeaderFrame {
+                background-color: #f1f5f9;
+                border-bottom: 1px solid #cbd5e1;
+                border-radius: 2px;
+            }
+            QFrame#HeaderFrame:hover {
+                background-color: #e2e8f0;
+            }
+            QFrame#HeaderFrame QLabel {
+                background-color: transparent;
+                border: none;
+                color: #334155;
+            }
+            QFrame#HeaderFrame QToolButton {
+                background-color: transparent;
+                border: none;
+            }
+        """)
+        header_lay = QHBoxLayout(self.header)
+        header_lay.setContentsMargins(8, 4, 8, 4)
+        header_lay.setSpacing(6)
+
+        # Arrow indicator button (non-focusable, flat)
+        self.btn_arrow = QToolButton()
+        self.btn_arrow.setArrowType(Qt.ArrowType.RightArrow)
+        self.btn_arrow.setStyleSheet("border: none; background: transparent; color: #64748b; padding: 0;")
+        self.btn_arrow.setFixedSize(12, 12)
+        self.btn_arrow.clicked.connect(self.toggle)
+        header_lay.addWidget(self.btn_arrow)
+
+        # Title Label
+        self.lbl_title = QLabel(title)
+        self.lbl_title.setStyleSheet("font-size: 12px; font-weight: normal; color: #334155; background-color: transparent;")
+        header_lay.addWidget(self.lbl_title, 1)
+
+        # Optional Checkbox on the right
+        self.chk_enable = None
+        if self.checkable:
+            self.chk_enable = QCheckBox()
+            self.chk_enable.setChecked(checked)
+            self.chk_enable.setToolTip("Kích hoạt tính năng này")
+            self.chk_enable.setStyleSheet("QCheckBox { background: transparent; } QCheckBox::indicator { width: 12px; height: 12px; }")
+            header_lay.addWidget(self.chk_enable)
+
+        self.main_lay.addWidget(self.header)
+
+        # Content area (container widget)
+        self.content_container = QWidget()
+        self.content_lay = QVBoxLayout(self.content_container)
+        self.content_lay.setContentsMargins(4, 4, 4, 4)
+        self.content_container.setVisible(False)
+        self.main_lay.addWidget(self.content_container)
+
+        # Make header clickable (filter mouse clicks)
+        self.header.mousePressEvent = self._on_header_clicked
+
+    def _on_header_clicked(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            # If clicked on the checkbox area, don't toggle collapse
+            if self.chk_enable:
+                # Map click position to header coordinates
+                if self.chk_enable.geometry().contains(event.position().toPoint()):
+                    return # Let the checkbox handle it
+            self.toggle()
+
+    def toggle(self):
+        self.is_expanded = not self.is_expanded
+        self.btn_arrow.setArrowType(
+            Qt.ArrowType.DownArrow if self.is_expanded else Qt.ArrowType.RightArrow
+        )
+        self.content_container.setVisible(self.is_expanded)
+        self.toggled.emit(self.is_expanded)
+
+    def isChecked(self) -> bool:
+        if self.chk_enable:
+            return self.chk_enable.isChecked()
+        return True
+
+    def setChecked(self, checked: bool):
+        if self.chk_enable:
+            self.chk_enable.blockSignals(True)
+            self.chk_enable.setChecked(checked)
+            self.chk_enable.blockSignals(False)
+
+    def setExpanded(self, expanded: bool):
+        if self.is_expanded != expanded:
+            self.toggle()
 
 class VideoLayerConfigWidget(QWidget):
     changed = pyqtSignal()
@@ -123,10 +229,9 @@ class VideoLayerConfigWidget(QWidget):
         lay.addLayout(row3)
 
         # Row 4: Margins Group
-        margin_grp = QGroupBox("Căn chỉnh khoảng lề (Margin - px)")
-        margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        margin_lay = QGridLayout(margin_grp)
-        margin_lay.setContentsMargins(6, 6, 6, 6)
+        self.margin_sec = CollapsibleSection("Căn chỉnh khoảng lề (Margin - px)", checkable=False)
+        margin_lay = QGridLayout()
+        margin_lay.setContentsMargins(4, 4, 4, 4)
         margin_lay.setSpacing(6)
 
         # Top
@@ -161,13 +266,14 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_r.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_r, 1, 3)
 
-        lay.addWidget(margin_grp)
+        self.margin_sec.content_lay.addLayout(margin_lay)
+        self.margin_sec.toggled.connect(self._on_changed)
+        lay.addWidget(self.margin_sec)
 
         # Row 5: Crop Group
-        crop_grp = QGroupBox("Cắt cúp khung hình (Crop - px)")
-        crop_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        crop_lay = QGridLayout(crop_grp)
-        crop_lay.setContentsMargins(6, 6, 6, 6)
+        self.crop_sec = CollapsibleSection("Cắt cúp khung hình (Crop - px)", checkable=True, checked=False)
+        crop_lay = QGridLayout()
+        crop_lay.setContentsMargins(4, 4, 4, 4)
         crop_lay.setSpacing(6)
 
         # Crop Top
@@ -202,7 +308,56 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_r.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_r, 1, 3)
 
-        lay.addWidget(crop_grp)
+        self.crop_sec.content_lay.addLayout(crop_lay)
+        self.crop_sec.chk_enable.stateChanged.connect(self._on_changed)
+        self.crop_sec.toggled.connect(self._on_changed)
+        lay.addWidget(self.crop_sec)
+
+        # Row 6: Chroma Key Group
+        self.chroma_sec = CollapsibleSection("Xóa phông nền (Chroma Key)", checkable=True, checked=False)
+        chroma_lay = QGridLayout()
+        chroma_lay.setContentsMargins(4, 4, 4, 4)
+        chroma_lay.setSpacing(6)
+
+        # Color picker
+        chroma_lay.addWidget(QLabel("Màu phông:"), 0, 0)
+        
+        color_row = QHBoxLayout()
+        color_row.setSpacing(4)
+        self.btn_key_color = QPushButton("Chọn màu")
+        self.btn_key_color.setStyleSheet("font-size: 11px; padding: 2px 6px;")
+        self.btn_key_color.clicked.connect(self._choose_key_color)
+        color_row.addWidget(self.btn_key_color)
+        
+        self.lbl_color_preview = QLabel()
+        self.lbl_color_preview.setFixedSize(16, 16)
+        self.lbl_color_preview.setStyleSheet("background-color: #00FF00; border: 1px solid #555;")
+        color_row.addWidget(self.lbl_color_preview)
+        
+        # Color value holder
+        self.chromakey_color_hex = "0x00FF00"
+        chroma_lay.addLayout(color_row, 0, 1)
+
+        # Similarity Spinbox
+        chroma_lay.addWidget(QLabel("Độ nhạy (Sim %):"), 1, 0)
+        self.spn_similarity = QSpinBox()
+        self.spn_similarity.setRange(1, 100)
+        self.spn_similarity.setValue(15) # Default 15%
+        self.spn_similarity.valueChanged.connect(self._on_changed)
+        chroma_lay.addWidget(self.spn_similarity, 1, 1)
+
+        # Blend Spinbox
+        chroma_lay.addWidget(QLabel("Mịn viền (Blend %):"), 1, 2)
+        self.spn_blend = QSpinBox()
+        self.spn_blend.setRange(0, 100)
+        self.spn_blend.setValue(10) # Default 10%
+        self.spn_blend.valueChanged.connect(self._on_changed)
+        chroma_lay.addWidget(self.spn_blend, 1, 3)
+
+        self.chroma_sec.content_lay.addLayout(chroma_lay)
+        self.chroma_sec.chk_enable.stateChanged.connect(self._on_changed)
+        self.chroma_sec.toggled.connect(self._on_changed)
+        lay.addWidget(self.chroma_sec)
 
         # Default states: Layer 1 and 2 are active on wireframe demo
         if self.index in (1, 2):
@@ -232,6 +387,19 @@ class VideoLayerConfigWidget(QWidget):
             self.edit_path.setText(file_path)
             self._on_changed()
 
+    def _choose_key_color(self):
+        from PyQt6.QtWidgets import QColorDialog
+        from PyQt6.QtGui import QColor
+        # Parse current hex color
+        color_str = self.chromakey_color_hex.replace("0x", "#")
+        initial_color = QColor(color_str)
+        color = QColorDialog.getColor(initial_color, self, "Chọn màu phông nền cần xóa")
+        if color.isValid():
+            hex_name = color.name().upper() # e.g. #00FF00
+            self.chromakey_color_hex = hex_name.replace("#", "0x")
+            self.lbl_color_preview.setStyleSheet(f"background-color: {hex_name}; border: 1px solid #555;")
+            self._on_changed()
+
     def _on_changed(self):
         self.changed.emit()
 
@@ -257,18 +425,26 @@ class VideoLayerConfigWidget(QWidget):
             position=pos_val,
             size=self.spn_size.value(),
             opacity=self.spn_opacity.value() / 100.0,
-            margin_t=self.spn_margin_t.value(),
-            margin_b=self.spn_margin_b.value(),
-            margin_l=self.spn_margin_l.value(),
-            margin_r=self.spn_margin_r.value()
+            margin_t=self.spn_margin_t.value() if self.margin_sec.isChecked() else 0,
+            margin_b=self.spn_margin_b.value() if self.margin_sec.isChecked() else 0,
+            margin_l=self.spn_margin_l.value() if self.margin_sec.isChecked() else 0,
+            margin_r=self.spn_margin_r.value() if self.margin_sec.isChecked() else 0
         )
         # Extend config dynamically with crop/radius
-        cfg_obj.crop_t = self.spn_crop_t.value()
-        cfg_obj.crop_b = self.spn_crop_b.value()
-        cfg_obj.crop_l = self.spn_crop_l.value()
-        cfg_obj.crop_r = self.spn_crop_r.value()
+        cfg_obj.crop_t = self.spn_crop_t.value() if self.crop_sec.isChecked() else 0
+        cfg_obj.crop_b = self.spn_crop_b.value() if self.crop_sec.isChecked() else 0
+        cfg_obj.crop_l = self.spn_crop_l.value() if self.crop_sec.isChecked() else 0
+        cfg_obj.crop_r = self.spn_crop_r.value() if self.crop_sec.isChecked() else 0
         cfg_obj.radius = 0
         cfg_obj.source_type = idx # Save index
+        cfg_obj.chromakey_enabled = self.chroma_sec.isChecked()
+        cfg_obj.chromakey_color = self.chromakey_color_hex
+        cfg_obj.chromakey_similarity = self.spn_similarity.value() / 100.0
+        cfg_obj.chromakey_blend = self.spn_blend.value() / 100.0
+        
+        # Save checkable states
+        cfg_obj.margin_enabled = self.margin_sec.isChecked()
+        cfg_obj.crop_enabled = self.crop_sec.isChecked()
         return cfg_obj
 
     def set_config(self, cfg_obj: ImageLayerConfig):
@@ -298,15 +474,50 @@ class VideoLayerConfigWidget(QWidget):
 
         self.spn_size.setValue(cfg_obj.size)
         self.spn_opacity.setValue(int(getattr(cfg_obj, "opacity", 1.0) * 100))
+        
+        # Margins restore
         self.spn_margin_t.setValue(cfg_obj.margin_t)
         self.spn_margin_b.setValue(cfg_obj.margin_b)
         self.spn_margin_l.setValue(cfg_obj.margin_l)
         self.spn_margin_r.setValue(cfg_obj.margin_r)
 
+        margin_enabled = getattr(cfg_obj, "margin_enabled", True)
+        self.margin_sec.setChecked(margin_enabled)
+        self.margin_sec.setExpanded(True) # Margins always expanded by default
+
+        # Crops restore
         self.spn_crop_t.setValue(getattr(cfg_obj, "crop_t", 0))
         self.spn_crop_b.setValue(getattr(cfg_obj, "crop_b", 0))
         self.spn_crop_l.setValue(getattr(cfg_obj, "crop_l", 0))
         self.spn_crop_r.setValue(getattr(cfg_obj, "crop_r", 0))
+
+        crop_enabled = getattr(cfg_obj, "crop_enabled", False)
+        # Fallback: if any crop values are non-zero, force crop_sec to be checked
+        if getattr(cfg_obj, "crop_t", 0) > 0 or getattr(cfg_obj, "crop_b", 0) > 0 or getattr(cfg_obj, "crop_l", 0) > 0 or getattr(cfg_obj, "crop_r", 0) > 0:
+            crop_enabled = True
+        self.crop_sec.setChecked(crop_enabled)
+        self.crop_sec.setExpanded(crop_enabled)
+
+        # Chroma key restore
+        ch_enabled = getattr(cfg_obj, "chromakey_enabled", False)
+        ch_color = getattr(cfg_obj, "chromakey_color", "0x00FF00")
+        ch_similarity = int(getattr(cfg_obj, "chromakey_similarity", 0.15) * 100)
+        ch_blend = int(getattr(cfg_obj, "chromakey_blend", 0.10) * 100)
+
+        self.chroma_sec.setChecked(ch_enabled)
+        self.chroma_sec.setExpanded(ch_enabled)
+
+        self.chromakey_color_hex = ch_color
+        hex_color = ch_color.replace("0x", "#")
+        self.lbl_color_preview.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #555;")
+
+        self.spn_similarity.blockSignals(True)
+        self.spn_similarity.setValue(ch_similarity)
+        self.spn_similarity.blockSignals(False)
+
+        self.spn_blend.blockSignals(True)
+        self.spn_blend.setValue(ch_blend)
+        self.spn_blend.blockSignals(False)
 
     def _on_pos_changed(self, index: int):
         # Snap margins when position changes in UI

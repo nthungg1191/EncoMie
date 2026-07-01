@@ -24,7 +24,7 @@ from PyQt6.QtWidgets import (
     QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox,
     QPlainTextEdit, QProgressBar, QSplitter, QCheckBox,
     QSizePolicy, QSlider, QMessageBox, QStatusBar,
-    QFrame, QGridLayout, QAbstractItemView, QTabWidget
+    QFrame, QGridLayout, QAbstractItemView, QTabWidget, QScrollArea
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
 from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap
@@ -1016,7 +1016,15 @@ class MainWindow(QMainWindow):
             widget = VideoLayerConfigWidget(i)
             widget.changed.connect(self._on_video_layer_changed)
             self.video_layer_widgets.append(widget)
-            self.video_tab_widget.addTab(widget, f"Video Layer {i}")
+            
+            # Wrap in QScrollArea for scrolling
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setStyleSheet("QScrollArea { background-color: transparent; }")
+            scroll.setWidget(widget)
+            
+            self.video_tab_widget.addTab(scroll, f"Video Layer {i}")
 
         vid_lay.addWidget(self.video_tab_widget)
 
@@ -1462,6 +1470,21 @@ class MainWindow(QMainWindow):
             widget.spn_crop_l.setValue(s.get(f"vlayer_crop_l_{layer_num}", 0))
             widget.spn_crop_r.setValue(s.get(f"vlayer_crop_r_{layer_num}", 0))
 
+            # Load chroma key settings
+            widget.chroma_sec.setChecked(s.get(f"vlayer_chromakey_enabled_{layer_num}", False))
+            widget.chroma_sec.setExpanded(s.get(f"vlayer_chromakey_enabled_{layer_num}", False))
+            widget.chromakey_color_hex = s.get(f"vlayer_chromakey_color_{layer_num}", "0x00FF00")
+            hex_color = widget.chromakey_color_hex.replace("0x", "#")
+            widget.lbl_color_preview.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #555;")
+            widget.spn_similarity.setValue(s.get(f"vlayer_chromakey_similarity_{layer_num}", 15))
+            widget.spn_blend.setValue(s.get(f"vlayer_chromakey_blend_{layer_num}", 10))
+            
+            # Load checkable CollapsibleSection states
+            widget.margin_sec.setChecked(s.get(f"vlayer_margin_enabled_{layer_num}", True))
+            widget.margin_sec.setExpanded(True) # Margins always expanded
+            widget.crop_sec.setChecked(s.get(f"vlayer_crop_enabled_{layer_num}", False))
+            widget.crop_sec.setExpanded(s.get(f"vlayer_crop_enabled_{layer_num}", False))
+
         self._on_video_layer_changed()
 
         # Auto-scan if files already set
@@ -1574,6 +1597,16 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_crop_b_{layer_num}"] = cfg_obj.crop_b
             settings_dict[f"vlayer_crop_l_{layer_num}"] = cfg_obj.crop_l
             settings_dict[f"vlayer_crop_r_{layer_num}"] = cfg_obj.crop_r
+            
+            # Save chroma key settings
+            settings_dict[f"vlayer_chromakey_enabled_{layer_num}"] = cfg_obj.chromakey_enabled
+            settings_dict[f"vlayer_chromakey_color_{layer_num}"] = cfg_obj.chromakey_color
+            settings_dict[f"vlayer_chromakey_similarity_{layer_num}"] = int(cfg_obj.chromakey_similarity * 100)
+            settings_dict[f"vlayer_chromakey_blend_{layer_num}"] = int(cfg_obj.chromakey_blend * 100)
+            
+            # Save checkable GroupBoxes states
+            settings_dict[f"vlayer_margin_enabled_{layer_num}"] = cfg_obj.margin_enabled
+            settings_dict[f"vlayer_crop_enabled_{layer_num}"] = cfg_obj.crop_enabled
 
         # Legacy fallback
         if self.logo_layers:

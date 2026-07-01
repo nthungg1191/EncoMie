@@ -116,6 +116,10 @@ class ImageLayerConfig:
     crop_l: int = 0
     crop_r: int = 0
     radius: int = 0
+    chromakey_enabled: bool = False
+    chromakey_color: str = "0x00FF00"
+    chromakey_similarity: float = 0.15
+    chromakey_blend: float = 0.10
 
 @dataclass
 class RenderConfig:
@@ -468,8 +472,16 @@ def build_ffmpeg_cmd(
             
             crop_filter = ""
             
+            # Check chroma key
+            chromakey_filter = ""
+            if getattr(layer, "chromakey_enabled", False):
+                color = getattr(layer, "chromakey_color", "0x00FF00")
+                sim = getattr(layer, "chromakey_similarity", 0.15)
+                blend = getattr(layer, "chromakey_blend", 0.10)
+                chromakey_filter = f"chromakey={color}:{sim:.2f}:{blend:.2f},"
+
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}scale={pixel_w}:-2,format=rgba,"
+                f"[{input_index}:v]{chromakey_filter}{crop_filter}scale={pixel_w}:-2,format=rgba,"
                 f"colorchannelmixer=aa={layer.opacity:.2f}[{layer_output}]"
             )
             
@@ -526,9 +538,17 @@ def build_ffmpeg_cmd(
             # Ensure even width for FFmpeg compatibility
             pixel_w = max(4, (pixel_w // 2) * 2)
 
+            # Check chroma key
+            chromakey_filter = ""
+            if getattr(layer, "chromakey_enabled", False):
+                color = getattr(layer, "chromakey_color", "0x00FF00")
+                sim = getattr(layer, "chromakey_similarity", 0.15)
+                blend = getattr(layer, "chromakey_blend", 0.10)
+                chromakey_filter = f"chromakey={color}:{sim:.2f}:{blend:.2f},"
+
             # 7. Build filter for scaling, crop, format conversion
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}scale={pixel_w}:-2,format=rgba,"
+                f"[{input_index}:v]{chromakey_filter}{crop_filter}scale={pixel_w}:-2,format=rgba,"
                 f"colorchannelmixer=aa={layer.opacity:.2f}[{layer_output}]"
             )
             

@@ -232,6 +232,12 @@ class VideoLayoutPreview(QWidget):
                 p.save()
                 p.setOpacity(layer_opacity)
                 
+                # Apply simulated Chroma Key if enabled in UI
+                if getattr(cfg, "chromakey_enabled", False):
+                    color_hex = getattr(cfg, "chromakey_color", "0x00FF00")
+                    similarity = getattr(cfg, "chromakey_similarity", 0.15)
+                    layer_img = self._apply_chromakey(layer_img, color_hex, similarity)
+                
                 # Proportional crop calculation: map virtual crop to original resolution
                 lw = layer_img.width()
                 lh = layer_img.height()
@@ -618,3 +624,52 @@ class VideoLayoutPreview(QWidget):
                 return
 
         self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def _apply_chromakey(self, img: QImage, color_hex: str, similarity: float) -> QImage:
+        key = (id(img), img.width(), img.height(), color_hex, similarity)
+        if hasattr(self, "_chromakey_cache") and key in self._chromakey_cache:
+            return self._chromakey_cache[key]
+
+        if not hasattr(self, "_chromakey_cache"):
+            self._chromakey_cache = {}
+
+        # 1. Parse hex color
+        color_str = color_hex.replace("0x", "#")
+        target_color = QColor(color_str)
+        tr = target_color.red()
+        tg = target_color.green()
+        tb = target_color.blue()
+
+        # Convert to ARGB32
+        keyed_img = img.convertToFormat(QImage.Format.Format_ARGB32)
+        w, h = keyed_img.width(), keyed_img.height()
+
+        # Optimization: scale down large images for preview chroma keying
+        max_dim = 240
+        if w > max_dim or h > max_dim:
+            keyed_img = keyed_img.scaled(max_dim, max_dim, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
+            w, h = keyed_img.width(), keyed_img.height()
+
+        threshold = similarity * 441.67
+
+        # Apply chroma key pixel modification
+        for y in range(h):
+            for x in range(w):
+                pixel = keyed_img.pixel(x, y)
+                r = (pixel >> 16) & 0xff
+                g = (pixel >> 8) & 0xff
+                b = pixel & 0xff
+                
+                # Euclidean color distance
+                dist = ((r - tr)**2 + (g - tg)**2 + (b - tb)**2)**0.5
+                if dist <= threshold:
+                    new_pixel = (pixel & 0x00ffffff) # clear alpha
+                    keyed_img.setPixel(x, y, new_pixel)
+
+        self._chromakey_cache[key] = keyed_img
+        # Limit cache size to prevent memory leak
+        if len(self._chromakey_cache) > 20:
+            self._chromakey_cache.clear()
+            self._chromakey_cache[key] = keyed_img
+
+        return keyed_img
