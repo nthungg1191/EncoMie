@@ -4,8 +4,7 @@
 /settings.json
 
 /tools
-
-
+/dist 
 
 # all __pycache__ directories
 __pycache__/
