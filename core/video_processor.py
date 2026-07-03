@@ -278,12 +278,246 @@ def select_bg_segment(
 
 
 # ---------------------------------------------------------------------------
+# SRT to ASS Conversion with Vector Box Drawing (Rounded Corners)
+# ---------------------------------------------------------------------------
+
+def srt_time_to_ass(srt_time: str) -> str:
+    parts = srt_time.split(",")
+    hms = parts[0]
+    ms = parts[1]
+    cs = int(round(int(ms) / 10.0))
+    if cs >= 100:
+        cs = 99
+    if hms.startswith("0"):
+        hms = hms[1:]
+    return f"{hms}.{cs:02d}"
+
+def draw_rounded_rect_path(w: float, h: float, r: float) -> str:
+    if r <= 0:
+        return f"m 0 0 l {int(w)} 0 l {int(w)} {int(h)} l 0 {int(h)}"
+    r = min(r, w / 2.0, h / 2.0)
+    r = float(r)
+    w = float(w)
+    h = float(h)
+    
+    tr = [
+        f"{int(w - r + r * 0.5)} {int(r - r * 0.866)}",
+        f"{int(w - r + r * 0.866)} {int(r - r * 0.5)}",
+        f"{int(w)} {int(r)}"
+    ]
+    br = [
+        f"{int(w - r + r * 0.866)} {int(h - r + r * 0.5)}",
+        f"{int(w - r + r * 0.5)} {int(h - r + r * 0.866)}",
+        f"{int(w - r)} {int(h)}"
+    ]
+    bl = [
+        f"{int(r - r * 0.5)} {int(h - r + r * 0.866)}",
+        f"{int(r - r * 0.866)} {int(h - r + r * 0.5)}",
+        f"0 {int(h - r)}"
+    ]
+    tl = [
+        f"{int(r - r * 0.866)} {int(r - r * 0.5)}",
+        f"{int(r - r * 0.5)} {int(r - r * 0.866)}",
+        f"{int(r)} 0"
+    ]
+    
+    path = []
+    path.append(f"m {int(r)} 0")
+    path.append(f"l {int(w - r)} 0")
+    for pt in tr:
+        path.append(f"l {pt}")
+    path.append(f"l {int(w)} {int(h - r)}")
+    for pt in br:
+        path.append(f"l {pt}")
+    path.append(f"l {int(r)} {int(h)}")
+    for pt in bl:
+        path.append(f"l {pt}")
+    path.append(f"l 0 {int(r)}")
+    for pt in tl:
+        path.append(f"l {pt}")
+        
+    return " ".join(path)
+
+def color_to_ass(hex_color: str, opacity: float = 1.0) -> str:
+    r = hex_color[1:3]
+    g = hex_color[3:5]
+    b = hex_color[5:7]
+    a = int((1.0 - opacity) * 255)
+    return f"&H{a:02X}{b}{g}{r}"
+
+def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
+    import math
+    from core.srt_service import SrtService
+    from PyQt6.QtGui import QFont, QFontMetrics
+    
+    entries = SrtService.parse(srt_path)
+    if not entries:
+        with open(ass_path, "w", encoding="utf-8") as f:
+            f.write("")
+        return
+
+    canvas_w = 1280
+    canvas_h = 720
+
+    font = QFont(style.font_name)
+    font.setPixelSize(style.font_size)
+    fm = QFontMetrics(font)
+
+    margin_l = style.margin_l
+    margin_r = style.margin_r
+    margin_v = style.margin_v
+    bg_pad_x = style.bg_padding_x
+    bg_pad_y = style.bg_padding_y
+    bg_radius = style.bg_corner_radius
+
+    max_allowed_w = canvas_w - margin_l - margin_r - 2 * bg_pad_x
+
+    lines_out = []
+    lines_out.append("[Script Info]")
+    lines_out.append("ScriptType: v4.00+")
+    lines_out.append(f"PlayResX: {canvas_w}")
+    lines_out.append(f"PlayResY: {canvas_h}")
+    lines_out.append("WrapStyle: 0")
+    lines_out.append("")
+    
+    lines_out.append("[V4+ Styles]")
+    lines_out.append("Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding")
+    
+    text_color = color_to_ass(style.font_color, 1.0)
+    stroke_color = color_to_ass(style.stroke_color, 1.0)
+    outline_val = int(style.stroke_width) if style.stroke_enabled else 0
+    
+    shadow_val = 0
+    shadow_color_ass = "&H00000000"
+    if style.shadow_enabled and not style.bg_enabled:
+        shadow_val = int(style.shadow_distance)
+        shadow_color_ass = color_to_ass(style.shadow_color, style.shadow_opacity)
+
+    lines_out.append(
+        f"Style: Default,{style.font_name},{style.font_size},{text_color},&H000000FF,{stroke_color},{shadow_color_ass},"
+        f"0,0,0,0,100,100,0,0,1,{outline_val},{shadow_val},7,0,0,0,1"
+    )
+    
+    bg_color_ass = color_to_ass(style.bg_color, style.bg_opacity)
+    lines_out.append(
+        f"Style: SubBG,Arial,8,{bg_color_ass},&H000000FF,&H00000000,&H00000000,"
+        f"0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1"
+    )
+    
+    if style.shadow_enabled and style.bg_enabled:
+        shadow_color_ass = color_to_ass(style.shadow_color, style.shadow_opacity)
+        lines_out.append(
+            f"Style: SubShadow,Arial,8,{shadow_color_ass},&H000000FF,&H00000000,&H00000000,"
+            f"0,0,0,0,100,100,0,0,1,0,0,7,0,0,0,1"
+        )
+        
+    lines_out.append("")
+    lines_out.append("[Events]")
+    lines_out.append("Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text")
+
+    align_map = {
+        7: (0.0, 0.0), 8: (0.5, 0.0), 9: (1.0, 0.0),
+        4: (0.0, 0.5), 5: (0.5, 0.5), 6: (1.0, 0.5),
+        1: (0.0, 1.0), 2: (0.5, 1.0), 3: (1.0, 1.0),
+        10: (0.5, 1.0),
+    }
+    h_a, v_a = align_map.get(style.alignment, (0.5, 1.0))
+
+    for entry in entries:
+        start_ass = srt_time_to_ass(entry.start_time)
+        end_ass = srt_time_to_ass(entry.end_time)
+        raw_text = entry.text
+        
+        wrapped_lines = []
+        raw_lines = raw_text.split("\n")
+        for line in raw_lines:
+            words = line.split(" ")
+            curr = []
+            for w in words:
+                test = " ".join(curr + [w])
+                if fm.horizontalAdvance(test) > max_allowed_w and curr:
+                    wrapped_lines.append(" ".join(curr))
+                    curr = [w]
+                else:
+                    curr.append(w)
+            if curr:
+                wrapped_lines.append(" ".join(curr))
+                
+        if not wrapped_lines:
+            continue
+            
+        max_lw = max(fm.horizontalAdvance(ln) for ln in wrapped_lines)
+        line_h = fm.height()
+        spacing = int(line_h * 0.15)
+        n = len(wrapped_lines)
+        txt_h = n * line_h + (n - 1) * spacing
+        txt_w = max_lw * 0.93
+
+        box_w = txt_w + 2 * bg_pad_x
+        box_h = txt_h + 2 * bg_pad_y
+
+        if h_a == 0.0:
+            bx = margin_l
+        elif h_a == 0.5:
+            bx = int((canvas_w - box_w) / 2)
+        else:
+            bx = canvas_w - margin_r - box_w
+
+        if v_a == 0.0:
+            by = margin_v
+        elif v_a == 0.5:
+            by = int((canvas_h - box_h) / 2)
+        else:
+            by = canvas_h - margin_v - box_h
+
+        # 1. Shadow Box
+        if style.shadow_enabled and style.bg_enabled and style.shadow_distance > 0:
+            rad = math.radians(style.shadow_angle)
+            dx = int(style.shadow_distance * math.cos(rad))
+            dy = int(style.shadow_distance * math.sin(rad))
+            path = draw_rounded_rect_path(box_w, box_h, bg_radius)
+            lines_out.append(
+                f"Dialogue: 0,{start_ass},{end_ass},SubShadow,,0,0,0,,{{\\pos({bx + dx},{by + dy})\\p1}}{path}"
+            )
+
+        # 2. Background Box
+        if style.bg_enabled:
+            path = draw_rounded_rect_path(box_w, box_h, bg_radius)
+            lines_out.append(
+                f"Dialogue: 1,{start_ass},{end_ass},SubBG,,0,0,0,,{{\\pos({bx},{by})\\p1}}{path}"
+            )
+
+        # 3. Text Lines
+        for i, line in enumerate(wrapped_lines):
+            line_w = fm.horizontalAdvance(line) * 0.93
+            if h_a == 0.0:
+                lx = bx + bg_pad_x
+            elif h_a == 0.5:
+                lx = bx + bg_pad_x + int((txt_w - line_w) / 2)
+            else:
+                lx = bx + bg_pad_x + (txt_w - line_w)
+                
+            ly = by + bg_pad_y + i * (line_h + spacing)
+            lines_out.append(
+                f"Dialogue: 2,{start_ass},{end_ass},Default,,0,0,0,,{{\\pos({lx},{ly})}}{line}"
+            )
+
+    with open(ass_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines_out))
+
+
+# ---------------------------------------------------------------------------
 # Subtitle ASS style string for FFmpeg
 # ---------------------------------------------------------------------------
 
 def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
     if not srt_path or not os.path.exists(srt_path):
         return ""
+    
+    safe_srt = srt_path.replace("\\", "/").replace(":", "\\:")
+    if srt_path.lower().endswith(".ass"):
+        return f"subtitles='{safe_srt}'"
+
     """
     Build FFmpeg subtitles filter with force_style.
 
@@ -631,17 +865,29 @@ def render_pair(
     temp_srt_path = ""
     if pair.srt_path and os.path.exists(pair.srt_path):
         _progress(10, f"[{pair.index}] Chuẩn bị tệp phụ đề tạm thời...")
-        import shutil
-
         project_root = Path(__file__).resolve().parent.parent
         temp_dir = project_root / ".temp_srt"
         temp_dir.mkdir(exist_ok=True)
-        temp_srt_path = str(temp_dir / f"temp_{pair.index}.srt")
-        try:
-            shutil.copy2(pair.srt_path, temp_srt_path)
-        except Exception as e:
-            _log(f"Warning: Failed to copy srt file: {e}")
-            temp_srt_path = ""
+        
+        # Only use the ASS vector drawing generator if background is enabled and radius > 0
+        if config.subtitle_style and config.subtitle_style.bg_enabled and config.subtitle_style.bg_corner_radius > 0:
+            temp_srt_path = str(temp_dir / f"temp_{pair.index}.ass")
+            try:
+                convert_srt_to_ass(pair.srt_path, temp_srt_path, config.subtitle_style)
+            except Exception as e:
+                _log(f"Warning: Failed to convert srt to ass: {e}")
+                # Fallback to copy srt
+                import shutil
+                temp_srt_path = str(temp_dir / f"temp_{pair.index}.srt")
+                shutil.copy2(pair.srt_path, temp_srt_path)
+        else:
+            import shutil
+            temp_srt_path = str(temp_dir / f"temp_{pair.index}.srt")
+            try:
+                shutil.copy2(pair.srt_path, temp_srt_path)
+            except Exception as e:
+                _log(f"Warning: Failed to copy srt file: {e}")
+                temp_srt_path = ""
     else:
         _progress(10, f"[{pair.index}] Bỏ qua phụ đề (không có srt)...")
 
