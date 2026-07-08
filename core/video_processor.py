@@ -189,6 +189,24 @@ def probe_resolution(file_path: str) -> tuple[int, int]:
         return 1280, 720
 
 
+def has_video_stream(file_path: str) -> bool:
+    cmd = [
+        FFPROBE_PATH, "-v", "quiet",
+        "-print_format", "json",
+        "-show_streams",
+        "-select_streams", "v:0",
+        file_path
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            return "streams" in data and len(data["streams"]) > 0
+    except Exception:
+        pass
+    return False
+
+
 def list_video_files(folder: str) -> list[str]:
     result = []
     for f in Path(folder).iterdir():
@@ -615,11 +633,14 @@ def build_ffmpeg_cmd(
                     layer_resolved_path = layer.path
                     
                 if layer_resolved_path and os.path.exists(layer_resolved_path):
-                    layer._resolved_path = layer_resolved_path
-                    active_layers.append(layer)
+                    if has_video_stream(layer_resolved_path):
+                        layer._resolved_path = layer_resolved_path
+                        active_layers.append(layer)
+                    else:
+                        print(f"[Warning] Layer {layer_resolved_path} has no video/image stream. Skipping.")
                     
     # Fallback to legacy logo config if no active layers set
-    if not active_layers and config.logo_path and os.path.exists(config.logo_path):
+    if not active_layers and config.logo_path and os.path.exists(config.logo_path) and has_video_stream(config.logo_path):
         fallback_layer = ImageLayerConfig(
             enabled=True,
             path=config.logo_path,
@@ -674,7 +695,11 @@ def build_ffmpeg_cmd(
         "-i", audio_path,
     ])
     for layer in active_layers:
-        cmd.extend(["-i", layer._resolved_path])
+        is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
+        if is_video:
+            cmd.extend(["-stream_loop", "-1", "-i", layer._resolved_path])
+        else:
+            cmd.extend(["-i", layer._resolved_path])
 
     quality_flags = ["-qp", "23"] if config.use_gpu else ["-crf", "23"]
     preset_flags  = ["-preset", "fast"]
@@ -688,6 +713,7 @@ def build_ffmpeg_cmd(
     for idx, layer in enumerate(active_layers):
         input_index = 2 + idx
         layer_output = f"v_layer_{idx}"
+        pts_filter = "setpts=PTS-STARTPTS,"
         
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)
@@ -703,8 +729,8 @@ def build_ffmpeg_cmd(
             crop_filter = ""
             
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}scale={pixel_w}:-2,format=rgba,"
-                f"colorchannelmixer=aa={layer.opacity:.2f}[{layer_output}]"
+                f"[{input_index}:v]{crop_filter}{pts_filter}scale={pixel_w}:-2,format=rgba,"
+                f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
             )
             
             ml = int(layer.margin_l * scale_x)
@@ -723,7 +749,7 @@ def build_ffmpeg_cmd(
             elif layer.position == 3:  # Top-Left
                 overlay_pos = f"x={ml}:y={mt}"
             else:  # 4: Top-Center
-                overlay_pos = f"x=(W-w)/2:y={mt}"
+                overlay_pos = f"x=trunc((W-w)/2):y={mt}"
         else:
             # Edit Video tab active layer calculations (400x225 workspace)
             # 2. Crop values (virtual margins relative to virtual uncropped layer size)
@@ -762,8 +788,8 @@ def build_ffmpeg_cmd(
 
             # 7. Build filter for scaling, crop, format conversion
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}scale={pixel_w}:-2,format=rgba,"
-                f"colorchannelmixer=aa={layer.opacity:.2f}[{layer_output}]"
+                f"[{input_index}:v]{crop_filter}{pts_filter}scale={pixel_w}:-2,format=rgba,"
+                f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
             )
             
             # 8. Position calculations with scaled margins
@@ -777,7 +803,7 @@ def build_ffmpeg_cmd(
 
             # Combo positions: 4: Center, 0: BR, 1: BL, 2: TR, 3: TL
             if layer.position == 4: # Center
-                overlay_pos = f"x=(W-w)/2+({ml}-{mr})/2:y=(H-h)/2+({mt}-{mb})/2"
+                overlay_pos = f"x=trunc((W-w)/2)+trunc(({ml}-{mr})/2):y=trunc((H-h)/2)+trunc(({mt}-{mb})/2)"
             elif layer.position == 0:  # Bottom-Right
                 overlay_pos = f"x=W-w-{mr}:y=H-h-{mb}"
             elif layer.position == 1:  # Bottom-Left

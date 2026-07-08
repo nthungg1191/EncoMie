@@ -8,18 +8,7 @@
 /dist
 
 
-# all __pycache__ directories
-__pycache__/
-**/__pycache__/
-*.pyc
-*.pyo
-*.pyd
-
-/output
-/.temp_srt
-.temp_srt/temp_1.srt
-
-.wireframe_box_b.html
-build.bat
-EncoMie.bat
-EncoMie.spec
+# all pycache
+*__pycache__
+EncoMie.bat 
+html.html
