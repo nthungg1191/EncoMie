@@ -52,19 +52,19 @@ from core.srt_service import SrtService
 # Hover:                        #2d3354
 # ---------------------------------------------------------------------------
 
-C_BG             = "#0f1017"
-C_SECTION_BG     = "#181b26"
-C_ELEVATED_BG    = "#22263a"
-C_ACCENT         = "#5b8def"
-C_ACCENT_DIM     = "#3a5299"
-C_SUCCESS        = "#4ade80"
-C_TEXT           = "#dde3f0"
-C_TEXT_MUTED     = "#7b849c"
-C_BORDER         = "#2e3347"
-C_HOVER          = "#2d3354"
-C_SECTION_BORDER = "#2e3347"
-C_PREVIEW_BG     = "#0a0b10"
-C_PREVIEW_BORDER = "#1e2235"
+C_BG             = "#f4f4f7"
+C_SECTION_BG     = "#ffffff"
+C_ELEVATED_BG    = "#f2f2f7"
+C_ACCENT         = "#007aff"
+C_ACCENT_DIM     = "#e5e5ea"
+C_SUCCESS        = "#34c759"
+C_TEXT           = "#1c1c1e"
+C_TEXT_MUTED     = "#636366"
+C_BORDER         = "#e5e5ea"
+C_HOVER          = "#f2f2f7"
+C_SECTION_BORDER = "#e5e5ea"
+C_PREVIEW_BG     = "#ffffff"
+C_PREVIEW_BORDER = "#d1d1d6"
 
 
 # ---------------------------------------------------------------------------

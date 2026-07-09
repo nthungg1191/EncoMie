@@ -85,17 +85,17 @@ class FolderPicker(QWidget):
         lay.setSpacing(6)
 
         self.lbl = QLabel(label)
-        self.lbl.setFixedWidth(110)
-        self.lbl.setStyleSheet("font-size: 13px;")
+        self.lbl.setFixedWidth(65)
+        self.lbl.setStyleSheet("font-size: 11px; font-weight: bold; color: #8e8e93;")
 
         self.edit = QLineEdit()
         self.edit.setPlaceholderText(placeholder)
         self.edit.setReadOnly(True)
-        self.edit.setStyleSheet("font-size: 12px;")
+        self.edit.setStyleSheet("font-size: 11px; padding: 4px; background-color: #ffffff; border: 1px solid #d1d1d6; border-radius: 4px; color: #1c1c1e;")
 
-        self.btn = QPushButton("Chọn…")
-        self.btn.setFixedWidth(64)
-        self.btn.setStyleSheet("font-size: 12px;")
+        self.btn = QPushButton("Chọn")
+        self.btn.setFixedWidth(50)
+        self.btn.setStyleSheet("font-size: 11px; padding: 4px 8px; background-color: #f2f2f7; border: 1px solid #d1d1d6; border-radius: 3px; color: #1c1c1e;")
         self.btn.clicked.connect(self._browse)
 
         lay.addWidget(self.lbl)
@@ -351,7 +351,7 @@ class PairTable(QTableWidget):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.setColumnWidth(0, 40)
         self.setColumnWidth(3, 100)
-        self.setStyleSheet("font-size: 12px;")
+        # Stylesheet is managed globally
 
     def load_pairs(self, pairs: list[FilePair]):
         self.setRowCount(0)
@@ -391,13 +391,14 @@ def _extract_video_frame(video_path: str, timestamp: str | None = None) -> QImag
     Uses the middle of the video by default (more representative than start).
     """
     import subprocess, tempfile, os
+    from utils.gpu_detect import FFMPEG_PATH, FFPROBE_PATH
     if not os.path.exists(video_path):
         return None
 
     try:
         if timestamp is None:
             probe_result = subprocess.run(
-                ["ffprobe", "-v", "error",
+                [FFPROBE_PATH, "-v", "error",
                  "-show_entries", "format=duration",
                  "-of", "default=noprint_wrappers=1:nokey=1",
                  video_path],
@@ -413,7 +414,7 @@ def _extract_video_frame(video_path: str, timestamp: str | None = None) -> QImag
             tmp_path = tmp.name
 
         cmd = [
-            "ffmpeg", "-y",
+            FFMPEG_PATH, "-y",
             "-ss", str(timestamp),
             "-i", video_path,
             "-frames:v", "1",
@@ -515,9 +516,230 @@ class MainWindow(QMainWindow):
             self._log_debug(f"Media file: {path}")
         return media_files
 
-    # ------------------------------------------------------------------
-    # UI construction
-    # ------------------------------------------------------------------
+    def _apply_theme(self):
+        qss = """
+        /* Main Window */
+        QMainWindow {
+            background-color: #f4f4f7;
+        }
+
+        /* General QWidget */
+        QWidget {
+            color: #1c1c1e;
+            font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial;
+            font-size: 11px;
+        }
+
+        /* Group Box */
+        QGroupBox {
+            background-color: #ffffff;
+            border: 1px solid #e5e5ea;
+            border-radius: 6px;
+            margin-top: 10px;
+            padding-top: 15px;
+            font-weight: bold;
+            color: #1c1c1e;
+        }
+        QGroupBox::title {
+            subcontrol-origin: margin;
+            subcontrol-position: top left;
+            left: 10px;
+            padding: 0 3px;
+        }
+
+        /* Line Edit & Text Edit */
+        QLineEdit, QPlainTextEdit, QTextEdit {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d6;
+            border-radius: 4px;
+            padding: 4px 6px;
+            color: #1c1c1e;
+        }
+        QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus {
+            border: 1px solid #007aff;
+        }
+
+        /* SpinBox & DoubleSpinBox */
+        QSpinBox, QDoubleSpinBox {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d6;
+            border-radius: 4px;
+            padding: 2px 4px;
+            color: #1c1c1e;
+            min-height: 22px;
+        }
+        QSpinBox:focus, QDoubleSpinBox:focus {
+            border: 1px solid #007aff;
+        }
+
+        /* ComboBox */
+        QComboBox {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d6;
+            border-radius: 4px;
+            padding: 2px 24px 2px 8px;
+            color: #1c1c1e;
+            min-height: 22px;
+        }
+        QComboBox:focus {
+            border: 1px solid #007aff;
+        }
+        QComboBox::drop-down {
+            subcontrol-origin: padding;
+            subcontrol-position: top right;
+            width: 20px;
+            border-left-width: 0px;
+        }
+        QComboBox QAbstractItemView {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d6;
+            selection-background-color: #e5e5ea;
+            selection-color: #1c1c1e;
+        }
+
+        /* PushButton */
+        QPushButton {
+            background-color: #ffffff;
+            border: 1px solid #d1d1d6;
+            border-radius: 4px;
+            color: #1c1c1e;
+            padding: 5px 10px;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background-color: #f2f2f7;
+            border-color: #c7c7cc;
+        }
+        QPushButton:pressed {
+            background-color: #e5e5ea;
+        }
+        QPushButton:checked {
+            background-color: #007aff;
+            color: #ffffff;
+            border-color: #007aff;
+        }
+
+        /* Table View */
+        QTableWidget, QTableView {
+            background-color: #ffffff;
+            alternate-background-color: #f9f9fa;
+            border: 1px solid #e5e5ea;
+            gridline-color: #e5e5ea;
+            color: #1c1c1e;
+            selection-background-color: rgba(0, 122, 255, 0.15);
+            selection-color: #1c1c1e;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+        QHeaderView::section {
+            background-color: #f2f2f7;
+            color: #636366;
+            padding: 6px;
+            font-weight: bold;
+            border: none;
+            border-bottom: 1px solid #e5e5ea;
+            border-right: 1px solid #e5e5ea;
+        }
+        QTableWidget::item {
+            padding: 4px;
+        }
+        QTableWidget::item:hover {
+            background-color: #f2f2f7;
+        }
+        QTableWidget::item:selected {
+            background-color: #007aff;
+            color: #ffffff;
+        }
+
+        /* Progress Bar */
+        QProgressBar {
+            background-color: #e5e5ea;
+            border: none;
+            border-radius: 3px;
+            text-align: center;
+            color: #1c1c1e;
+            font-weight: bold;
+        }
+        QProgressBar::chunk {
+            background-color: #34c759;
+            border-radius: 3px;
+        }
+
+        /* Slider */
+        QSlider::groove:horizontal {
+            height: 4px;
+            background: #e5e5ea;
+            border-radius: 2px;
+        }
+        QSlider::handle:horizontal {
+            background: #007aff;
+            width: 12px;
+            height: 12px;
+            margin: -4px 0;
+            border-radius: 6px;
+        }
+        QSlider::handle:horizontal:hover {
+            background: #0062cc;
+        }
+
+        /* ScrollBar */
+        QScrollBar:vertical {
+            border: none;
+            background: transparent;
+            width: 6px;
+        }
+        QScrollBar::handle:vertical {
+            background: #c7c7cc;
+            border-radius: 3px;
+            min-height: 20px;
+        }
+        QScrollBar::handle:vertical:hover {
+            background: #a1a1aa;
+        }
+        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+            height: 0px;
+        }
+
+        QScrollBar:horizontal {
+            border: none;
+            background: transparent;
+            height: 6px;
+        }
+        QScrollBar::handle:horizontal {
+            background: #c7c7cc;
+            border-radius: 3px;
+            min-width: 20px;
+        }
+        QScrollBar::handle:horizontal:hover {
+            background: #a1a1aa;
+        }
+        QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+            width: 0px;
+        }
+
+        /* Tab Widget */
+        QTabWidget::pane {
+            border: 1px solid #e5e5ea;
+            border-radius: 4px;
+            background-color: #ffffff;
+        }
+        QTabBar::tab {
+            background: #f2f2f7;
+            color: #636366;
+            border: 1px solid #e5e5ea;
+            border-bottom: none;
+            padding: 4px 12px;
+            border-top-left-radius: 4px;
+            border-top-right-radius: 4px;
+            min-width: 80px;
+        }
+        QTabBar::tab:selected {
+            background: #ffffff;
+            color: #1c1c1e;
+            border-bottom: 2px solid #007aff;
+        }
+        """
+        self.setStyleSheet(qss)
 
     def _build_ui(self):
         central = QWidget()
@@ -532,29 +754,31 @@ class MainWindow(QMainWindow):
 
         # --- Main Mode Tab Selector Bar ---
         mode_bar = QWidget()
-        mode_bar.setFixedHeight(36)
-        mode_bar.setStyleSheet("background: #e2e8f0; border-bottom: 1px solid #cbd5e1;")
+        mode_bar.setFixedHeight(38)
+        mode_bar.setStyleSheet("background-color: #e5e5ea; border-bottom: 1px solid #d1d1d6;")
         mode_lay = QHBoxLayout(mode_bar)
         mode_lay.setContentsMargins(0, 0, 0, 0)
         mode_lay.setSpacing(0)
 
-        self.btn_tab_sub = QPushButton("✍️ Edit Sub (Biên tập phụ đề)")
+        self.btn_tab_sub = QPushButton("✍️  Biên tập phụ đề (Edit Sub)")
         self.btn_tab_sub.setCheckable(True)
         self.btn_tab_sub.setChecked(True)
-        self.btn_tab_sub.setFixedHeight(36)
+        self.btn_tab_sub.setFixedHeight(38)
         self.btn_tab_sub.setStyleSheet(
-            "QPushButton { background: #ffffff; color: #2563eb; font-weight: bold; border: none; border-bottom: 2px solid #2563eb; font-size: 12px; }"
-            "QPushButton:hover { background: #f8fafc; }"
+            "QPushButton { background: transparent; color: #636366; font-weight: bold; border: none; border-bottom: 2px solid transparent; font-size: 12px; border-radius: 0; }"
+            "QPushButton:hover { color: #1c1c1e; }"
+            "QPushButton:checked { color: #007aff; border-bottom: 2px solid #007aff; }"
         )
         self.btn_tab_sub.clicked.connect(self._on_mode_sub_clicked)
 
-        self.btn_tab_video = QPushButton("🎬 Edit Video (Biên tập Video)")
+        self.btn_tab_video = QPushButton("🎬  Biên tập Video (Edit Video)")
         self.btn_tab_video.setCheckable(True)
         self.btn_tab_video.setChecked(False)
-        self.btn_tab_video.setFixedHeight(36)
+        self.btn_tab_video.setFixedHeight(38)
         self.btn_tab_video.setStyleSheet(
-            "QPushButton { background: #f1f5f9; color: #475569; font-weight: bold; border: none; font-size: 12px; }"
-            "QPushButton:hover { background: #e2e8f0; }"
+            "QPushButton { background: transparent; color: #636366; font-weight: bold; border: none; border-bottom: 2px solid transparent; font-size: 12px; border-radius: 0; }"
+            "QPushButton:hover { color: #1c1c1e; }"
+            "QPushButton:checked { color: #007aff; border-bottom: 2px solid #007aff; }"
         )
         self.btn_tab_video.clicked.connect(self._on_mode_video_clicked)
 
@@ -562,32 +786,67 @@ class MainWindow(QMainWindow):
         mode_lay.addWidget(self.btn_tab_video, 1)
         root_lay.addWidget(mode_bar)
 
+        # Instantiate style and layer controls first so panels can cross-reference them
+        self.style_panel = SubtitleStyleEditor(self)
+        self.style_panel.hide_preset_bar()
+        # Remove _preview from style_panel layout and parent, but keep _ctrl inside it
+        self.style_panel.layout().removeWidget(self.style_panel._preview)
+        self.style_panel._preview.setParent(None)
+        self.style_panel._preview.setVisible(True)
+
+        self.layer_tab_widget = QTabWidget()
+        self.layer_tab_widget.setStyleSheet(
+            "QTabWidget::pane { border: 1px solid #e5e5ea; border-radius: 4px; background: #ffffff; }"
+            "QTabBar::tab { font-size: 10px; font-weight: bold; padding: 4px 10px; background: #f2f2f7; color: #636366; border: 1px solid #e5e5ea; }"
+            "QTabBar::tab:selected { background: #ffffff; color: #007aff; border-bottom: 2px solid #007aff; }"
+        )
+        self.logo_layers = []
+        for i in range(1, 6):
+            ctrl = ImageLayerControl(i)
+            ctrl.changed.connect(self._on_logo_settings_changed)
+            self.logo_layers.append(ctrl)
+            self.layer_tab_widget.addTab(ctrl, f"L {i}")
+
+        self.video_tab_widget = QTabWidget()
+        self.video_tab_widget.setStyleSheet(
+            "QTabWidget::pane { border: 1px solid #e5e5ea; border-radius: 4px; background: #ffffff; }"
+            "QTabBar::tab { font-size: 10px; font-weight: bold; padding: 4px 10px; background: #f2f2f7; color: #636366; border: 1px solid #e5e5ea; }"
+            "QTabBar::tab:selected { background: #ffffff; color: #007aff; border-bottom: 2px solid #007aff; }"
+        )
+        self.video_layer_widgets = []
+        for i in range(1, 6):
+            widget = VideoLayerConfigWidget(i)
+            widget.changed.connect(self._on_video_layer_changed)
+            self.video_layer_widgets.append(widget)
+            self.video_tab_widget.addTab(widget, f"L {i}")
+
         # --- 3-panel horizontal splitter ---
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setHandleWidth(1)
+        splitter.setStyleSheet("QSplitter::handle { background-color: #d1d1d6; }")
 
         left   = self._build_left_panel()    # file selection
-        middle = self._build_middle_panel()  # subtitle style + preview
-        right  = self._build_right_panel()   # render + log + controls
+        middle = self._build_middle_panel()  # video player
+        right  = self._build_right_panel()   # inspector tabs & render log
 
         splitter.addWidget(left)
         splitter.addWidget(middle)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 11)
-        splitter.setStretchFactor(1, 23)
-        splitter.setStretchFactor(2, 8)
-        splitter.setSizes([330, 670, 240])
+        splitter.setStretchFactor(0, 10)
+        splitter.setStretchFactor(1, 22)
+        splitter.setStretchFactor(2, 10)
+        splitter.setSizes([330, 650, 340])
 
         root_lay.addWidget(splitter, 1)
 
-        # Status bar
+        self._apply_theme()
         self.statusBar().showMessage("Sẵn sàng")
 
     def _make_title_bar(self) -> QWidget:
         si = self._sys_info
         bar = QWidget()
         bar.setFixedHeight(44)
-        bar.setStyleSheet("background: #1e1e2e; border-bottom: 1px solid #333;")
+        bar.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #d1d1d6;")
 
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(12, 0, 12, 0)
@@ -605,14 +864,14 @@ class MainWindow(QMainWindow):
                     Qt.TransformationMode.SmoothTransformation
                 ))
             else:
-                icon_lbl.setText("▶")
-                icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
+                icon_lbl.setText("E")
+                icon_lbl.setStyleSheet("color: #007aff; font-size: 16px; font-weight: bold;")
         else:
-            icon_lbl.setText("▶")
-            icon_lbl.setStyleSheet("color: #60a5fa; font-size: 18px;")
+            icon_lbl.setText("E")
+            icon_lbl.setStyleSheet("color: #007aff; font-size: 16px; font-weight: bold;")
 
-        title_lbl = QLabel("EncoMie")
-        title_lbl.setStyleSheet("color: #f8fafc; font-size: 14px; font-weight: 600;")
+        title_lbl = QLabel("EncoMie Studio")
+        title_lbl.setStyleSheet("color: #1c1c1e; font-size: 13px; font-weight: 600;")
         lay.addWidget(icon_lbl)
         lay.addWidget(title_lbl)
         lay.addSpacing(16)
@@ -620,46 +879,45 @@ class MainWindow(QMainWindow):
         # CPU load badge
         self._cpu_load_lbl = QLabel(f"CPU: {si['cpu_load_pct']}%")
         self._cpu_load_lbl.setStyleSheet(
-            "color: #fde68a; font-size: 11px; "
-            "background: #2e2500; border-radius: 4px; padding: 3px 8px; "
-            "border: 1px solid #78350f;"
+            "color: #b45309; font-size: 10px; "
+            "background: #fef3c7; border-radius: 4px; padding: 2px 6px; "
+            "border: 1px solid #f59e0b;"
         )
         lay.addWidget(self._cpu_load_lbl)
-
 
         # RAM usage badge
         self._ram_pct_lbl = QLabel(f"RAM: {si['ram_used_pct']}%")
         self._ram_pct_lbl.setStyleSheet(
-            "color: #fca5a5; font-size: 11px; "
-            "background: #2e1a1a; border-radius: 4px; padding: 3px 8px; "
-            "border: 1px solid #742a2a;"
+            "color: #b91c1c; font-size: 10px; "
+            "background: #fee2e2; border-radius: 4px; padding: 2px 6px; "
+            "border: 1px solid #ef4444;"
         )
         lay.addWidget(self._ram_pct_lbl)
 
         # GPU badge
         gpu_ok = si["gpu_available"]
-        gpu_color = "#4ade80" if gpu_ok else "#f87171"
-        gpu_bg = "#1a2e1a" if gpu_ok else "#2e1a1a"
-        gpu_border = "#22543d" if gpu_ok else "#742a2a"
+        gpu_color = "#15803d" if gpu_ok else "#b91c1c"
+        gpu_bg = "#dcfce7" if gpu_ok else "#fee2e2"
+        gpu_border = "#22c55e" if gpu_ok else "#ef4444"
         self._gpu_lbl = QLabel(f"GPU: {si['gpu_name']}")
         if gpu_ok:
             vram_used = si['vram_total_mb'] - si['vram_free_mb']
             self._gpu_lbl.setText(f"GPU: {si['gpu_name']}  VRAM: {vram_used}/{si['vram_total_mb']} MB")
         self._gpu_lbl.setStyleSheet(
-            f"color: {gpu_color}; font-size: 11px; "
-            f"background: {gpu_bg}; border-radius: 4px; padding: 3px 8px; "
+            f"color: {gpu_color}; font-size: 10px; "
+            f"background: {gpu_bg}; border-radius: 4px; padding: 2px 6px; "
             f"border: 1px solid {gpu_border};"
         )
         lay.addWidget(self._gpu_lbl)
 
-        # Power badge (only if GPU available)
+        # Power badge
         self._pwr_lbl = None
         if gpu_ok and si["gpu_power_w"] != "—":
             self._pwr_lbl = QLabel(f"{si['gpu_power_w']}")
             self._pwr_lbl.setStyleSheet(
-                "color: #fbbf24; font-size: 11px; "
-                "background: #2e2500; border-radius: 4px; padding: 3px 8px; "
-                "border: 1px solid #78350f;"
+                "color: #b45309; font-size: 10px; "
+                "background: #fef3c7; border-radius: 4px; padding: 2px 6px; "
+                "border: 1px solid #f59e0b;"
             )
             lay.addWidget(self._pwr_lbl)
 
@@ -676,14 +934,8 @@ class MainWindow(QMainWindow):
     def _update_sysinfo(self):
         """Refresh system-info badges in the title bar."""
         si = detect_system_info()
-
-        # CPU load
         self._cpu_load_lbl.setText(f"CPU: {si['cpu_load_pct']}%")
-
-        # RAM usage
         self._ram_pct_lbl.setText(f"RAM: {si['ram_used_pct']}%")
-
-        # VRAM
         if si["gpu_available"]:
             vram_used = si['vram_total_mb'] - si['vram_free_mb']
             self._gpu_lbl.setText(
@@ -696,27 +948,33 @@ class MainWindow(QMainWindow):
 
     def _build_left_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setStyleSheet("background: #fafafa;")
+        panel.setStyleSheet("background-color: #ffffff; border-right: 1px solid #e5e5ea;")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(10)
+
+        header_lay = QHBoxLayout()
+        header_lbl = QLabel("📁  PROJECT MEDIA")
+        header_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #1c1c1e;")
+        header_lay.addWidget(header_lbl)
+        header_lay.addStretch()
+        
+        self.btn_refresh = QPushButton("⚡  Quét cặp")
+        self.btn_refresh.setStyleSheet("font-size: 10px; padding: 3px 8px; background-color: #f2f2f7; border: 1px solid #d1d1d6; color: #1c1c1e;")
+        self.btn_refresh.clicked.connect(self._scan_pairs)
+        header_lay.addWidget(self.btn_refresh)
+        lay.addLayout(header_lay)
 
         # 1. Edit Sub Container
         self.left_sub_container = QWidget()
         sub_lay = QVBoxLayout(self.left_sub_container)
-        sub_lay.setContentsMargins(12, 12, 12, 12)
-        sub_lay.setSpacing(10)
+        sub_lay.setContentsMargins(0, 0, 0, 0)
+        sub_lay.setSpacing(6)
 
-        # Folder pickers group
-        grp_folders = QGroupBox("📁  Thư mục (Biên tập phụ đề)")
-        grp_folders.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        f_lay = QVBoxLayout(grp_folders)
-        f_lay.setSpacing(6)
-
-        self.pick_bg = FolderPicker("Video nền:", "Chọn file video nền")
-        self.pick_audio = FolderPicker("Nguồn media:", "Chọn file video/audio nguồn")
-        self.pick_srt = FolderPicker("Subtitle SRT:", "Chọn thư mục chứa file .srt")
-        self.pick_output = FolderPicker("Output:", "Chọn thư mục xuất video")
+        self.pick_bg = FolderPicker("📁 Nền:", "Chọn file video nền")
+        self.pick_audio = FolderPicker("🎵 Media:", "Chọn file video/audio nguồn")
+        self.pick_srt = FolderPicker("✍️ Phụ đề:", "Chọn thư mục chứa file .srt")
+        self.pick_output = FolderPicker("📤 Xuất:", "Chọn thư mục xuất video")
 
         self.pick_bg.set_mode("files")
         self.pick_audio.set_mode("files")
@@ -729,100 +987,63 @@ class MainWindow(QMainWindow):
             "Chọn file phụ đề",
             "Subtitle files (*.srt);;All files (*.*)"
         )
-        self.pick_bg.btn.setText("Chọn file…")
-        self.pick_audio.btn.setText("Chọn file…")
-        self.pick_srt.btn.setText("Chọn file…")
+        self.pick_bg.btn.setText("Chọn")
+        self.pick_audio.btn.setText("Chọn")
+        self.pick_srt.btn.setText("Chọn")
 
         self.pick_bg.set_callback(self._on_file_selection_change)
         self.pick_audio.set_callback(self._on_file_selection_change)
         self.pick_srt.set_callback(self._on_file_selection_change)
 
         for w in [self.pick_bg, self.pick_audio, self.pick_srt, self.pick_output]:
-            f_lay.addWidget(w)
+            sub_lay.addWidget(w)
 
-        self.btn_refresh = QPushButton("🔄  Quét lại file")
-        self.btn_refresh.clicked.connect(self._scan_pairs)
-        self.btn_refresh.setStyleSheet("font-size: 12px;")
-        f_lay.addWidget(self.btn_refresh)
-
-        pair_hint = QLabel(
-            "Chọn thủ công danh sách audio và SRT; tool sẽ ghép 2 danh sách theo đúng thứ tự bạn chọn."
-        )
-        pair_hint.setWordWrap(True)
-        pair_hint.setStyleSheet("font-size: 11px; color: #6b7280;")
-        f_lay.addWidget(pair_hint)
-
-        sub_lay.addWidget(grp_folders)
-
-        # File pairs table
-        grp_pairs = QGroupBox("📋  Danh sách file (audio ↔ SRT)")
-        grp_pairs.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        p_lay = QVBoxLayout(grp_pairs)
         self.pair_table = PairTable()
         self.pair_table.itemSelectionChanged.connect(self._on_pair_selection_changed)
         self.pair_table.itemChanged.connect(self._on_table_item_changed)
-        p_lay.addWidget(self.pair_table)
+        sub_lay.addWidget(self.pair_table, 1)
 
         pair_btn_lay = QHBoxLayout()
         self.btn_pair_select_all = QPushButton("Chọn tất cả")
-        self.btn_pair_select_all.setStyleSheet("font-size: 10px; padding: 2px 8px;")
+        self.btn_pair_select_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
         self.btn_pair_select_all.clicked.connect(self._pair_select_all)
         self.btn_pair_deselect_all = QPushButton("Bỏ chọn tất cả")
-        self.btn_pair_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 8px;")
+        self.btn_pair_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
         self.btn_pair_deselect_all.clicked.connect(self._pair_deselect_all)
         pair_btn_lay.addWidget(self.btn_pair_select_all)
         pair_btn_lay.addWidget(self.btn_pair_deselect_all)
         pair_btn_lay.addStretch(1)
         
         self.lbl_pair_summary = QLabel("Chưa quét")
-        self.lbl_pair_summary.setStyleSheet("font-size: 11px; color: #6b7280;")
+        self.lbl_pair_summary.setStyleSheet("font-size: 10px; color: #636366;")
         pair_btn_lay.addWidget(self.lbl_pair_summary)
-        p_lay.addLayout(pair_btn_lay)
+        sub_lay.addLayout(pair_btn_lay)
 
-        sub_lay.addWidget(grp_pairs, 1)
-        lay.addWidget(self.left_sub_container)
+        lay.addWidget(self.left_sub_container, 1)
 
         # 2. Edit Video Container
         self.left_video_container = QWidget()
         vid_lay = QVBoxLayout(self.left_video_container)
-        vid_lay.setContentsMargins(12, 12, 12, 12)
-        vid_lay.setSpacing(10)
+        vid_lay.setContentsMargins(0, 0, 0, 0)
+        vid_lay.setSpacing(6)
 
-        # Video pickers group
-        grp_vid_folders = QGroupBox("📁  Thư mục (Biên tập video)")
-        grp_vid_folders.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        fv_lay = QVBoxLayout(grp_vid_folders)
-        fv_lay.setSpacing(6)
-
-        self.pick_vid_src = FolderPicker("Video nguồn:", "Chọn thư mục video nguồn")
-        self.pick_vid_bg = FolderPicker("Video nền:", "Chọn file video nền (tùy chọn)")
-        self.pick_vid_output = FolderPicker("Output:", "Chọn thư mục xuất video")
+        self.pick_vid_src = FolderPicker("🎥 Nguồn:", "Chọn thư mục video nguồn")
+        self.pick_vid_bg = FolderPicker("📁 Nền:", "Chọn file video nền (tùy chọn)")
+        self.pick_vid_output = FolderPicker("📤 Xuất:", "Chọn thư mục xuất video")
 
         self.pick_vid_bg.set_mode("files")
         self.pick_vid_bg.set_file_dialog(
             "Chọn file video nền",
             "Video files (*.mp4 *.mkv *.mov *.avi *.webm *.m4v);;All files (*.*)"
         )
-        self.pick_vid_bg.btn.setText("Chọn file…")
+        self.pick_vid_bg.btn.setText("Chọn")
         
         self.pick_vid_src.set_callback(self._on_video_selection_change)
         self.pick_vid_bg.set_callback(self._on_video_selection_change)
 
         for w in [self.pick_vid_src, self.pick_vid_bg, self.pick_vid_output]:
-            fv_lay.addWidget(w)
+            vid_lay.addWidget(w)
 
-        self.btn_vid_refresh = QPushButton("🔄  Quét lại thư mục")
-        self.btn_vid_refresh.clicked.connect(self._scan_video_batch)
-        self.btn_vid_refresh.setStyleSheet("font-size: 12px;")
-        fv_lay.addWidget(self.btn_vid_refresh)
-
-        vid_lay.addWidget(grp_vid_folders)
-
-        # Video Batch Table
-        grp_vids = QGroupBox("📋  Danh sách Video cần Scale hàng loạt")
-        grp_vids.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        pv_lay = QVBoxLayout(grp_vids)
-        
         self.vid_batch_table = QTableWidget(0, 4)
         self.vid_batch_table.setHorizontalHeaderLabels(["#", "Tên video nguồn", "Độ phân giải", "Trạng thái"])
         self.vid_batch_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -836,196 +1057,65 @@ class MainWindow(QMainWindow):
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.vid_batch_table.setColumnWidth(0, 40)
         self.vid_batch_table.setColumnWidth(3, 100)
-        self.vid_batch_table.setStyleSheet("font-size: 12px;")
+        # Stylesheet is managed globally
         self.vid_batch_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.vid_batch_table.itemSelectionChanged.connect(self._on_video_batch_selection_changed)
         self.vid_batch_table.itemChanged.connect(self._on_table_item_changed)
-        pv_lay.addWidget(self.vid_batch_table)
+        vid_lay.addWidget(self.vid_batch_table, 1)
 
         vid_btn_lay = QHBoxLayout()
         self.btn_vid_select_all = QPushButton("Chọn tất cả")
-        self.btn_vid_select_all.setStyleSheet("font-size: 10px; padding: 2px 8px;")
+        self.btn_vid_select_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
         self.btn_vid_select_all.clicked.connect(self._vid_select_all)
         self.btn_vid_deselect_all = QPushButton("Bỏ chọn tất cả")
-        self.btn_vid_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 8px;")
+        self.btn_vid_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
         self.btn_vid_deselect_all.clicked.connect(self._vid_deselect_all)
         vid_btn_lay.addWidget(self.btn_vid_select_all)
         vid_btn_lay.addWidget(self.btn_vid_deselect_all)
         vid_btn_lay.addStretch(1)
 
         self.lbl_vid_summary = QLabel("Chưa quét")
-        self.lbl_vid_summary.setStyleSheet("font-size: 11px; color: #6b7280;")
+        self.lbl_vid_summary.setStyleSheet("font-size: 10px; color: #636366;")
         vid_btn_lay.addWidget(self.lbl_vid_summary)
-        pv_lay.addLayout(vid_btn_lay)
+        vid_lay.addLayout(vid_btn_lay)
 
-        vid_lay.addWidget(grp_vids, 1)
-        lay.addWidget(self.left_video_container)
+        lay.addWidget(self.left_video_container, 1)
         self.left_video_container.setVisible(False)
 
         return panel
 
-    # ---- Middle panel — Subtitle Style + Preview ----
-
     def _build_middle_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setStyleSheet("background: #fafafa;")
+        panel.setStyleSheet("background-color: #f4f4f7;")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
+        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setSpacing(8)
 
-        # 1. Edit Sub Container
+        # Viewer Stacked Area
+        self.viewer_stack = QWidget()
+        viewer_lay = QVBoxLayout(self.viewer_stack)
+        viewer_lay.setContentsMargins(0, 0, 0, 0)
+        viewer_lay.setSpacing(0)
+
+        # 1. Edit Sub Viewer (Preview Widget)
         self.middle_sub_container = QWidget()
-        sub_lay = QVBoxLayout(self.middle_sub_container)
-        sub_lay.setContentsMargins(10, 10, 10, 10)
-        sub_lay.setSpacing(10)
-
-        self.main_tab_widget = QTabWidget()
-        self.main_tab_widget.setStyleSheet(
-            "QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 4px; background: white; }"
-            "QTabBar::tab { font-size: 11px; font-weight: 600; padding: 6px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; min-width: 120px; }"
-            "QTabBar::tab:selected { background: white; color: #2563eb; border-bottom: 2px solid #2563eb; }"
-        )
-
-        # Tab 1: Subtitle Style
-        tab_subtitle = QWidget()
-        tab_subtitle_lay = QVBoxLayout(tab_subtitle)
-        tab_subtitle_lay.setContentsMargins(6, 6, 6, 6)
-        tab_subtitle_lay.setSpacing(6)
-
-        self.style_panel = SubtitleStyleEditor()
-        self.style_panel.hide_preset_bar()
-        self.style_panel._preview.setVisible(True)
-        self.style_panel.style_changed.connect(self._on_style_changed)
-
-        preset_bar = QWidget()
-        preset_bar.setFixedHeight(32)
-        preset_bar.setStyleSheet(
-            "background: #1e1e2e; border-radius: 4px; border: 1px solid #2e3347;"
-        )
-        pst_lay = QHBoxLayout(preset_bar)
-        pst_lay.setContentsMargins(8, 0, 8, 0)
-        pst_lay.setSpacing(6)
-
-        title = QLabel("Presets")
-        title.setStyleSheet("color: #f8fafc; font-size: 11px; font-weight: 600;")
-        pst_lay.addWidget(title)
-        pst_lay.addSpacing(4)
-
-        self.cmb_preset = QComboBox()
-        self.cmb_preset.setStyleSheet(
-            "QComboBox { background: #2e3347; color: #f8fafc; border: 1px solid #2e3347; "
-            "border-radius: 4px; padding: 0px 8px; font-size: 11px; height: 26px; }"
-            "QComboBox::drop-down { border: none; width: 18px; }"
-            "QComboBox::down-arrow { image: none; border-left: 3px solid transparent; "
-            "border-right: 3px solid transparent; border-top: 4px #9ca3af; }"
-        )
-        self.cmb_preset.currentIndexChanged.connect(self._on_preset_changed)
-        pst_lay.addWidget(self.cmb_preset, 1)
-
-        for icon, tip, handler in [
-            ("💾", "Save preset", self._on_save_preset),
-            ("🗑", "Delete preset", self._on_delete_preset_inline),
-            ("↺", "Reset defaults", self._on_reset_defaults_inline),
-        ]:
-            btn = QPushButton(icon)
-            btn.setFixedSize(28, 22)
-            btn.setToolTip(tip)
-            btn.setStyleSheet(
-                "QPushButton { background: #2e3347; color: #f8fafc; border: 1px solid #2e3347; "
-                "border-radius: 4px; font-size: 12px; padding: 0; }"
-                "QPushButton:hover { background: #5b8def; border-color: #5b8def; }"
-            )
-            btn.clicked.connect(handler)
-            pst_lay.addWidget(btn)
-
-        tab_subtitle_lay.addWidget(preset_bar)
-        tab_subtitle_lay.addWidget(self.style_panel._ctrl)
-        self.main_tab_widget.addTab(tab_subtitle, "💬 Subtitle Style")
-
-        # Tab 2: Image Layers
-        tab_layers = QWidget()
-        tab_layers_lay = QVBoxLayout(tab_layers)
-        tab_layers_lay.setContentsMargins(6, 6, 6, 6)
-        tab_layers_lay.setSpacing(6)
-
-        self.layer_tab_widget = QTabWidget()
-        self.layer_tab_widget.setStyleSheet(
-            "QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 4px; background: #f8fafc; }"
-            "QTabBar::tab { font-size: 10px; font-weight: bold; padding: 4px 10px; background: #e2e8f0; color: #475569; border: 1px solid #cbd5e1; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; }"
-            "QTabBar::tab:selected { background: #f8fafc; color: #2563eb; border-bottom: 2px solid #2563eb; }"
-        )
-
-        self.logo_layers = []
-        for i in range(1, 6):
-            ctrl = ImageLayerControl(i)
-            ctrl.changed.connect(self._on_logo_settings_changed)
-            self.logo_layers.append(ctrl)
-            self.layer_tab_widget.addTab(ctrl, f"Layer {i}")
-
-        tab_layers_lay.addWidget(self.layer_tab_widget)
-        self.main_tab_widget.addTab(tab_layers, "🖼️ Image Layers")
-        sub_lay.addWidget(self.main_tab_widget)
-
-        # Preview Group
-        grp_preview = QGroupBox("🖼  Preview")
-        grp_preview.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        preview_lay = QVBoxLayout(grp_preview)
-        preview_lay.setSpacing(6)
-
+        sub_view_lay = QVBoxLayout(self.middle_sub_container)
+        sub_view_lay.setContentsMargins(0, 0, 0, 0)
         self.preview_widget = self.style_panel._preview
-        self.preview_widget.setMinimumHeight(180)
+        self.preview_widget.setMinimumHeight(240)
         self.preview_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
         )
         self.preview_widget.clicked.connect(self._on_refresh_preview_frame)
         self.preview_widget.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.preview_widget.setToolTip("Click vào đây để tải/làm mới khung hình xem trước từ video")
-        preview_lay.addWidget(self.preview_widget)
+        self.preview_widget.setToolTip("Click để làm mới khung hình xem trước")
+        sub_view_lay.addWidget(self.preview_widget)
+        viewer_lay.addWidget(self.middle_sub_container)
 
-        preview_ctrl = QHBoxLayout()
-        preview_ctrl.setSpacing(6)
-        preview_ctrl.addStretch()
-        self.btn_refresh_frame = QPushButton("🔄  Load frame from video")
-        self.btn_refresh_frame.setStyleSheet("font-size: 12px;")
-        self.btn_refresh_frame.setToolTip("Extract a frame from the first video as preview background")
-        self.btn_refresh_frame.clicked.connect(self._on_refresh_preview_frame)
-        preview_ctrl.addWidget(self.btn_refresh_frame)
-        preview_lay.addLayout(preview_ctrl)
-
-        sub_lay.addWidget(grp_preview, 1)
-        self.style_panel.hide_preset_bar()
-        self.preview_widget.set_style(self.style_panel.get_style())
-        lay.addWidget(self.middle_sub_container)
-
-        # 2. Edit Video Container
+        # 2. Edit Video Viewer (Video Layout Preview)
         self.middle_video_container = QWidget()
-        vid_lay = QVBoxLayout(self.middle_video_container)
-        vid_lay.setContentsMargins(10, 10, 10, 10)
-        vid_lay.setSpacing(10)
-
-        # Tab Widget for 5 Video Layers
-        self.video_tab_widget = QTabWidget()
-        self.video_tab_widget.setStyleSheet(
-            "QTabWidget::pane { border: 1px solid #cbd5e1; border-radius: 4px; background: white; }"
-            "QTabBar::tab { font-size: 11px; font-weight: 600; padding: 6px 16px; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; border-bottom: none; border-top-left-radius: 4px; border-top-right-radius: 4px; min-width: 100px; }"
-            "QTabBar::tab:selected { background: white; color: #2563eb; border-bottom: 2px solid #2563eb; }"
-        )
-
-        self.video_layer_widgets = []
-        for i in range(1, 6):
-            widget = VideoLayerConfigWidget(i)
-            widget.changed.connect(self._on_video_layer_changed)
-            self.video_layer_widgets.append(widget)
-            self.video_tab_widget.addTab(widget, f"Video Layer {i}")
-
-        vid_lay.addWidget(self.video_tab_widget)
-
-        # Video Layout Preview Box
-        grp_vid_preview = QGroupBox("🖼  Preview (Kéo/Thả/Scale & Cắt khung trực tiếp)")
-        grp_vid_preview.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        vid_preview_lay = QVBoxLayout(grp_vid_preview)
-        vid_preview_lay.setSpacing(6)
-
+        vid_view_lay = QVBoxLayout(self.middle_video_container)
+        vid_view_lay.setContentsMargins(0, 0, 0, 0)
         self.video_layout_preview = VideoLayoutPreview()
         self.video_layout_preview.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -1034,27 +1124,69 @@ class MainWindow(QMainWindow):
         self.video_layout_preview.layerMoved.connect(self._on_preview_layer_moved)
         self.video_layout_preview.layerResized.connect(self._on_preview_layer_resized)
         self.video_layout_preview.layerCropped.connect(self._on_preview_layer_cropped)
-        vid_preview_lay.addWidget(self.video_layout_preview)
+        vid_view_lay.addWidget(self.video_layout_preview)
+        viewer_lay.addWidget(self.middle_video_container)
+        self.middle_video_container.setVisible(False)
 
-        # Video Preview controls
-        vid_preview_ctrl = QHBoxLayout()
-        vid_preview_ctrl.setSpacing(6)
-        vid_preview_ctrl.addStretch()
+        lay.addWidget(self.viewer_stack, 1)
+
+        # Bottom row player controls
+        ctrl_bar = QWidget()
+        ctrl_bar.setFixedHeight(50)
+        ctrl_lay = QVBoxLayout(ctrl_bar)
+        ctrl_lay.setContentsMargins(0, 0, 0, 0)
+        ctrl_lay.setSpacing(6)
+
+        # Timeline Slider
+        self.timeline_slider = QSlider(Qt.Orientation.Horizontal)
+        self.timeline_slider.setRange(0, 1000)
+        self.timeline_slider.setValue(0)
+        ctrl_lay.addWidget(self.timeline_slider)
+
+        # Controls Row
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(4, 0, 4, 0)
         
+        self.lbl_timecode = QLabel("00:00:00.00 / 00:00:00.00")
+        self.lbl_timecode.setStyleSheet("font-size: 11px; color: #636366;")
+        btn_row.addWidget(self.lbl_timecode)
+        btn_row.addStretch()
+
+        self.btn_play_prev = QPushButton("⏮")
+        self.btn_play_prev.setFixedSize(30, 24)
+        self.btn_play_prev.setStyleSheet("border: none; background: none; font-size: 14px; color: #1c1c1e;")
+        self.btn_play_prev.clicked.connect(self._on_refresh_preview_frame)
+        
+        self.btn_play_toggle = QPushButton("⏸")
+        self.btn_play_toggle.setFixedSize(30, 24)
+        self.btn_play_toggle.setStyleSheet("border: none; background: none; font-size: 16px; color: #1c1c1e;")
+
+        self.btn_play_next = QPushButton("⏭")
+        self.btn_play_next.setFixedSize(30, 24)
+        self.btn_play_next.setStyleSheet("border: none; background: none; font-size: 14px; color: #1c1c1e;")
+
         self.btn_vid_crop_mode = QPushButton("✂  Bật Crop Mode")
         self.btn_vid_crop_mode.setCheckable(True)
         self.btn_vid_crop_mode.setStyleSheet(
-            "QPushButton { background: #1e293b; color: #f59e0b; border: 1px solid #f59e0b; "
-            "padding: 4px 12px; border-radius: 4px; font-size: 11px; font-weight: bold; }"
-            "QPushButton:checked { background: #f59e0b; color: #000000; }"
+            "QPushButton { background: #fef3c7; color: #d97706; border: 1px solid #f59e0b; "
+            "padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }"
+            "QPushButton:checked { background: #f59e0b; color: #ffffff; }"
         )
         self.btn_vid_crop_mode.clicked.connect(self._toggle_video_crop_mode)
-        vid_preview_ctrl.addWidget(self.btn_vid_crop_mode)
-        vid_preview_lay.addLayout(vid_preview_ctrl)
+        self.btn_vid_crop_mode.setVisible(False)
 
-        vid_lay.addWidget(grp_vid_preview, 1)
-        lay.addWidget(self.middle_video_container)
-        self.middle_video_container.setVisible(False)
+        btn_row.addWidget(self.btn_play_prev)
+        btn_row.addWidget(self.btn_play_toggle)
+        btn_row.addWidget(self.btn_play_next)
+        btn_row.addStretch()
+        btn_row.addWidget(self.btn_vid_crop_mode)
+
+        self.lbl_fps = QLabel("30 fps")
+        self.lbl_fps.setStyleSheet("font-size: 11px; color: #636366;")
+        btn_row.addWidget(self.lbl_fps)
+
+        ctrl_lay.addLayout(btn_row)
+        lay.addWidget(ctrl_bar)
 
         return panel
 
@@ -1062,7 +1194,7 @@ class MainWindow(QMainWindow):
         """Sync style changes from style_panel to preview_widget."""
         if hasattr(self, "preview_widget"):
             self.preview_widget.set_style(style)
-        self._active_preset = None  # mark as modified (not from preset)
+        self._active_preset = None
 
     def _on_logo_changed(self, files):
         self._on_logo_settings_changed()
@@ -1075,32 +1207,167 @@ class MainWindow(QMainWindow):
         for idx, ctrl in enumerate(self.logo_layers):
             cfg_obj = ctrl.get_config()
             configs.append(cfg_obj)
-            
-            # Update tab text with active dot indicator
             status = " (•)" if cfg_obj.enabled and cfg_obj.path else ""
             self.layer_tab_widget.setTabText(idx, f"Layer {idx+1}{status}")
             
         self.preview_widget.set_logo_layers(configs)
         self._save_settings()
 
-    # ---- Right panel — Render + Log + Controls ----
-
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
-        panel.setMaximumWidth(240)
+        panel.setStyleSheet("background-color: #ffffff; border-left: 1px solid #e5e5ea;")
         lay = QVBoxLayout(panel)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
 
-        # --- Render settings ---
-        grp_render = QGroupBox("⚙️  Cài đặt Render")
-        grp_render.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
+        # --- Flat Inspector Tab Selector Buttons ---
+        tab_selector = QWidget()
+        tab_selector.setFixedHeight(34)
+        tab_selector.setStyleSheet("background-color: #f2f2f7; border-bottom: 1px solid #e5e5ea; border-radius: 4px;")
+        ts_lay = QHBoxLayout(tab_selector)
+        ts_lay.setContentsMargins(2, 2, 2, 2)
+        ts_lay.setSpacing(2)
+
+        self.inspector_tab_buttons = []
+        for i, text in enumerate(["Phụ đề", "Layer", "Cài đặt xuất"]):
+            btn = QPushButton(text)
+            btn.setCheckable(True)
+            btn.setFixedHeight(30)
+            btn.setStyleSheet(
+                "QPushButton { background: transparent; color: #636366; border: none; font-size: 11px; font-weight: bold; border-radius: 3px; }"
+                "QPushButton:hover { color: #1c1c1e; background: rgba(0,0,0,0.02); }"
+                "QPushButton:checked { color: #ffffff; background-color: #007aff; }"
+            )
+            if i == 0:
+                btn.setChecked(True)
+            btn.clicked.connect(lambda checked, idx=i: self._on_inspector_tab_clicked(idx))
+            self.inspector_tab_buttons.append(btn)
+            ts_lay.addWidget(btn)
+
+        lay.addWidget(tab_selector)
+
+        # --- Inspector QTabWidget ---
+        self.inspector_tab_widget = QTabWidget()
+        self.inspector_tab_widget.tabBar().setVisible(False) # Hide original tabbar
+        self.inspector_tab_widget.setStyleSheet("QTabWidget::pane { border: none; background: transparent; }")
+
+        # Tab 0: Subtitle & Style
+        tab_sub = QWidget()
+        tab_sub_lay = QVBoxLayout(tab_sub)
+        tab_sub_lay.setContentsMargins(0, 4, 0, 0)
+        tab_sub_lay.setSpacing(8)
+
+        # Preset bar (Moved from middle panel)
+        preset_bar = QWidget()
+        preset_bar.setFixedHeight(32)
+        preset_bar.setStyleSheet("background: #ffffff; border-radius: 4px; border: 1px solid #e5e5ea;")
+        pst_lay = QHBoxLayout(preset_bar)
+        pst_lay.setContentsMargins(8, 0, 8, 0)
+        pst_lay.setSpacing(6)
+
+        title = QLabel("Presets:")
+        title.setStyleSheet("color: #636366; font-size: 10px; font-weight: bold;")
+        pst_lay.addWidget(title)
+
+        self.cmb_preset = QComboBox()
+        self.cmb_preset.setStyleSheet(
+            "QComboBox { background: #ffffff; color: #1c1c1e; border: 1px solid #e5e5ea; "
+            "border-radius: 4px; padding: 0px 8px; font-size: 11px; height: 24px; }"
+        )
+        self.cmb_preset.currentIndexChanged.connect(self._on_preset_changed)
+        pst_lay.addWidget(self.cmb_preset, 1)
+
+        for icon, tip, handler in [
+            ("💾", "Save preset", self._on_save_preset),
+            ("🗑", "Delete preset", self._on_delete_preset_inline),
+            ("↺", "Reset defaults", self._on_reset_defaults_inline),
+        ]:
+            btn = QPushButton(icon)
+            btn.setFixedSize(26, 22)
+            btn.setToolTip(tip)
+            btn.setStyleSheet(
+                "QPushButton { background: #ffffff; color: #1c1c1e; border: 1px solid #e5e5ea; "
+                "border-radius: 4px; font-size: 11px; padding: 0; }"
+                "QPushButton:hover { background: #007aff; border-color: #007aff; color: white; }"
+            )
+            btn.clicked.connect(handler)
+            pst_lay.addWidget(btn)
+
+        tab_sub_lay.addWidget(preset_bar)
+
+        # Configure and connect pre-instantiated Subtitle Style Editor
+        self.style_panel._preview.setVisible(False) # Hidden preview inside inspector
+        self.style_panel.style_changed.connect(self._on_style_changed)
+        tab_sub_lay.addWidget(self.style_panel, 1)
+
+        # Timing Tools (Moved from right panel)
+        grp_timing = QGroupBox("⏱  Timing Tools")
+        grp_timing.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
+        timing_lay = QHBoxLayout(grp_timing)
+        timing_lay.setContentsMargins(8, 8, 8, 8)
+        timing_lay.setSpacing(6)
+
+        self.btn_first_to_zero = QPushButton("⏮  Shift To 0s")
+        self.btn_first_to_zero.setStyleSheet("font-size: 11px;")
+        self.btn_first_to_zero.setToolTip(
+            "Shift subtitle timeline so the first subtitle starts at 0s."
+        )
+        self.btn_first_to_zero.clicked.connect(self._on_first_sub_to_zero)
+        timing_lay.addWidget(self.btn_first_to_zero)
+
+        self.btn_undo_timing = QPushButton("↩  Undo")
+        self.btn_undo_timing.setStyleSheet("font-size: 11px;")
+        self.btn_undo_timing.setToolTip("Undo the last timing change.")
+        self.btn_undo_timing.setEnabled(False)
+        self.btn_undo_timing.clicked.connect(self._on_undo_timing)
+        timing_lay.addWidget(self.btn_undo_timing)
+
+        tab_sub_lay.addWidget(grp_timing)
+        self.inspector_tab_widget.addTab(tab_sub, "Phụ đề")
+
+        # Tab 1: Layer Configuration
+        tab_layer = QWidget()
+        tab_layer_lay = QVBoxLayout(tab_layer)
+        tab_layer_lay.setContentsMargins(0, 4, 0, 0)
+        tab_layer_lay.setSpacing(8)
+
+        # Add pre-instantiated layer tab widgets
+        tab_layer_lay.addWidget(self.layer_tab_widget)
+        tab_layer_lay.addWidget(self.video_tab_widget)
+        
+        # Initially, show image layers, hide video layers
+        self.layer_tab_widget.setVisible(True)
+        self.video_tab_widget.setVisible(False)
+
+        self.inspector_tab_widget.addTab(tab_layer, "Layer")
+
+        # Tab 2: Export & System Settings
+        tab_export = QWidget()
+        tab_export_lay = QVBoxLayout(tab_export)
+        tab_export_lay.setContentsMargins(0, 4, 0, 0)
+        tab_export_lay.setSpacing(10)
+
+        grp_render = QGroupBox("⚙️  Thông số Render")
+        grp_render.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         r_lay = QVBoxLayout(grp_render)
-        r_lay.setSpacing(6)
+        r_lay.setSpacing(8)
         r_lay.setContentsMargins(10, 10, 10, 10)
 
+        # Target Resolution Dropdown (New feature!)
+        res_lbl = QLabel("Độ phân giải:")
+        res_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
+        r_lay.addWidget(res_lbl)
+        
+        self.cmb_resolution = QComboBox()
+        self.cmb_resolution.addItem("1280x720 (HD - 16:9)")
+        self.cmb_resolution.addItem("1920x1080 (FullHD - 16:9)")
+        self.cmb_resolution.addItem("720x1280 (Dọc - TikTok)")
+        self.cmb_resolution.addItem("1080x1920 (Dọc FullHD)")
+        self.cmb_resolution.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(self.cmb_resolution)
+
         codec_lbl = QLabel("Codec xuất:")
-        codec_lbl.setStyleSheet("font-size: 11px;")
+        codec_lbl.setStyleSheet("font-size: 11px; color: #636366;")
         r_lay.addWidget(codec_lbl)
 
         self.cmb_codec = QComboBox()
@@ -1109,15 +1376,30 @@ class MainWindow(QMainWindow):
         self.cmb_codec.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.cmb_codec)
 
+        fps_lbl = QLabel("Tốc độ khung hình (FPS):")
+        fps_lbl.setStyleSheet("font-size: 11px; color: #636366;")
+        r_lay.addWidget(fps_lbl)
+
+        self.cmb_fps = QComboBox()
+        self.cmb_fps.addItem("60 FPS", 60)
+        self.cmb_fps.addItem("50 FPS", 50)
+        self.cmb_fps.addItem("30 FPS", 30)
+        self.cmb_fps.addItem("25 FPS", 25)
+        self.cmb_fps.addItem("24 FPS", 24)
+        self.cmb_fps.addItem("23.976 FPS", 23)
+        self.cmb_fps.setCurrentIndex(2) # Default to 30 FPS
+        self.cmb_fps.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(self.cmb_fps)
+
         speed_lbl = QLabel("Tốc độ chậm của video nền:")
-        speed_lbl.setStyleSheet("font-size: 11px;")
+        speed_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
         r_lay.addWidget(speed_lbl)
 
         speed_row = QHBoxLayout()
         speed_row.setSpacing(6)
 
         min_lbl = QLabel("Min:")
-        min_lbl.setStyleSheet("font-size: 11px;")
+        min_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
         speed_row.addWidget(min_lbl)
 
         self.spn_slow_min = QDoubleSpinBox()
@@ -1128,7 +1410,7 @@ class MainWindow(QMainWindow):
         speed_row.addWidget(self.spn_slow_min, 1)
 
         max_lbl = QLabel("Max:")
-        max_lbl.setStyleSheet("font-size: 11px;")
+        max_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
         speed_row.addWidget(max_lbl)
 
         self.spn_slow_max = QDoubleSpinBox()
@@ -1140,110 +1422,91 @@ class MainWindow(QMainWindow):
 
         r_lay.addLayout(speed_row)
 
-        slow_hint = QLabel(
-            "ℹ️  Ví dụ: 40% = video nền chạy chậm 40% so với gốc"
-        )
+        slow_hint = QLabel("ℹ️  Ví dụ: 40% = video nền chạy chậm 40% so với gốc")
         slow_hint.setWordWrap(True)
-        slow_hint.setStyleSheet("font-size: 10px; color: #6b7280;")
+        slow_hint.setStyleSheet("font-size: 10px; color: #8e8e93;")
         r_lay.addWidget(slow_hint)
-        lay.addWidget(grp_render)
+        tab_export_lay.addWidget(grp_render)
+        tab_export_lay.addStretch()
 
+        self.inspector_tab_widget.addTab(tab_export, "Cài đặt xuất")
 
+        # Add QTabWidget to the main inspector layout
+        lay.addWidget(self.inspector_tab_widget, 1)
 
-        # --- Timing Tools ---
-        grp_timing = QGroupBox("⏱  Timing Tools")
-        grp_timing.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
-        timing_lay = QHBoxLayout(grp_timing)
-        timing_lay.setSpacing(6)
-
-        self.btn_first_to_zero = QPushButton("⏮  Shift To 0s")
-        self.btn_first_to_zero.setFixedWidth(115)
-        self.btn_first_to_zero.setStyleSheet("font-size: 11px;")
-        self.btn_first_to_zero.setToolTip(
-            "Shift the entire subtitle timeline so the first subtitle starts at 0s."
-        )
-        self.btn_first_to_zero.clicked.connect(self._on_first_sub_to_zero)
-        timing_lay.addWidget(self.btn_first_to_zero)
-
-        self.btn_undo_timing = QPushButton("↩  Undo")
-        self.btn_undo_timing.setFixedWidth(55)
-        self.btn_undo_timing.setStyleSheet("font-size: 11px;")
-        self.btn_undo_timing.setToolTip("Undo the last timing change.")
-        self.btn_undo_timing.setEnabled(False)
-        self.btn_undo_timing.clicked.connect(self._on_undo_timing)
-        timing_lay.addWidget(self.btn_undo_timing)
-
-        timing_lay.addStretch()
-        lay.addWidget(grp_timing)
-
-        # --- FFmpeg log ---
+        # --- FFmpeg log (Always visible at the bottom of the Inspector) ---
         grp_log = QGroupBox("📝  Log FFmpeg")
-        grp_log.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
+        grp_log.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         log_lay = QVBoxLayout(grp_log)
+        log_lay.setContentsMargins(6, 6, 6, 6)
+        
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setMaximumBlockCount(500)
+        self.log_text.setMaximumBlockCount(100)
+        self.log_text.setFixedHeight(80) # Compact height
         self.log_text.setStyleSheet(
-            "background: #111827; color: #d1fae5; font-family: monospace; font-size: 11px;"
+            "background: #f4f4f7; color: #166534; font-family: monospace; font-size: 10px; border-radius: 4px; border: 1px solid #d1d1d6;"
         )
         log_lay.addWidget(self.log_text)
+        
         self.btn_clear_log = QPushButton("Xóa log")
-        self.btn_clear_log.setFixedWidth(80)
-        self.btn_clear_log.setStyleSheet("font-size: 11px;")
+        self.btn_clear_log.setFixedSize(60, 20)
+        self.btn_clear_log.setStyleSheet("font-size: 10px; padding: 0;")
         self.btn_clear_log.clicked.connect(self.log_text.clear)
         log_lay.addWidget(self.btn_clear_log, alignment=Qt.AlignmentFlag.AlignRight)
-        lay.addWidget(grp_log, 1)
+        lay.addWidget(grp_log)
 
         # --- Render controls ---
         grp_ctrl = QGroupBox("▶  Render")
-        grp_ctrl.setStyleSheet("QGroupBox { font-size: 13px; font-weight: 600; }")
+        grp_ctrl.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         ctrl_lay = QVBoxLayout(grp_ctrl)
-        ctrl_lay.setSpacing(8)
+        ctrl_lay.setSpacing(6)
+        ctrl_lay.setContentsMargins(8, 8, 8, 8)
 
         self.btn_render = QPushButton("▶  Bắt đầu Render")
-        self.btn_render.setMinimumHeight(38)
+        self.btn_render.setFixedHeight(32)
         self.btn_render.setStyleSheet(
-            "QPushButton { background: #2563eb; color: white; font-size: 13px; "
-            "font-weight: 600; border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #1d4ed8; }"
-            "QPushButton:disabled { background: #93c5fd; }"
+            "QPushButton { background: #007aff; color: white; font-size: 12px; "
+            "font-weight: bold; border-radius: 4px; border: none; }"
+            "QPushButton:hover { background: #0062cc; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_render.clicked.connect(self._start_render)
         ctrl_lay.addWidget(self.btn_render)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(6)
+        btn_row.setSpacing(4)
 
         self.btn_export = QPushButton("📤  Xuất JSON")
-        self.btn_export.setMinimumHeight(32)
+        self.btn_export.setFixedHeight(24)
         self.btn_export.setStyleSheet(
-            "QPushButton { background: #059669; color: white; font-size: 11px; "
-            "font-weight: 600; border-radius: 5px; border: none; }"
-            "QPushButton:hover { background: #047857; }"
+            "QPushButton { background: #34c759; color: white; font-size: 10px; "
+            "font-weight: bold; border-radius: 4px; border: none; }"
+            "QPushButton:hover { background: #28a745; }"
         )
         self.btn_export.clicked.connect(self._export_json)
         btn_row.addWidget(self.btn_export, 1)
 
         self.btn_pause = QPushButton("⏸  Tạm dừng")
-        self.btn_pause.setMinimumHeight(32)
+        self.btn_pause.setFixedHeight(24)
         self.btn_pause.setEnabled(False)
         self.btn_pause.setStyleSheet(
-            "QPushButton { background: #f59e0b; color: white; font-size: 11px; "
-            "border-radius: 5px; border: none; }"
+            "QPushButton { background: #f59e0b; color: white; font-size: 10px; "
+            "font-weight: bold; border-radius: 4px; border: none; }"
             "QPushButton:hover { background: #d97706; }"
-            "QPushButton:disabled { background: #fcd34d; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_pause.clicked.connect(self._toggle_pause_render)
         btn_row.addWidget(self.btn_pause, 1)
 
         self.btn_stop = QPushButton("⏹  Dừng")
-        self.btn_stop.setMinimumHeight(32)
+        self.btn_stop.setFixedHeight(24)
         self.btn_stop.setEnabled(False)
         self.btn_stop.setStyleSheet(
-            "QPushButton { background: #dc2626; color: white; font-size: 11px; "
-            "border-radius: 5px; border: none; }"
-            "QPushButton:hover { background: #b91c1c; }"
-            "QPushButton:disabled { background: #fca5a5; }"
+            "QPushButton { background: #ff3b30; color: white; font-size: 10px; "
+            "font-weight: bold; border-radius: 4px; border: none; }"
+            "QPushButton:hover { background: #d32f2f; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_stop.clicked.connect(self._stop_render)
         btn_row.addWidget(self.btn_stop, 1)
@@ -1253,20 +1516,21 @@ class MainWindow(QMainWindow):
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(24)
+        self.progress_bar.setFixedHeight(18)
         self.progress_bar.setStyleSheet(
-            "QProgressBar { border: 1px solid #cbd5e1; border-radius: 4px; "
-            "background: #e2e8f0; text-align: center; font-size: 12px; }"
-            "QProgressBar::chunk { background: #2563eb; border-radius: 3px; }"
+            "QProgressBar { border: 1px solid #d1d1d6; border-radius: 4px; "
+            "background: #e5e5ea; text-align: center; font-size: 10px; color: #1c1c1e; }"
+            "QProgressBar::chunk { background: #007aff; border-radius: 3px; }"
         )
         ctrl_lay.addWidget(self.progress_bar)
 
         self.lbl_status = QLabel("Sẵn sàng")
-        self.lbl_status.setStyleSheet("font-size: 12px; color: #64748b;")
+        self.lbl_status.setStyleSheet("font-size: 11px; color: #636366;")
         ctrl_lay.addWidget(self.lbl_status)
 
         lay.addWidget(grp_ctrl)
         return panel
+
 
     def _build_bottom_bar(self) -> QWidget:
         bar = QWidget()
@@ -1282,10 +1546,10 @@ class MainWindow(QMainWindow):
         self.btn_render.setFixedHeight(38)
         self.btn_render.setMinimumWidth(160)
         self.btn_render.setStyleSheet(
-            "QPushButton { background: #2563eb; color: white; font-size: 14px; "
+            "QPushButton { background: #007aff; color: white; font-size: 14px; "
             "font-weight: 600; border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #1d4ed8; }"
-            "QPushButton:disabled { background: #93c5fd; }"
+            "QPushButton:hover { background: #0062cc; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_render.clicked.connect(self._start_render)
 
@@ -1293,9 +1557,9 @@ class MainWindow(QMainWindow):
         self.btn_export.setFixedHeight(38)
         self.btn_export.setMinimumWidth(100)
         self.btn_export.setStyleSheet(
-            "QPushButton { background: #059669; color: white; font-size: 13px; "
+            "QPushButton { background: #34c759; color: white; font-size: 13px; "
             "font-weight: 600; border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #047857; }"
+            "QPushButton:hover { background: #28a745; }"
         )
         self.btn_export.clicked.connect(self._export_json)
 
@@ -1307,7 +1571,7 @@ class MainWindow(QMainWindow):
             "QPushButton { background: #f59e0b; color: white; font-size: 13px; "
             "border-radius: 6px; border: none; }"
             "QPushButton:hover { background: #d97706; }"
-            "QPushButton:disabled { background: #fcd34d; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_pause.clicked.connect(self._toggle_pause_render)
 
@@ -1316,10 +1580,10 @@ class MainWindow(QMainWindow):
         self.btn_stop.setMinimumWidth(80)
         self.btn_stop.setEnabled(False)
         self.btn_stop.setStyleSheet(
-            "QPushButton { background: #dc2626; color: white; font-size: 13px; "
+            "QPushButton { background: #ff3b30; color: white; font-size: 13px; "
             "border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #b91c1c; }"
-            "QPushButton:disabled { background: #fca5a5; }"
+            "QPushButton:hover { background: #d32f2f; }"
+            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
         self.btn_stop.clicked.connect(self._stop_render)
 
@@ -1328,13 +1592,13 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setFixedHeight(28)
         self.progress_bar.setStyleSheet(
-            "QProgressBar { border: 1px solid #cbd5e1; border-radius: 4px; "
-            "background: #e2e8f0; text-align: center; font-size: 12px; }"
-            "QProgressBar::chunk { background: #2563eb; border-radius: 3px; }"
+            "QProgressBar { border: 1px solid #d1d1d6; border-radius: 4px; "
+            "background: #e5e5ea; text-align: center; font-size: 12px; color: #1c1c1e; }"
+            "QProgressBar::chunk { background: #007aff; border-radius: 3px; }"
         )
 
         self.lbl_status = QLabel("Sẵn sàng")
-        self.lbl_status.setStyleSheet("font-size: 12px; color: #64748b; min-width: 220px;")
+        self.lbl_status.setStyleSheet("font-size: 12px; color: #636366; min-width: 220px;")
 
         lay.addWidget(self.btn_render)
         lay.addWidget(self.btn_pause)
@@ -1403,8 +1667,16 @@ class MainWindow(QMainWindow):
         )
         self.style_panel.load_from_style(preset)
 
+        self.cmb_resolution.setCurrentIndex(s.get("resolution", 0))
         self.spn_slow_min.setValue(s.get("slow_min", 35.0))
         self.spn_slow_max.setValue(s.get("slow_max", 45.0))
+
+        fps_val = s.get("fps", 30)
+        idx = self.cmb_fps.findData(fps_val)
+        if idx >= 0:
+            self.cmb_fps.setCurrentIndex(idx)
+        else:
+            self.cmb_fps.setCurrentIndex(2)
 
         codec_val = s.get("codec", "hevc_nvenc")
         for i, (_, val) in enumerate(CODECS):
@@ -1535,9 +1807,11 @@ class MainWindow(QMainWindow):
             "margin_v": style.margin_v,
             "margin_l": style.margin_l,
             "margin_r": style.margin_r,
+            "resolution": self.cmb_resolution.currentIndex(),
             "slow_min": self.spn_slow_min.value(),
             "slow_max": self.spn_slow_max.value(),
             "codec": CODECS[self.cmb_codec.currentIndex()][1],
+            "fps": self.cmb_fps.currentData(),
             "use_gpu": True,
             "subtitle_alignment": style.alignment,
         }
@@ -1802,6 +2076,8 @@ class MainWindow(QMainWindow):
 
     def _build_config(self) -> RenderConfig:
         codec_val = CODECS[self.cmb_codec.currentIndex()][1]
+        res_val = self.cmb_resolution.currentText().split(" ")[0]
+        fps_val = self.cmb_fps.currentData() or 30
         
         if self.btn_tab_video.isChecked():
             # Edit Video mode configurations
@@ -1821,7 +2097,9 @@ class MainWindow(QMainWindow):
                 codec=codec_val,
                 use_gpu="nvenc" in codec_val,
                 logo_path=None,
-                layers=configs
+                layers=configs,
+                resolution=res_val,
+                fps=fps_val
             )
         else:
             preset = self.style_panel.get_style()
@@ -1848,7 +2126,9 @@ class MainWindow(QMainWindow):
                 logo_position=layer1.position if layer1 else 0,
                 logo_size=layer1.size if layer1 else 100,
                 logo_opacity=layer1.opacity if layer1 else 0.8,
-                layers=configs
+                layers=configs,
+                resolution=res_val,
+                fps=fps_val
             )
 
     def _validate(self) -> bool:
@@ -2105,41 +2385,42 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Undo", msg)
         self._log(f"[Timing] Undo: {restored} file khôi phục")
 
+    def _on_inspector_tab_clicked(self, idx: int):
+        self.inspector_tab_widget.setCurrentIndex(idx)
+        for i, btn in enumerate(self.inspector_tab_buttons):
+            btn.setChecked(i == idx)
+
     # ------------------------------------------------------------------
     # Edit Video Interactive Event Slots
     # ------------------------------------------------------------------
 
     def _on_mode_sub_clicked(self):
         self.btn_tab_sub.setChecked(True)
-        self.btn_tab_sub.setStyleSheet(
-            "QPushButton { background: #ffffff; color: #2563eb; font-weight: bold; border: none; border-bottom: 2px solid #2563eb; font-size: 12px; }"
-        )
         self.btn_tab_video.setChecked(False)
-        self.btn_tab_video.setStyleSheet(
-            "QPushButton { background: #f1f5f9; color: #475569; font-weight: bold; border: none; font-size: 12px; }"
-        )
         
         self.left_sub_container.setVisible(True)
         self.left_video_container.setVisible(False)
         self.middle_sub_container.setVisible(True)
         self.middle_video_container.setVisible(False)
         
+        self.layer_tab_widget.setVisible(True)
+        self.video_tab_widget.setVisible(False)
+        self.btn_vid_crop_mode.setVisible(False)
+        
         self._scan_pairs()
 
     def _on_mode_video_clicked(self):
         self.btn_tab_sub.setChecked(False)
-        self.btn_tab_sub.setStyleSheet(
-            "QPushButton { background: #f1f5f9; color: #475569; font-weight: bold; border: none; font-size: 12px; }"
-        )
         self.btn_tab_video.setChecked(True)
-        self.btn_tab_video.setStyleSheet(
-            "QPushButton { background: #ffffff; color: #2563eb; font-weight: bold; border: none; border-bottom: 2px solid #2563eb; font-size: 12px; }"
-        )
         
         self.left_sub_container.setVisible(False)
         self.left_video_container.setVisible(True)
         self.middle_sub_container.setVisible(False)
         self.middle_video_container.setVisible(True)
+        
+        self.layer_tab_widget.setVisible(False)
+        self.video_tab_widget.setVisible(True)
+        self.btn_vid_crop_mode.setVisible(True)
         
         self._on_video_layer_changed()
         self._scan_video_batch()

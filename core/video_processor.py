@@ -135,6 +135,7 @@ class RenderConfig:
     logo_size: int = 100     # Legacy field
     logo_opacity: float = 0.8 # Legacy field
     layers: list[ImageLayerConfig] = field(default_factory=lambda: [ImageLayerConfig() for _ in range(5)])
+    fps: int = 30
 
     def __post_init__(self):
         if self.subtitle_style is None:
@@ -828,6 +829,14 @@ def build_ffmpeg_cmd(
         "-map", "[vout]",
         "-map", "1:a",
         "-c:v", vcodec,
+    ]
+
+    # Custom frame rate
+    fps_val = getattr(config, "fps", 30)
+    if fps_val:
+        cmd += ["-r", str(fps_val)]
+
+    cmd += [
         *preset_flags,
         *quality_flags,
         "-c:a", "aac",
