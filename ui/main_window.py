@@ -24,7 +24,8 @@ from PyQt6.QtWidgets import (
     QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox,
     QPlainTextEdit, QProgressBar, QSplitter, QCheckBox,
     QSizePolicy, QSlider, QMessageBox, QStatusBar,
-    QFrame, QGridLayout, QAbstractItemView, QTabWidget
+    QFrame, QGridLayout, QAbstractItemView, QTabWidget,
+    QScrollArea
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
 from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap
@@ -164,6 +165,7 @@ class FolderPicker(QWidget):
 
 
 class ImageLayerControl(QWidget):
+    MAX_HEIGHT = 380  # Fixed max height with scrollbar
     changed = pyqtSignal()
 
     def __init__(self, index: int, parent=None):
@@ -172,7 +174,21 @@ class ImageLayerControl(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        lay = QVBoxLayout(self)
+        # Outer wrapper with scroll area
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        # Inner content widget
+        content = QWidget()
+        lay = QVBoxLayout(content)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(8)
 
@@ -308,6 +324,11 @@ class ImageLayerControl(QWidget):
 
         lay.addSpacing(5)
         lay.addWidget(margin_grp)
+
+        # Set max height and wrap in scroll area
+        content.setMaximumHeight(self.MAX_HEIGHT)
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
 
     def _on_file_changed(self, files):
         self._on_changed()

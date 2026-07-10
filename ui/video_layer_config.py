@@ -4,15 +4,17 @@ Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QCheckBox, QPushButton,
-    QGroupBox, QFrame, QLineEdit
+    QGroupBox, QFrame, QLineEdit, QScrollArea
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from pathlib import Path
 import os
 
 from core.video_processor import ImageLayerConfig
 
 class VideoLayerConfigWidget(QWidget):
+    MAX_HEIGHT = 380  # Fixed max height with scrollbar
+
     changed = pyqtSignal()
 
     def __init__(self, index: int, parent=None):
@@ -21,9 +23,23 @@ class VideoLayerConfigWidget(QWidget):
         self._init_ui()
 
     def _init_ui(self):
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(10, 10, 10, 10)
-        lay.setSpacing(8)
+        # Outer wrapper with scroll area
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        # Inner content widget
+        content = QWidget()
+        content_lay = QVBoxLayout(content)
+        content_lay.setContentsMargins(10, 10, 10, 10)
+        content_lay.setSpacing(8)
 
         # Row 1: Active switch & Source Picker
         row1 = QHBoxLayout()
@@ -44,7 +60,7 @@ class VideoLayerConfigWidget(QWidget):
         self.cmb_source_type.setStyleSheet("font-size: 11px;")
         self.cmb_source_type.currentIndexChanged.connect(self._on_source_type_changed)
         row1.addWidget(self.cmb_source_type)
-        lay.addLayout(row1)
+        content_lay.addLayout(row1)
 
         # Static file selector row (visible only if Static file is selected)
         self.static_file_frame = QFrame()
@@ -70,7 +86,7 @@ class VideoLayerConfigWidget(QWidget):
         self.btn_browse.clicked.connect(self._browse_static_file)
         static_lay.addWidget(self.btn_browse)
 
-        lay.addWidget(self.static_file_frame)
+        content_lay.addWidget(self.static_file_frame)
         self.static_file_frame.setVisible(False) # Default is Batch file
 
         # Row 2: Vị trí neo (Alignment)
@@ -92,7 +108,7 @@ class VideoLayerConfigWidget(QWidget):
         self.cmb_pos.setStyleSheet("font-size: 11px;")
         self.cmb_pos.currentIndexChanged.connect(self._on_pos_changed)
         row2.addWidget(self.cmb_pos, 1)
-        lay.addLayout(row2)
+        content_lay.addLayout(row2)
 
         # Row 3: Cỡ (Scale %) & Bo góc (Radius px)
         row3 = QHBoxLayout()
@@ -120,7 +136,7 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_opacity.setStyleSheet("font-size: 11px;")
         self.spn_opacity.valueChanged.connect(self._on_changed)
         row3.addWidget(self.spn_opacity, 1)
-        lay.addLayout(row3)
+        content_lay.addLayout(row3)
 
         # Row 4: Margins Group
         margin_grp = QGroupBox("Căn chỉnh khoảng lề (Margin - px)")
@@ -161,7 +177,7 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_r.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_r, 1, 3)
 
-        lay.addWidget(margin_grp)
+        content_lay.addWidget(margin_grp)
 
         # Row 5: Crop Group
         crop_grp = QGroupBox("Cắt cúp khung hình (Crop - px)")
@@ -202,7 +218,14 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_r.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_r, 1, 3)
 
-        lay.addWidget(crop_grp)
+        content_lay.addWidget(crop_grp)
+        
+        # Set max height for scroll
+        content.setMaximumHeight(self.MAX_HEIGHT)
+        
+        # Set scroll area widget
+        scroll.setWidget(content)
+        outer.addWidget(scroll)
 
         # Default states: Layer 1 and 2 are active on wireframe demo
         if self.index in (1, 2):
