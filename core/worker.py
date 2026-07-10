@@ -60,15 +60,15 @@ class RenderWorker(QThread):
             if self._abort:
                 break
 
-            base_pct = (i / total) * 100
-            scale = 1.0 / total
+            # batch_index: số thứ tự trong batch đang render (1, 2, 3...)
+            batch_index = i + 1
 
-            def _progress(pct, msg, _base=base_pct, _scale=scale):
+            def _progress(pct, msg, _batch=batch_index, _total=total, _pair_idx=pair.index):
                 self._wait_if_paused()
                 if self._abort:
                     raise InterruptedError("Render đã bị dừng")
-                # Show current video percentage directly so progress bar updates continuously
-                msg_with_batch = msg.replace(f"[{pair.index}]", f"[{pair.index}/{total}]")
+                # Replace [pair.index] with [batch/total] for correct progress display
+                msg_with_batch = msg.replace(f"[{_pair_idx}]", f"[{_batch}/{_total}]")
                 self.progress.emit(pct, msg_with_batch)
 
             def _log(line):

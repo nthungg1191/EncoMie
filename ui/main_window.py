@@ -793,6 +793,9 @@ class MainWindow(QMainWindow):
         self.style_panel.layout().removeWidget(self.style_panel._preview)
         self.style_panel._preview.setParent(None)
         self.style_panel._preview.setVisible(True)
+        
+        # Alias for backward compatibility with code referencing self.cmb_preset
+        self.cmb_preset = self.style_panel._cmb_preset
 
         self.layer_tab_widget = QTabWidget()
         self.layer_tab_widget.setStyleSheet(
@@ -2403,8 +2406,20 @@ class MainWindow(QMainWindow):
         self.middle_sub_container.setVisible(True)
         self.middle_video_container.setVisible(False)
         
+        # Show SRT picker in Edit Sub mode
+        self.pick_srt.setVisible(True)
+        
         self.layer_tab_widget.setVisible(True)
         self.video_tab_widget.setVisible(False)
+        
+        # Show all 3 tabs: Phụ đề / Layer / Cài đặt xuất
+        self.inspector_tab_buttons[0].setVisible(True)  # Phụ đề
+        self.inspector_tab_widget.setTabVisible(0, True)  # tab_sub
+        
+        # Switch to Phụ đề tab
+        self.inspector_tab_widget.setCurrentIndex(0)
+        for i, btn in enumerate(self.inspector_tab_buttons):
+            btn.setChecked(i == 0)
         self.btn_vid_crop_mode.setVisible(False)
         
         self._scan_pairs()
@@ -2421,6 +2436,18 @@ class MainWindow(QMainWindow):
         self.layer_tab_widget.setVisible(False)
         self.video_tab_widget.setVisible(True)
         self.btn_vid_crop_mode.setVisible(True)
+        
+        # Hide SRT picker in Edit Video mode (video has no subtitles)
+        self.pick_srt.setVisible(False)
+        
+        # Hide Phụ đề tab (only Layer / Cài đặt xuất)
+        self.inspector_tab_buttons[0].setVisible(False)  # Phụ đề
+        self.inspector_tab_widget.setTabVisible(0, False)  # tab_sub
+        
+        # Switch to Layer tab (index 1 in original, which is index 0 after hiding)
+        self.inspector_tab_widget.setCurrentIndex(1)
+        for i, btn in enumerate(self.inspector_tab_buttons):
+            btn.setChecked(i == 1)
         
         self._on_video_layer_changed()
         self._scan_video_batch()

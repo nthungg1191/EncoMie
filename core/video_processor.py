@@ -620,25 +620,72 @@ def build_ffmpeg_cmd(
 
     sub_filter = _build_subtitle_filter(srt_path, config.subtitle_style)
 
+    # ============================================================
+    # DEBUG LOG: Layer Resolution
+    # ============================================================
+    print(f"\n{'='*60}")
+    print(f"[DEBUG] build_ffmpeg_cmd() called")
+    print(f"  - bg_video: {bg_video}")
+    print(f"  - audio_path: {audio_path}")
+    print(f"  - srt_path: {srt_path}")
+    print(f"  - config.resolution: {config.resolution}")
+    print(f"  - config.use_gpu: {config.use_gpu}")
+    print(f"  - config.codec: {config.codec}")
+    print(f"  - is_edit_sub (has srt_folder): {bool(config.srt_folder)}")
+    print(f"{'='*60}")
+
     # Resolve active layers (supporting up to 5 layers)
     active_layers = []
     if hasattr(config, "layers") and config.layers:
-        for layer in config.layers:
-            if layer.enabled and layer.path:
-                # Resolve source type path dynamically
-                if layer.path == "Video nền":
-                    layer_resolved_path = bg_video
-                elif layer.path == "Theo danh sách chạy":
-                    layer_resolved_path = audio_path
-                else:
-                    layer_resolved_path = layer.path
-                    
-                if layer_resolved_path and os.path.exists(layer_resolved_path):
-                    if has_video_stream(layer_resolved_path):
-                        layer._resolved_path = layer_resolved_path
-                        active_layers.append(layer)
-                    else:
-                        print(f"[Warning] Layer {layer_resolved_path} has no video/image stream. Skipping.")
+        for idx, layer in enumerate(config.layers):
+            print(f"\n[DEBUG] Layer {idx+1} config:")
+            print(f"  - enabled: {layer.enabled}")
+            print(f"  - path: '{layer.path}'")
+            print(f"  - position: {layer.position}")
+            print(f"  - size: {layer.size}")
+            print(f"  - opacity: {layer.opacity}")
+            print(f"  - margin_t/b/l/r: {layer.margin_t}/{layer.margin_b}/{layer.margin_l}/{layer.margin_r}")
+            
+            if not layer.enabled:
+                print(f"  -> SKIPPED: Layer is disabled")
+                continue
+                
+            if not layer.path:
+                print(f"  -> SKIPPED: Layer path is empty")
+                continue
+                
+            # Resolve source type path dynamically
+            if layer.path == "Video nền":
+                layer_resolved_path = bg_video
+                print(f"  -> Source: 'Video nền' -> resolved to bg_video")
+            elif layer.path == "Theo danh sách chạy":
+                layer_resolved_path = audio_path
+                print(f"  -> Source: 'Theo danh sách chạy' -> resolved to audio_path")
+            else:
+                layer_resolved_path = layer.path
+                print(f"  -> Source: 'File cố định' -> path = '{layer_resolved_path}'")
+            
+            # Check file exists
+            exists = os.path.exists(layer_resolved_path)
+            print(f"  -> os.path.exists(): {exists}")
+            if not exists:
+                print(f"  -> SKIPPED: Resolved path does not exist!")
+                continue
+                
+            # Check video stream
+            has_video = has_video_stream(layer_resolved_path)
+            print(f"  -> has_video_stream(): {has_video}")
+            
+            if has_video:
+                layer._resolved_path = layer_resolved_path
+                active_layers.append(layer)
+                print(f"  -> ACCEPTED: Layer added to active_layers")
+            else:
+                print(f"  -> SKIPPED: File has no video/image stream")
+    else:
+        print(f"\n[DEBUG] config.layers is None or empty!")
+        
+    print(f"\n[DEBUG] Total active_layers: {len(active_layers)}")
                     
     # Fallback to legacy logo config if no active layers set
     if not active_layers and config.logo_path and os.path.exists(config.logo_path) and has_video_stream(config.logo_path):
@@ -846,6 +893,16 @@ def build_ffmpeg_cmd(
         output_path
     ]
 
+    # DEBUG: Log final command inputs
+    print(f"\n[DEBUG] FFmpeg input files:")
+    for i, part in enumerate(cmd):
+        if part == "-i":
+            print(f"  Input #{cmd.index(part, i)}: {cmd[cmd.index(part, i)+1]}")
+    
+    print(f"[DEBUG] Filter complex preview:")
+    print(f"  {filter_expr[:500]}{'...' if len(filter_expr) > 500 else ''}")
+    print(f"{'='*60}\n")
+    
     return cmd
 
 
@@ -860,6 +917,30 @@ def render_pair(
     log_callback=None,
     should_abort=None,
 ) -> str:
+    # ============================================================
+    # DEBUG LOG: render_pair() entry
+    # ============================================================
+    print(f"\n{'#'*70}")
+    print(f"[DEBUG] render_pair() STARTED for pair #{pair.index}")
+    print(f"  - audio_path: {pair.audio_path}")
+    print(f"  - srt_path: {pair.srt_path}")
+    print(f"  - matched: {pair.matched}")
+    print(f"")
+    print(f"  RenderConfig:")
+    print(f"    - bg_folder: '{config.bg_folder}'")
+    print(f"    - bg_videos: {config.bg_videos}")
+    print(f"    - srt_folder: '{config.srt_folder}'")
+    print(f"    - output_folder: '{config.output_folder}'")
+    print(f"    - use_gpu: {config.use_gpu}")
+    print(f"    - codec: {config.codec}")
+    print(f"    - subtitle_style.font_size: {config.subtitle_style.font_size if config.subtitle_style else 'None'}")
+    print(f"")
+    print(f"    Layers config ({len(config.layers) if config.layers else 0} layers):")
+    if config.layers:
+        for i, layer in enumerate(config.layers):
+            print(f"      Layer {i+1}: enabled={layer.enabled}, path='{layer.path}', position={layer.position}, size={layer.size}")
+    print(f"{'#'*70}")
+    
     if not pair.matched:
         raise ValueError(f"FilePair {pair.index} chưa được ghép đầy đủ: {pair.error}")
 
