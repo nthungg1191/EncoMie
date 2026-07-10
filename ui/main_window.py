@@ -793,9 +793,6 @@ class MainWindow(QMainWindow):
         self.style_panel.layout().removeWidget(self.style_panel._preview)
         self.style_panel._preview.setParent(None)
         self.style_panel._preview.setVisible(True)
-        
-        # Alias for backward compatibility with code referencing self.cmb_preset
-        self.cmb_preset = self.style_panel._cmb_preset
 
         self.layer_tab_widget = QTabWidget()
         self.layer_tab_widget.setStyleSheet(
@@ -1625,9 +1622,19 @@ class MainWindow(QMainWindow):
             self.pick_bg.set_value(s.get("bg_folder", ""))
         self.pick_output.set_value(s.get("output_folder", ""))
 
-        # Restore Edit Video Folder paths
+        # Restore Edit Video Folder paths and selected files
         self.pick_vid_src.set_value(s.get("vid_src_folder", ""))
+        vid_src_files = s.get("vid_src_files", [])
+        if isinstance(vid_src_files, list) and vid_src_files:
+            self.pick_vid_src.set_selected_files(vid_src_files)
+            self._log_debug(f"Restored {len(vid_src_files)} video source files")
+        
         self.pick_vid_bg.set_value(s.get("vid_bg_folder", ""))
+        vid_bg_files = s.get("vid_bg_files", [])
+        if isinstance(vid_bg_files, list) and vid_bg_files:
+            self.pick_vid_bg.set_selected_files(vid_bg_files)
+            self._log_debug(f"Restored {len(vid_bg_files)} video background files")
+        
         self.pick_vid_output.set_value(s.get("vid_output_folder", ""))
 
         hardcoded_media_files = self._resolve_hardcoded_media_files()
@@ -1786,7 +1793,9 @@ class MainWindow(QMainWindow):
             "srt_files": self.pick_srt.selected_files(),
             "output_folder": self.pick_output.value(),
             "vid_src_folder": self.pick_vid_src.value(),
+            "vid_src_files": self.pick_vid_src.selected_files(),
             "vid_bg_folder": self.pick_vid_bg.value(),
+            "vid_bg_files": self.pick_vid_bg.selected_files(),
             "vid_output_folder": self.pick_vid_output.value(),
             "font_name": style.font_name,
             "font_size": style.font_size,
@@ -2146,8 +2155,8 @@ class MainWindow(QMainWindow):
                 errs.append("• Chưa có video nào trong danh sách (hãy quét lại)")
         else:
             # Validate Edit Sub mode
-            if not self.pick_bg.selected_files():
-                errs.append("• Chưa chọn file Video nền")
+            if not self.pick_bg.value() and not self.pick_bg.selected_files():
+                errs.append("• Chưa chọn Video nền hoặc folder chứa video nền")
             if not self.pick_audio.selected_files():
                 errs.append("• Chưa chọn file media nguồn")
             if not self.pick_srt.selected_files():
