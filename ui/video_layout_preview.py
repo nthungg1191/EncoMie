@@ -230,6 +230,7 @@ class VideoLayoutPreview(QWidget):
             layer_img = self._layer_images.get(i)
             layer_opacity = getattr(cfg, "opacity", 1.0)
             if layer_img and not layer_img.isNull():
+                layer_img = self._get_keyed_image(i, layer_img, cfg)
                 p.save()
                 p.setOpacity(layer_opacity)
                 
@@ -619,3 +620,63 @@ class VideoLayoutPreview(QWidget):
                 return
 
         self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def _get_keyed_image(self, index: int, img: QImage, cfg) -> QImage:
+        if not hasattr(self, "_keyed_images_cache"):
+            self._keyed_images_cache = {}
+            
+        chroma_enabled = getattr(cfg, "chroma_key_enabled", False)
+        sim = getattr(cfg, "chroma_key_similarity", 0.38)
+        blend = getattr(cfg, "chroma_key_blend", 0.08)
+        
+        if not chroma_enabled:
+            return img
+            
+        cache_key = img.cacheKey()
+        cached = self._keyed_images_cache.get(index)
+        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend:
+            return cached[4]
+            
+        # Process and cache
+        keyed_img = self._apply_chroma_key(img, sim, blend)
+        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, keyed_img)
+        return keyed_img
+
+    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float) -> QImage:
+        if img.isNull():
+            return img
+            
+        # Downscale for preview first to make pixel loop super fast
+        scaled_img = img.scaled(QSize(400, 400), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
+        scaled_img = scaled_img.convertToFormat(QImage.Format.Format_ARGB32)
+        
+        width = scaled_img.width()
+        height = scaled_img.height()
+        
+        ptr = scaled_img.bits()
+        ptr.setsize(height * width * 4)
+        buf = memoryview(ptr)
+        
+        # Color key: Green screen (R=0, G=255, B=0)
+        # In Format_ARGB32: bytes are ordered as B, G, R, A on little-endian
+        # cd = sqrt( r^2 + (g - 1.0)^2 + b^2 ) where channels are 0..1
+        
+        for i in range(0, len(buf), 4):
+            b = buf[i]
+            g = buf[i+1]
+            r = buf[i+2]
+            
+            rn = r / 255.0
+            gn = g / 255.0
+            bn = b / 255.0
+            
+            cd_sq = rn*rn + (gn - 1.0)*(gn - 1.0) + bn*bn
+            cd = cd_sq ** 0.5
+            
+            if cd < similarity:
+                buf[i+3] = 0
+            elif blend > 0.001 and cd < similarity + blend:
+                alpha = int(255 * (cd - similarity) / blend)
+                buf[i+3] = max(0, min(255, alpha))
+                
+        return scaled_img

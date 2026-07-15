@@ -116,6 +116,10 @@ class ImageLayerConfig:
     crop_l: int = 0
     crop_r: int = 0
     radius: int = 0
+    speed: int = 100
+    chroma_key_enabled: bool = False
+    chroma_key_similarity: float = 0.38
+    chroma_key_blend: float = 0.08
 
 @dataclass
 class RenderConfig:
@@ -762,7 +766,18 @@ def build_ffmpeg_cmd(
     for idx, layer in enumerate(active_layers):
         input_index = 2 + idx
         layer_output = f"v_layer_{idx}"
-        pts_filter = "setpts=PTS-STARTPTS,"
+        speed_val = getattr(layer, "speed", 100)
+        if speed_val != 100 and speed_val > 0:
+            speed_factor = speed_val / 100.0
+            pts_filter = f"setpts=(PTS-STARTPTS)/{speed_factor:.3f},"
+        else:
+            pts_filter = "setpts=PTS-STARTPTS,"
+            
+        chroma_filter = ""
+        if getattr(layer, "chroma_key_enabled", False):
+            sim = getattr(layer, "chroma_key_similarity", 0.38)
+            blend = getattr(layer, "chroma_key_blend", 0.08)
+            chroma_filter = f"colorkey=0x00FF00:{sim:.2f}:{blend:.2f},"
         
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)
@@ -778,7 +793,7 @@ def build_ffmpeg_cmd(
             crop_filter = ""
             
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}{pts_filter}scale={pixel_w}:-2,format=rgba,"
+                f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
                 f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
             )
             
@@ -837,7 +852,7 @@ def build_ffmpeg_cmd(
 
             # 7. Build filter for scaling, crop, format conversion
             filter_parts.append(
-                f"[{input_index}:v]{crop_filter}{pts_filter}scale={pixel_w}:-2,format=rgba,"
+                f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
                 f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
             )
             

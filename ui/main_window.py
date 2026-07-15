@@ -1728,6 +1728,14 @@ class MainWindow(QMainWindow):
             widget.spn_crop_b.setValue(s.get(f"vlayer_crop_b_{layer_num}", 0))
             widget.spn_crop_l.setValue(s.get(f"vlayer_crop_l_{layer_num}", 0))
             widget.spn_crop_r.setValue(s.get(f"vlayer_crop_r_{layer_num}", 0))
+            widget.spn_speed.setValue(s.get(f"vlayer_speed_{layer_num}", 100))
+            
+            widget.chk_chroma_enabled.setChecked(s.get(f"vlayer_chroma_enabled_{layer_num}", False))
+            widget.spn_chroma_sim.setValue(s.get(f"vlayer_chroma_sim_{layer_num}", 0.38))
+            widget.spn_chroma_blend.setValue(s.get(f"vlayer_chroma_blend_{layer_num}", 0.08))
+            widget.chroma_params_frame.setVisible(widget.chk_chroma_enabled.isChecked())
+            
+            widget._update_speed_visibility()
 
         self._on_video_layer_changed()
 
@@ -1846,6 +1854,10 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_crop_b_{layer_num}"] = cfg_obj.crop_b
             settings_dict[f"vlayer_crop_l_{layer_num}"] = cfg_obj.crop_l
             settings_dict[f"vlayer_crop_r_{layer_num}"] = cfg_obj.crop_r
+            settings_dict[f"vlayer_speed_{layer_num}"] = widget.spn_speed.value()
+            settings_dict[f"vlayer_chroma_enabled_{layer_num}"] = widget.chk_chroma_enabled.isChecked()
+            settings_dict[f"vlayer_chroma_sim_{layer_num}"] = widget.spn_chroma_sim.value()
+            settings_dict[f"vlayer_chroma_blend_{layer_num}"] = widget.spn_chroma_blend.value()
 
         # Legacy fallback
         if self.logo_layers:

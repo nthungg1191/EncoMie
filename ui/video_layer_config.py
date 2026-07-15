@@ -3,7 +3,7 @@ Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QComboBox, QSpinBox, QCheckBox, QPushButton,
+    QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QPushButton,
     QGroupBox, QFrame, QLineEdit, QScrollArea
 )
 from PyQt6.QtCore import pyqtSignal, Qt
@@ -139,6 +139,26 @@ class VideoLayerConfigWidget(QWidget):
         row3.addWidget(self.spn_opacity, 1)
         content_lay.addLayout(row3)
 
+        # Row 3.5: Speed configuration (only for video layers)
+        self.row_speed_widget = QWidget()
+        row_speed_lay = QHBoxLayout(self.row_speed_widget)
+        row_speed_lay.setContentsMargins(0, 0, 0, 0)
+        row_speed_lay.setSpacing(10)
+
+        speed_lbl = QLabel("Tốc độ chạy layer (%):")
+        speed_lbl.setStyleSheet("font-size: 11px;")
+        row_speed_lay.addWidget(speed_lbl)
+
+        self.spn_speed = QSpinBox()
+        self.spn_speed.setRange(10, 300)
+        self.spn_speed.setValue(100)
+        self.spn_speed.setSuffix("%")
+        self.spn_speed.setStyleSheet("font-size: 11px;")
+        self.spn_speed.valueChanged.connect(self._on_changed)
+        row_speed_lay.addWidget(self.spn_speed, 1)
+
+        content_lay.addWidget(self.row_speed_widget)
+
         # Row 4: Margins Group
         margin_grp = QGroupBox("Căn chỉnh khoảng lề (Margin - px)")
         margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
@@ -231,6 +251,48 @@ class VideoLayerConfigWidget(QWidget):
         crop_lay.addWidget(self.spn_crop_r, 2, 3)
 
         content_lay.addWidget(crop_grp)
+
+        # Row 6: Chroma Key (Green Screen) Group
+        self.chroma_grp = QGroupBox("Xóa nền xanh (Chroma Key)")
+        self.chroma_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
+        chroma_lay = QVBoxLayout(self.chroma_grp)
+        chroma_lay.setContentsMargins(6, 6, 6, 6)
+        chroma_lay.setSpacing(6)
+
+        self.chk_chroma_enabled = QCheckBox("Kích hoạt khử nền xanh")
+        self.chk_chroma_enabled.setStyleSheet("font-size: 11px;")
+        self.chk_chroma_enabled.stateChanged.connect(self._on_chroma_enabled_changed)
+        chroma_lay.addWidget(self.chk_chroma_enabled)
+
+        self.chroma_params_frame = QWidget()
+        chroma_params_lay = QGridLayout(self.chroma_params_frame)
+        chroma_params_lay.setContentsMargins(0, 0, 0, 0)
+        chroma_params_lay.setSpacing(6)
+
+        # Similarity
+        chroma_params_lay.addWidget(QLabel("Độ nhạy:"), 0, 0)
+        self.spn_chroma_sim = QDoubleSpinBox()
+        self.spn_chroma_sim.setRange(0.01, 1.00)
+        self.spn_chroma_sim.setSingleStep(0.01)
+        self.spn_chroma_sim.setValue(0.38)
+        self.spn_chroma_sim.setStyleSheet("font-size: 11px;")
+        self.spn_chroma_sim.valueChanged.connect(self._on_changed)
+        chroma_params_lay.addWidget(self.spn_chroma_sim, 0, 1)
+
+        # Blend
+        chroma_params_lay.addWidget(QLabel("Độ mềm:"), 0, 2)
+        self.spn_chroma_blend = QDoubleSpinBox()
+        self.spn_chroma_blend.setRange(0.00, 1.00)
+        self.spn_chroma_blend.setSingleStep(0.01)
+        self.spn_chroma_blend.setValue(0.08)
+        self.spn_chroma_blend.setStyleSheet("font-size: 11px;")
+        self.spn_chroma_blend.valueChanged.connect(self._on_changed)
+        chroma_params_lay.addWidget(self.spn_chroma_blend, 0, 3)
+
+        chroma_lay.addWidget(self.chroma_params_frame)
+        self.chroma_params_frame.setVisible(False)
+
+        content_lay.addWidget(self.chroma_grp)
         
         # Set scroll area widget
         scroll.setWidget(content)
@@ -248,8 +310,11 @@ class VideoLayerConfigWidget(QWidget):
             self.edit_path.setText("logo.png")
             self.cmb_pos.setCurrentIndex(1) # Bottom-Right
 
+        self._update_speed_visibility()
+
     def _on_source_type_changed(self, idx: int):
         self.static_file_frame.setVisible(idx == 2)
+        self._update_speed_visibility()
         self._on_changed()
 
     def _browse_static_file(self):
@@ -262,6 +327,7 @@ class VideoLayerConfigWidget(QWidget):
         )
         if file_path:
             self.edit_path.setText(file_path)
+            self._update_speed_visibility()
             self._on_changed()
 
     def _on_crop_mode_toggled(self, checked: bool):
@@ -270,6 +336,21 @@ class VideoLayerConfigWidget(QWidget):
         else:
             self.btn_crop_mode.setText("✂  Bật Crop Mode")
         self.cropModeToggled.emit(checked)
+
+    def _on_chroma_enabled_changed(self, state: int):
+        # In PyQt6, check state can be an int or CheckState
+        enabled = (state == 2) or (state == Qt.CheckState.Checked.value) or (hasattr(Qt.CheckState, "Checked") and state == Qt.CheckState.Checked)
+        self.chroma_params_frame.setVisible(enabled)
+        self._on_changed()
+
+    def _update_speed_visibility(self):
+        idx = self.cmb_source_type.currentIndex()
+        if idx in (0, 1):
+            self.row_speed_widget.setVisible(True)
+        else:
+            path = self.edit_path.text().lower()
+            is_video = any(path.endswith(ext) for ext in [".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"])
+            self.row_speed_widget.setVisible(is_video)
 
     def _on_changed(self):
         self.changed.emit()
@@ -307,6 +388,10 @@ class VideoLayerConfigWidget(QWidget):
         cfg_obj.crop_l = self.spn_crop_l.value()
         cfg_obj.crop_r = self.spn_crop_r.value()
         cfg_obj.radius = 0
+        cfg_obj.speed = self.spn_speed.value()
+        cfg_obj.chroma_key_enabled = self.chk_chroma_enabled.isChecked()
+        cfg_obj.chroma_key_similarity = self.spn_chroma_sim.value()
+        cfg_obj.chroma_key_blend = self.spn_chroma_blend.value()
         cfg_obj.source_type = idx # Save index
         return cfg_obj
 
@@ -346,6 +431,14 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_b.setValue(getattr(cfg_obj, "crop_b", 0))
         self.spn_crop_l.setValue(getattr(cfg_obj, "crop_l", 0))
         self.spn_crop_r.setValue(getattr(cfg_obj, "crop_r", 0))
+        self.spn_speed.setValue(getattr(cfg_obj, "speed", 100))
+        
+        self.chk_chroma_enabled.setChecked(getattr(cfg_obj, "chroma_key_enabled", False))
+        self.spn_chroma_sim.setValue(getattr(cfg_obj, "chroma_key_similarity", 0.38))
+        self.spn_chroma_blend.setValue(getattr(cfg_obj, "chroma_key_blend", 0.08))
+        self.chroma_params_frame.setVisible(self.chk_chroma_enabled.isChecked())
+        
+        self._update_speed_visibility()
 
     def _on_pos_changed(self, index: int):
         # Snap margins when position changes in UI

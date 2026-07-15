@@ -6,7 +6,9 @@
 /tools
 
 /dist
-
+/build
+*.spec
+*.zip
 
 # all pycache
 *__pycache__
