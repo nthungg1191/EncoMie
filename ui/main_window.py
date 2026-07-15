@@ -27,7 +27,7 @@ from PyQt6.QtWidgets import (
     QFrame, QGridLayout, QAbstractItemView, QTabWidget,
     QScrollArea
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject
+from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject, QTimer
 from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap
 
 from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
@@ -375,20 +375,24 @@ class PairTable(QTableWidget):
         # Stylesheet is managed globally
 
     def load_pairs(self, pairs: list[FilePair]):
-        self.setRowCount(0)
-        for pair in pairs:
-            row = self.rowCount()
-            self.insertRow(row)
-            self.setItem(row, 0, self._cell(pair.index, center=True, checkable=pair.matched))
-            self.setItem(row, 1, self._cell(Path(pair.audio_path).name if pair.audio_path else "—"))
-            self.setItem(row, 2, self._cell(Path(pair.srt_path).name if pair.srt_path else "—"))
-            status_text = "✓ Khớp" if pair.matched else f"✗ {pair.error}"
-            status_item = self._cell(status_text, center=True)
-            if pair.matched:
-                status_item.setForeground(QColor("#16a34a"))
-            else:
-                status_item.setForeground(QColor("#dc2626"))
-            self.setItem(row, 3, status_item)
+        self.blockSignals(True)
+        try:
+            self.setRowCount(0)
+            for pair in pairs:
+                row = self.rowCount()
+                self.insertRow(row)
+                self.setItem(row, 0, self._cell(pair.index, center=True, checkable=pair.matched))
+                self.setItem(row, 1, self._cell(Path(pair.audio_path).name if pair.audio_path else "—"))
+                self.setItem(row, 2, self._cell(Path(pair.srt_path).name if pair.srt_path else "—"))
+                status_text = "✓ Khớp" if pair.matched else f"✗ {pair.error}"
+                status_item = self._cell(status_text, center=True)
+                if pair.matched:
+                    status_item.setForeground(QColor("#16a34a"))
+                else:
+                    status_item.setForeground(QColor("#dc2626"))
+                self.setItem(row, 3, status_item)
+        finally:
+            self.blockSignals(False)
 
     @staticmethod
     def _cell(text: str, center: bool = False, checkable: bool = False) -> QTableWidgetItem:
@@ -495,6 +499,11 @@ class MainWindow(QMainWindow):
         self.frame_pool = QThreadPool()
         self.frame_pool.setMaxThreadCount(2)
         self.running_extractions = set()
+        
+        # Debounce settings saving to avoid disk write stuttering during drags/edits
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.timeout.connect(self._save_settings)
 
         self._build_ui()
         self._apply_saved_settings()
@@ -838,8 +847,10 @@ class MainWindow(QMainWindow):
         for i in range(1, 6):
             widget = VideoLayerConfigWidget(i)
             widget.changed.connect(self._on_video_layer_changed)
+            widget.cropModeToggled.connect(self._on_video_layer_crop_toggled)
             self.video_layer_widgets.append(widget)
             self.video_tab_widget.addTab(widget, f"L {i}")
+        self.video_tab_widget.currentChanged.connect(self._on_video_tab_changed)
 
         # --- 3-panel horizontal splitter ---
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1151,64 +1162,6 @@ class MainWindow(QMainWindow):
 
         lay.addWidget(self.viewer_stack, 1)
 
-        # Bottom row player controls
-        ctrl_bar = QWidget()
-        ctrl_bar.setFixedHeight(50)
-        ctrl_lay = QVBoxLayout(ctrl_bar)
-        ctrl_lay.setContentsMargins(0, 0, 0, 0)
-        ctrl_lay.setSpacing(6)
-
-        # Timeline Slider
-        self.timeline_slider = QSlider(Qt.Orientation.Horizontal)
-        self.timeline_slider.setRange(0, 1000)
-        self.timeline_slider.setValue(0)
-        ctrl_lay.addWidget(self.timeline_slider)
-
-        # Controls Row
-        btn_row = QHBoxLayout()
-        btn_row.setContentsMargins(4, 0, 4, 0)
-        
-        self.lbl_timecode = QLabel("00:00:00.00 / 00:00:00.00")
-        self.lbl_timecode.setStyleSheet("font-size: 11px; color: #636366;")
-        btn_row.addWidget(self.lbl_timecode)
-        btn_row.addStretch()
-
-        self.btn_play_prev = QPushButton("⏮")
-        self.btn_play_prev.setFixedSize(30, 24)
-        self.btn_play_prev.setStyleSheet("border: none; background: none; font-size: 14px; color: #1c1c1e;")
-        self.btn_play_prev.clicked.connect(self._on_refresh_preview_frame)
-        
-        self.btn_play_toggle = QPushButton("⏸")
-        self.btn_play_toggle.setFixedSize(30, 24)
-        self.btn_play_toggle.setStyleSheet("border: none; background: none; font-size: 16px; color: #1c1c1e;")
-
-        self.btn_play_next = QPushButton("⏭")
-        self.btn_play_next.setFixedSize(30, 24)
-        self.btn_play_next.setStyleSheet("border: none; background: none; font-size: 14px; color: #1c1c1e;")
-
-        self.btn_vid_crop_mode = QPushButton("✂  Bật Crop Mode")
-        self.btn_vid_crop_mode.setCheckable(True)
-        self.btn_vid_crop_mode.setStyleSheet(
-            "QPushButton { background: #fef3c7; color: #d97706; border: 1px solid #f59e0b; "
-            "padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: bold; }"
-            "QPushButton:checked { background: #f59e0b; color: #ffffff; }"
-        )
-        self.btn_vid_crop_mode.clicked.connect(self._toggle_video_crop_mode)
-        self.btn_vid_crop_mode.setVisible(False)
-
-        btn_row.addWidget(self.btn_play_prev)
-        btn_row.addWidget(self.btn_play_toggle)
-        btn_row.addWidget(self.btn_play_next)
-        btn_row.addStretch()
-        btn_row.addWidget(self.btn_vid_crop_mode)
-
-        self.lbl_fps = QLabel("30 fps")
-        self.lbl_fps.setStyleSheet("font-size: 11px; color: #636366;")
-        btn_row.addWidget(self.lbl_fps)
-
-        ctrl_lay.addLayout(btn_row)
-        lay.addWidget(ctrl_bar)
-
         return panel
 
     def _on_style_changed(self, style: SubtitleStylePreset):
@@ -1232,7 +1185,7 @@ class MainWindow(QMainWindow):
             self.layer_tab_widget.setTabText(idx, f"Layer {idx+1}{status}")
             
         self.preview_widget.set_logo_layers(configs)
-        self._save_settings()
+        self._save_timer.start(1000)
 
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
@@ -1411,6 +1364,16 @@ class MainWindow(QMainWindow):
         self.cmb_fps.setCurrentIndex(2) # Default to 30 FPS
         self.cmb_fps.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.cmb_fps)
+
+        concurrent_lbl = QLabel("Render song song đồng thời:")
+        concurrent_lbl.setStyleSheet("font-size: 11px; color: #636366;")
+        r_lay.addWidget(concurrent_lbl)
+
+        self.spn_concurrent = QSpinBox()
+        self.spn_concurrent.setRange(1, 8)
+        self.spn_concurrent.setValue(2)
+        self.spn_concurrent.setStyleSheet("font-size: 11px;")
+        r_lay.addWidget(self.spn_concurrent)
 
         speed_lbl = QLabel("Tốc độ chậm của video nền:")
         speed_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
@@ -1699,6 +1662,7 @@ class MainWindow(QMainWindow):
         self.style_panel.load_from_style(preset)
 
         self.cmb_resolution.setCurrentIndex(s.get("resolution", 0))
+        self.spn_concurrent.setValue(s.get("max_concurrent_renders", 2))
         self.spn_slow_min.setValue(s.get("slow_min", 35.0))
         self.spn_slow_max.setValue(s.get("slow_max", 45.0))
 
@@ -1847,6 +1811,7 @@ class MainWindow(QMainWindow):
             "fps": self.cmb_fps.currentData(),
             "use_gpu": True,
             "subtitle_alignment": style.alignment,
+            "max_concurrent_renders": self.spn_concurrent.value(),
         }
 
         # Save 3 layers logo settings
@@ -2132,7 +2097,8 @@ class MainWindow(QMainWindow):
                 logo_path=None,
                 layers=configs,
                 resolution=res_val,
-                fps=fps_val
+                fps=fps_val,
+                max_concurrent_renders=self.spn_concurrent.value()
             )
         else:
             preset = self.style_panel.get_style()
@@ -2161,7 +2127,8 @@ class MainWindow(QMainWindow):
                 logo_opacity=layer1.opacity if layer1 else 0.8,
                 layers=configs,
                 resolution=res_val,
-                fps=fps_val
+                fps=fps_val,
+                max_concurrent_renders=self.spn_concurrent.value()
             )
 
     def _validate(self) -> bool:
@@ -2199,6 +2166,7 @@ class MainWindow(QMainWindow):
         if not self._validate():
             return
 
+        self._save_timer.stop()
         self._save_settings()
 
         config = self._build_config()
@@ -2450,7 +2418,6 @@ class MainWindow(QMainWindow):
         self.inspector_tab_widget.setCurrentIndex(0)
         for i, btn in enumerate(self.inspector_tab_buttons):
             btn.setChecked(i == 0)
-        self.btn_vid_crop_mode.setVisible(False)
         
         self._scan_pairs()
 
@@ -2465,7 +2432,6 @@ class MainWindow(QMainWindow):
         
         self.layer_tab_widget.setVisible(False)
         self.video_tab_widget.setVisible(True)
-        self.btn_vid_crop_mode.setVisible(True)
         
         # Hide SRT picker in Edit Video mode (video has no subtitles)
         self.pick_srt.setVisible(False)
@@ -2490,47 +2456,54 @@ class MainWindow(QMainWindow):
         if not src_files and self.pick_vid_src.value():
             folder_path = self.pick_vid_src.value()
             if os.path.isdir(folder_path):
-                import glob
-                extensions = ["*.mp4", "*.mkv", "*.mov", "*.avi", "*.webm", "*.m4v"]
+                exts = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
                 src_files = []
-                for ext in extensions:
-                    src_files.extend(glob.glob(os.path.join(folder_path, ext)))
-                    src_files.extend(glob.glob(os.path.join(folder_path, ext.upper())))
+                try:
+                    for entry in os.scandir(folder_path):
+                        if entry.is_file() and Path(entry.name).suffix.lower() in exts:
+                            src_files.append(entry.path)
+                except Exception:
+                    pass
                 src_files = sorted(list(set(src_files)))
 
         self._pairs = []
-        self.vid_batch_table.setRowCount(0)
-        
-        if not src_files:
-            self.lbl_vid_summary.setText("Tìm thấy 0 video")
-            return
-
-        for idx, file_path in enumerate(src_files):
-            row = self.vid_batch_table.rowCount()
-            self.vid_batch_table.insertRow(row)
+        self.vid_batch_table.blockSignals(True)
+        try:
+            self.vid_batch_table.setRowCount(0)
             
-            item_idx = QTableWidgetItem(str(idx + 1))
-            item_idx.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_idx.setFlags(item_idx.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item_idx.setCheckState(Qt.CheckState.Checked)
-            self.vid_batch_table.setItem(row, 0, item_idx)
-            
-            self.vid_batch_table.setItem(row, 1, QTableWidgetItem(os.path.basename(file_path)))
-            self.vid_batch_table.setItem(row, 2, QTableWidgetItem("1280x720 (16:9)"))
-            
-            item_status = QTableWidgetItem("Sẵn sàng")
-            item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            item_status.setForeground(QColor("#2563eb"))
-            self.vid_batch_table.setItem(row, 3, item_status)
+            if not src_files:
+                self.lbl_vid_summary.setText("Tìm thấy 0 video")
+                return
 
-            self._pairs.append(FilePair(
-                index=str(idx + 1),
-                audio_path=file_path,
-                srt_path="",
-                matched=True
-            ))
+            for idx, file_path in enumerate(src_files):
+                row = self.vid_batch_table.rowCount()
+                self.vid_batch_table.insertRow(row)
+                
+                item_idx = QTableWidgetItem(str(idx + 1))
+                item_idx.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item_idx.setFlags(item_idx.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                item_idx.setCheckState(Qt.CheckState.Checked)
+                self.vid_batch_table.setItem(row, 0, item_idx)
+                
+                self.vid_batch_table.setItem(row, 1, QTableWidgetItem(os.path.basename(file_path)))
+                self.vid_batch_table.setItem(row, 2, QTableWidgetItem("1280x720 (16:9)"))
+                
+                item_status = QTableWidgetItem("Sẵn sàng")
+                item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                item_status.setForeground(QColor("#2563eb"))
+                self.vid_batch_table.setItem(row, 3, item_status)
 
-        self.lbl_vid_summary.setText(f"Tìm thấy {len(src_files)} video — {len(src_files)} sẵn sàng")
+                self._pairs.append(FilePair(
+                    index=str(idx + 1),
+                    audio_path=file_path,
+                    srt_path="",
+                    matched=True
+                ))
+
+            self.lbl_vid_summary.setText(f"Tìm thấy {len(src_files)} video — {len(src_files)} sẵn sàng")
+        finally:
+            self.vid_batch_table.blockSignals(False)
+
         if src_files:
             self.vid_batch_table.selectRow(0)
 
@@ -2551,7 +2524,7 @@ class MainWindow(QMainWindow):
 
         self.video_layout_preview.set_configs(configs)
         self._update_video_preview_frames()
-        self._save_settings()
+        self._save_timer.start(1000)
 
     def _update_video_preview_frames(self):
         if not hasattr(self, "video_layout_preview") or not hasattr(self, "video_layer_widgets"):
@@ -2570,8 +2543,8 @@ class MainWindow(QMainWindow):
             if any(lower_path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".bmp", ".webp"]):
                 img = QImage(path)
                 if not img.isNull():
-                    self._video_frame_cache[path] = img
-                    return img
+                    self._add_frame_to_cache(path, img)
+                    return self._video_frame_cache[path]
             
             # Asynchronous extraction for videos to prevent UI freezing
             if path in self.running_extractions:
@@ -2616,11 +2589,21 @@ class MainWindow(QMainWindow):
             
             self.video_layout_preview.set_layer_image(layer_num, layer_img)
 
+    def _add_frame_to_cache(self, path: str, img: QImage):
+        if not img or img.isNull():
+            return
+        if img.width() > 1280 or img.height() > 720:
+            img = img.scaled(1280, 720, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        self._video_frame_cache[path] = img
+        if len(self._video_frame_cache) > 50:
+            first_key = next(iter(self._video_frame_cache))
+            self._video_frame_cache.pop(first_key, None)
+
     def _on_frame_loaded(self, path: str, image: QImage):
         if path in self.running_extractions:
             self.running_extractions.remove(path)
         if image and not image.isNull():
-            self._video_frame_cache[path] = image
+            self._add_frame_to_cache(path, image)
             self._update_video_preview_frames()
 
     def _on_preview_layer_selected(self, index: int):
@@ -2675,12 +2658,31 @@ class MainWindow(QMainWindow):
 
         self._on_video_layer_changed()
 
-    def _toggle_video_crop_mode(self, enabled: bool):
-        self.video_layout_preview.set_crop_mode(enabled)
-        if enabled:
-            self.btn_vid_crop_mode.setText("✓  Đang Crop (Tắt)")
-        else:
-            self.btn_vid_crop_mode.setText("✂  Bật Crop Mode")
+    def _on_video_tab_changed(self, index: int):
+        if not hasattr(self, "video_layout_preview") or not hasattr(self, "video_layer_widgets"):
+            return
+        self.video_layout_preview.select_layer(index + 1)
+        if 0 <= index < len(self.video_layer_widgets):
+            widget = self.video_layer_widgets[index]
+            self.video_layout_preview.set_crop_mode(widget.btn_crop_mode.isChecked())
+
+    def _on_video_layer_crop_toggled(self, enabled: bool):
+        sender_widget = self.sender()
+        if not sender_widget:
+            return
+        
+        current_idx = self.video_tab_widget.currentIndex()
+        if 0 <= current_idx < len(self.video_layer_widgets):
+            active_widget = self.video_layer_widgets[current_idx]
+            if sender_widget == active_widget:
+                self.video_layout_preview.set_crop_mode(enabled)
+                
+        for widget in self.video_layer_widgets:
+            if widget != sender_widget and widget.btn_crop_mode.isChecked():
+                widget.btn_crop_mode.blockSignals(True)
+                widget.btn_crop_mode.setChecked(False)
+                widget.btn_crop_mode.setText("✂  Bật Crop Mode")
+                widget.btn_crop_mode.blockSignals(False)
 
     def _pair_select_all(self):
         for row in range(self.pair_table.rowCount()):
@@ -2736,6 +2738,7 @@ class MainWindow(QMainWindow):
             table.blockSignals(False)
 
     def closeEvent(self, event):
+        self._save_timer.stop()
         self._save_settings()
         self.frame_pool.clear()
         if self._worker and self._worker.isRunning():

@@ -16,6 +16,7 @@ class VideoLayerConfigWidget(QWidget):
     MAX_HEIGHT = 380  # Fixed max height with scrollbar
 
     changed = pyqtSignal()
+    cropModeToggled = pyqtSignal(bool)
 
     def __init__(self, index: int, parent=None):
         super().__init__(parent)
@@ -186,42 +187,50 @@ class VideoLayerConfigWidget(QWidget):
         crop_lay.setContentsMargins(6, 6, 6, 6)
         crop_lay.setSpacing(6)
 
+        # Crop Mode Button (moved from main window player controls to each individual layer widget)
+        self.btn_crop_mode = QPushButton("✂  Bật Crop Mode")
+        self.btn_crop_mode.setCheckable(True)
+        self.btn_crop_mode.setStyleSheet(
+            "QPushButton { background: #fef3c7; color: #d97706; border: 1px solid #f59e0b; "
+            "padding: 4px; border-radius: 4px; font-size: 11px; font-weight: bold; }"
+            "QPushButton:checked { background: #f59e0b; color: #ffffff; }"
+        )
+        self.btn_crop_mode.toggled.connect(self._on_crop_mode_toggled)
+        crop_lay.addWidget(self.btn_crop_mode, 0, 0, 1, 4)
+
         # Crop Top
-        crop_lay.addWidget(QLabel("Cắt Trên:"), 0, 0)
+        crop_lay.addWidget(QLabel("Cắt Trên:"), 1, 0)
         self.spn_crop_t = QSpinBox()
         self.spn_crop_t.setRange(0, 500)
         self.spn_crop_t.setValue(0)
         self.spn_crop_t.valueChanged.connect(self._on_changed)
-        crop_lay.addWidget(self.spn_crop_t, 0, 1)
+        crop_lay.addWidget(self.spn_crop_t, 1, 1)
 
         # Crop Bottom
-        crop_lay.addWidget(QLabel("Cắt Dưới:"), 0, 2)
+        crop_lay.addWidget(QLabel("Cắt Dưới:"), 1, 2)
         self.spn_crop_b = QSpinBox()
         self.spn_crop_b.setRange(0, 500)
         self.spn_crop_b.setValue(0)
         self.spn_crop_b.valueChanged.connect(self._on_changed)
-        crop_lay.addWidget(self.spn_crop_b, 0, 3)
+        crop_lay.addWidget(self.spn_crop_b, 1, 3)
 
         # Crop Left
-        crop_lay.addWidget(QLabel("Cắt Trái:"), 1, 0)
+        crop_lay.addWidget(QLabel("Cắt Trái:"), 2, 0)
         self.spn_crop_l = QSpinBox()
         self.spn_crop_l.setRange(0, 500)
         self.spn_crop_l.setValue(0)
         self.spn_crop_l.valueChanged.connect(self._on_changed)
-        crop_lay.addWidget(self.spn_crop_l, 1, 1)
+        crop_lay.addWidget(self.spn_crop_l, 2, 1)
 
         # Crop Right
-        crop_lay.addWidget(QLabel("Cắt Phải:"), 1, 2)
+        crop_lay.addWidget(QLabel("Cắt Phải:"), 2, 2)
         self.spn_crop_r = QSpinBox()
         self.spn_crop_r.setRange(0, 500)
         self.spn_crop_r.setValue(0)
         self.spn_crop_r.valueChanged.connect(self._on_changed)
-        crop_lay.addWidget(self.spn_crop_r, 1, 3)
+        crop_lay.addWidget(self.spn_crop_r, 2, 3)
 
         content_lay.addWidget(crop_grp)
-        
-        # Set max height for scroll
-        content.setMaximumHeight(self.MAX_HEIGHT)
         
         # Set scroll area widget
         scroll.setWidget(content)
@@ -254,6 +263,13 @@ class VideoLayerConfigWidget(QWidget):
         if file_path:
             self.edit_path.setText(file_path)
             self._on_changed()
+
+    def _on_crop_mode_toggled(self, checked: bool):
+        if checked:
+            self.btn_crop_mode.setText("✓  Đang Crop (Tắt)")
+        else:
+            self.btn_crop_mode.setText("✂  Bật Crop Mode")
+        self.cropModeToggled.emit(checked)
 
     def _on_changed(self):
         self.changed.emit()

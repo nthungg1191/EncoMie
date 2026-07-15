@@ -220,10 +220,11 @@ class VideoLayoutPreview(QWidget):
             self._layer_rects[i] = cropped_rect
 
             p.save()
-            # Draw uncropped boundaries (faint dotted line)
-            p.setPen(QPen(QColor(border_color.red(), border_color.green(), border_color.blue(), 60), 1, Qt.PenStyle.DotLine))
-            p.setBrush(QBrush(QColor(bg_color.red(), bg_color.green(), bg_color.blue(), 15)))
-            p.drawRoundedRect(rect, radius, radius)
+            # Draw uncropped boundaries (faint dotted line) - ONLY when in crop mode for the active layer
+            if self._is_crop_mode and i == self._selected_index:
+                p.setPen(QPen(QColor(border_color.red(), border_color.green(), border_color.blue(), 80), 1, Qt.PenStyle.DotLine))
+                p.setBrush(QBrush(QColor(bg_color.red(), bg_color.green(), bg_color.blue(), 15)))
+                p.drawRoundedRect(rect, radius, radius)
 
             # Draw real layer frame if available with correct opacity
             layer_img = self._layer_images.get(i)

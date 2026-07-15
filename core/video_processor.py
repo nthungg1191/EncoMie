@@ -136,6 +136,7 @@ class RenderConfig:
     logo_opacity: float = 0.8 # Legacy field
     layers: list[ImageLayerConfig] = field(default_factory=lambda: [ImageLayerConfig() for _ in range(5)])
     fps: int = 30
+    max_concurrent_renders: int = 2
 
     def __post_init__(self):
         if self.subtitle_style is None:
