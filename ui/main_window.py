@@ -848,6 +848,7 @@ class MainWindow(QMainWindow):
             widget = VideoLayerConfigWidget(i)
             widget.changed.connect(self._on_video_layer_changed)
             widget.cropModeToggled.connect(self._on_video_layer_crop_toggled)
+            widget.eyedropperRequested.connect(self._on_eyedropper_requested)
             self.video_layer_widgets.append(widget)
             self.video_tab_widget.addTab(widget, f"L {i}")
         self.video_tab_widget.currentChanged.connect(self._on_video_tab_changed)
@@ -1156,6 +1157,7 @@ class MainWindow(QMainWindow):
         self.video_layout_preview.layerMoved.connect(self._on_preview_layer_moved)
         self.video_layout_preview.layerResized.connect(self._on_preview_layer_resized)
         self.video_layout_preview.layerCropped.connect(self._on_preview_layer_cropped)
+        self.video_layout_preview.colorPicked.connect(self._on_preview_color_picked)
         vid_view_lay.addWidget(self.video_layout_preview)
         viewer_lay.addWidget(self.middle_video_container)
         self.middle_video_container.setVisible(False)
@@ -1733,6 +1735,7 @@ class MainWindow(QMainWindow):
             widget.chk_chroma_enabled.setChecked(s.get(f"vlayer_chroma_enabled_{layer_num}", False))
             widget.spn_chroma_sim.setValue(s.get(f"vlayer_chroma_sim_{layer_num}", 0.38))
             widget.spn_chroma_blend.setValue(s.get(f"vlayer_chroma_blend_{layer_num}", 0.08))
+            widget.set_chroma_color(s.get(f"vlayer_chroma_color_{layer_num}", "#00FF00"))
             widget.chroma_params_frame.setVisible(widget.chk_chroma_enabled.isChecked())
             
             widget._update_speed_visibility()
@@ -1858,6 +1861,7 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_chroma_enabled_{layer_num}"] = widget.chk_chroma_enabled.isChecked()
             settings_dict[f"vlayer_chroma_sim_{layer_num}"] = widget.spn_chroma_sim.value()
             settings_dict[f"vlayer_chroma_blend_{layer_num}"] = widget.spn_chroma_blend.value()
+            settings_dict[f"vlayer_chroma_color_{layer_num}"] = widget.chroma_key_color
 
         # Legacy fallback
         if self.logo_layers:
@@ -2669,6 +2673,17 @@ class MainWindow(QMainWindow):
         widget.spn_crop_r.blockSignals(False)
 
         self._on_video_layer_changed()
+
+    def _on_eyedropper_requested(self, layer_num: int):
+        if hasattr(self, "video_layout_preview"):
+            self.video_layout_preview.select_layer(layer_num)
+            self.video_layout_preview.set_eyedropper_active(True)
+
+    def _on_preview_color_picked(self, layer_num: int, color_hex: str):
+        if 1 <= layer_num <= len(self.video_layer_widgets):
+            widget = self.video_layer_widgets[layer_num - 1]
+            widget.set_chroma_color(color_hex)
+            self._on_video_layer_changed()
 
     def _on_video_tab_changed(self, index: int):
         if not hasattr(self, "video_layout_preview") or not hasattr(self, "video_layer_widgets"):

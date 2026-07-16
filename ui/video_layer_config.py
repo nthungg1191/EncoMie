@@ -17,11 +17,14 @@ class VideoLayerConfigWidget(QWidget):
 
     changed = pyqtSignal()
     cropModeToggled = pyqtSignal(bool)
+    eyedropperRequested = pyqtSignal(int)
 
     def __init__(self, index: int, parent=None):
         super().__init__(parent)
         self.index = index
+        self.chroma_key_color = "#00FF00"
         self._init_ui()
+
 
     def _init_ui(self):
         # Outer wrapper with scroll area
@@ -289,6 +292,19 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_blend.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_blend, 0, 3)
 
+        # Chroma Color Selector Row
+        chroma_params_lay.addWidget(QLabel("Màu khử:"), 1, 0)
+        self.btn_chroma_color = QPushButton()
+        self.btn_chroma_color.setFixedSize(24, 24)
+        self.btn_chroma_color.setStyleSheet(f"background-color: {self.chroma_key_color}; border: 1px solid #cccccc; border-radius: 4px;")
+        self.btn_chroma_color.clicked.connect(self._on_color_picker_clicked)
+        chroma_params_lay.addWidget(self.btn_chroma_color, 1, 1)
+
+        self.btn_eyedropper = QPushButton("Hút màu từ ảnh (Eyedropper)")
+        self.btn_eyedropper.setStyleSheet("font-size: 11px;")
+        self.btn_eyedropper.clicked.connect(self._on_eyedropper_clicked)
+        chroma_params_lay.addWidget(self.btn_eyedropper, 1, 2, 1, 2)
+
         chroma_lay.addWidget(self.chroma_params_frame)
         self.chroma_params_frame.setVisible(False)
 
@@ -392,6 +408,7 @@ class VideoLayerConfigWidget(QWidget):
         cfg_obj.chroma_key_enabled = self.chk_chroma_enabled.isChecked()
         cfg_obj.chroma_key_similarity = self.spn_chroma_sim.value()
         cfg_obj.chroma_key_blend = self.spn_chroma_blend.value()
+        cfg_obj.chroma_key_color = self.chroma_key_color
         cfg_obj.source_type = idx # Save index
         return cfg_obj
 
@@ -436,9 +453,28 @@ class VideoLayerConfigWidget(QWidget):
         self.chk_chroma_enabled.setChecked(getattr(cfg_obj, "chroma_key_enabled", False))
         self.spn_chroma_sim.setValue(getattr(cfg_obj, "chroma_key_similarity", 0.38))
         self.spn_chroma_blend.setValue(getattr(cfg_obj, "chroma_key_blend", 0.08))
+        self.set_chroma_color(getattr(cfg_obj, "chroma_key_color", "#00FF00"))
         self.chroma_params_frame.setVisible(self.chk_chroma_enabled.isChecked())
         
         self._update_speed_visibility()
+
+    def set_chroma_color(self, color_hex: str):
+        self.chroma_key_color = color_hex
+        if hasattr(self, "btn_chroma_color"):
+            self.btn_chroma_color.setStyleSheet(
+                f"background-color: {color_hex}; border: 1px solid #cccccc; border-radius: 4px;"
+            )
+
+    def _on_color_picker_clicked(self):
+        from PyQt6.QtWidgets import QColorDialog
+        from PyQt6.QtGui import QColor
+        color = QColorDialog.getColor(QColor(self.chroma_key_color), self, "Chọn màu cần khử")
+        if color.isValid():
+            self.set_chroma_color(color.name())
+            self._on_changed()
+
+    def _on_eyedropper_clicked(self):
+        self.eyedropperRequested.emit(self.index)
 
     def _on_pos_changed(self, index: int):
         # Snap margins when position changes in UI

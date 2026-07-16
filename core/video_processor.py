@@ -120,6 +120,8 @@ class ImageLayerConfig:
     chroma_key_enabled: bool = False
     chroma_key_similarity: float = 0.38
     chroma_key_blend: float = 0.08
+    chroma_key_color: str = "#00FF00"
+
 
 @dataclass
 class RenderConfig:
@@ -777,7 +779,9 @@ def build_ffmpeg_cmd(
         if getattr(layer, "chroma_key_enabled", False):
             sim = getattr(layer, "chroma_key_similarity", 0.38)
             blend = getattr(layer, "chroma_key_blend", 0.08)
-            chroma_filter = f"colorkey=0x00FF00:{sim:.2f}:{blend:.2f},"
+            color_val = getattr(layer, "chroma_key_color", "#00FF00")
+            color_hex = color_val.replace("#", "0x")
+            chroma_filter = f"colorkey={color_hex}:{sim:.2f}:{blend:.2f},"
         
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)

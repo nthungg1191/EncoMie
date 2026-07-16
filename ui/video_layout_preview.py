@@ -12,6 +12,7 @@ class VideoLayoutPreview(QWidget):
     layerMoved = pyqtSignal(int, int, int, int, int) # index, t, b, l, r
     layerResized = pyqtSignal(int, int) # index, scale_pct
     layerCropped = pyqtSignal(int, int, int, int, int) # index, t, b, l, r
+    colorPicked = pyqtSignal(int, str) # index (1-based), hex_color
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -22,6 +23,7 @@ class VideoLayoutPreview(QWidget):
         self._configs = {} # index -> ImageLayerConfig
         self._selected_index = 1 # Layer 1 selected by default
         self._is_crop_mode = False
+        self._eyedropper_active = False
         
         # Actual preview frames (background and layers)
         self._bg_image = None
@@ -43,6 +45,13 @@ class VideoLayoutPreview(QWidget):
         self._layer_rects = {} # index -> QRect (local coordinates of layer rect)
         self._uncropped_layer_rects = {} # index -> QRect (local coordinates of uncropped layer rect)
         self._crop_rect = QRect() # local coordinates of crop box
+
+    def set_eyedropper_active(self, enabled: bool):
+        self._eyedropper_active = enabled
+        if enabled:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def set_configs(self, configs: dict):
         """Pass the dictionary of layer configs {1..5: config}."""
@@ -359,6 +368,15 @@ class VideoLayoutPreview(QWidget):
             return
 
         pos = event.position().toPoint()
+
+        if hasattr(self, "_eyedropper_active") and self._eyedropper_active:
+            grab_img = self.grab().toImage()
+            px_color = grab_img.pixelColor(pos)
+            self.colorPicked.emit(self._selected_index, px_color.name())
+            self.set_eyedropper_active(False)
+            self.update()
+            return
+
         
         # 1. Check Crop Mode click interaction
         if self._is_crop_mode:
@@ -572,6 +590,10 @@ class VideoLayoutPreview(QWidget):
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _update_cursor(self, pos: QPoint):
+        if hasattr(self, "_eyedropper_active") and self._eyedropper_active:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            return
+
         # Update pointer cursor visual based on hover position
         if self._is_crop_mode:
             active_rect = self._layer_rects.get(self._selected_index)
@@ -628,21 +650,22 @@ class VideoLayoutPreview(QWidget):
         chroma_enabled = getattr(cfg, "chroma_key_enabled", False)
         sim = getattr(cfg, "chroma_key_similarity", 0.38)
         blend = getattr(cfg, "chroma_key_blend", 0.08)
+        color = getattr(cfg, "chroma_key_color", "#00FF00")
         
         if not chroma_enabled:
             return img
             
         cache_key = img.cacheKey()
         cached = self._keyed_images_cache.get(index)
-        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend:
-            return cached[4]
+        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend and cached[4] == color:
+            return cached[5]
             
         # Process and cache
-        keyed_img = self._apply_chroma_key(img, sim, blend)
-        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, keyed_img)
+        keyed_img = self._apply_chroma_key(img, sim, blend, color)
+        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, color, keyed_img)
         return keyed_img
 
-    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float) -> QImage:
+    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float, color: str) -> QImage:
         if img.isNull():
             return img
             
@@ -657,9 +680,17 @@ class VideoLayoutPreview(QWidget):
         ptr.setsize(height * width * 4)
         buf = memoryview(ptr)
         
-        # Color key: Green screen (R=0, G=255, B=0)
+        # Color key
+        hex_val = color.lstrip('#')
+        if len(hex_val) == 6:
+            tr = int(hex_val[0:2], 16) / 255.0
+            tg = int(hex_val[2:4], 16) / 255.0
+            tb = int(hex_val[4:6], 16) / 255.0
+        else:
+            tr, tg, tb = 0.0, 1.0, 0.0
+        
         # In Format_ARGB32: bytes are ordered as B, G, R, A on little-endian
-        # cd = sqrt( r^2 + (g - 1.0)^2 + b^2 ) where channels are 0..1
+        # cd = sqrt( (r - tr)^2 + (g - tg)^2 + (b - tb)^2 ) where channels are 0..1
         
         for i in range(0, len(buf), 4):
             b = buf[i]
@@ -670,7 +701,7 @@ class VideoLayoutPreview(QWidget):
             gn = g / 255.0
             bn = b / 255.0
             
-            cd_sq = rn*rn + (gn - 1.0)*(gn - 1.0) + bn*bn
+            cd_sq = (rn - tr)*(rn - tr) + (gn - tg)*(gn - tg) + (bn - tb)*(bn - tb)
             cd = cd_sq ** 0.5
             
             if cd < similarity:
