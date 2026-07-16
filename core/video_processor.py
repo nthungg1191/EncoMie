@@ -786,100 +786,69 @@ def build_ffmpeg_cmd(
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)
         
-        if is_edit_sub:
-            # Edit Subtitles tab logo layer calculations (1280x720 canvas)
-            scale_x = int(w) / 1280.0
-            scale_y = int(h) / 720.0
-            
-            pixel_w = int(layer.size * scale_x)
-            pixel_w = max(4, (pixel_w // 2) * 2)
-            
-            crop_filter = ""
-            
-            filter_parts.append(
-                f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
-                f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
-            )
-            
-            ml = int(layer.margin_l * scale_x)
-            mr = int(layer.margin_r * scale_x)
-            mt = int(layer.margin_t * scale_y)
-            mb = int(layer.margin_b * scale_y)
-            
-            # Position mapping for Edit Sub:
-            # 0: BR, 1: BL, 2: TR, 3: TL, 4: Top-Center
-            if layer.position == 0:  # Bottom-Right
-                overlay_pos = f"x=W-w-{mr}:y=H-h-{mb}"
-            elif layer.position == 1:  # Bottom-Left
-                overlay_pos = f"x={ml}:y=H-h-{mb}"
-            elif layer.position == 2:  # Top-Right
-                overlay_pos = f"x=W-w-{mr}:y={mt}"
-            elif layer.position == 3:  # Top-Left
-                overlay_pos = f"x={ml}:y={mt}"
-            else:  # 4: Top-Center
-                overlay_pos = f"x=trunc((W-w)/2):y={mt}"
+        ws_w_virt = 1280.0 if is_edit_sub else 400.0
+        ws_h_virt = 720.0 if is_edit_sub else 225.0
+
+        # Crop values
+        crop_t = getattr(layer, "crop_t", 0)
+        crop_b = getattr(layer, "crop_b", 0)
+        crop_l = getattr(layer, "crop_l", 0)
+        crop_r = getattr(layer, "crop_r", 0)
+
+        # Compute virtual uncropped layer size
+        if layer.size <= 100:
+            max_w_virt = ws_w_virt * (layer.size / 100.0)
+            max_h_virt = ws_h_virt * (layer.size / 100.0)
+            scale_factor_virt = min(max_w_virt / float(lw_orig), max_h_virt / float(lh_orig)) if lw_orig > 0 and lh_orig > 0 else 1.0
+            layer_w_virt = lw_orig * scale_factor_virt
+            layer_h_virt = lh_orig * scale_factor_virt
         else:
-            # Edit Video tab active layer calculations (400x225 workspace)
-            # 2. Crop values (virtual margins relative to virtual uncropped layer size)
-            crop_t = getattr(layer, "crop_t", 0)
-            crop_b = getattr(layer, "crop_b", 0)
-            crop_l = getattr(layer, "crop_l", 0)
-            crop_r = getattr(layer, "crop_r", 0)
+            layer_w_virt = float(layer.size)
+            layer_h_virt = layer_w_virt * lh_orig / float(lw_orig) if lw_orig > 0 else float(layer.size)
 
-            # 3. Compute virtual uncropped layer size
-            if layer.size <= 100:
-                max_w_virt = 400.0 * (layer.size / 100.0)
-                max_h_virt = 225.0 * (layer.size / 100.0)
-                scale_factor_virt = min(max_w_virt / float(lw_orig), max_h_virt / float(lh_orig))
-                layer_w_virt = lw_orig * scale_factor_virt
-                layer_h_virt = lh_orig * scale_factor_virt
-            else:
-                layer_w_virt = float(layer.size)
-                layer_h_virt = layer_w_virt * lh_orig / float(lw_orig)
+        # Map virtual crop to actual pixel crop on the original video size
+        actual_crop_l = max(0, min(lw_orig - 10, int(lw_orig * (crop_l / float(layer_w_virt))))) if layer_w_virt > 0 else 0
+        actual_crop_r = max(0, min(lw_orig - actual_crop_l - 10, int(lw_orig * (crop_r / float(layer_w_virt))))) if layer_w_virt > 0 else 0
+        actual_crop_t = max(0, min(lh_orig - 10, int(lh_orig * (crop_t / float(layer_h_virt))))) if layer_h_virt > 0 else 0
+        actual_crop_b = max(0, min(lh_orig - actual_crop_t - 10, int(lh_orig * (crop_b / float(layer_h_virt))))) if layer_h_virt > 0 else 0
 
-            # 4. Map virtual crop to actual pixel crop on the original video size
-            actual_crop_l = max(0, min(lw_orig - 10, int(lw_orig * (crop_l / float(layer_w_virt)))))
-            actual_crop_r = max(0, min(lw_orig - actual_crop_l - 10, int(lw_orig * (crop_r / float(layer_w_virt)))))
-            actual_crop_t = max(0, min(lh_orig - 10, int(lh_orig * (crop_t / float(layer_h_virt)))))
-            actual_crop_b = max(0, min(lh_orig - actual_crop_t - 10, int(lh_orig * (crop_b / float(layer_h_virt)))))
+        # Crop filter block
+        crop_filter = ""
+        if actual_crop_t > 0 or actual_crop_b > 0 or actual_crop_l > 0 or actual_crop_r > 0:
+            crop_filter = f"crop=iw-{actual_crop_l}-{actual_crop_r}:ih-{actual_crop_t}-{actual_crop_b}:{actual_crop_l}:{actual_crop_t},"
 
-            # 5. Crop filter block
-            crop_filter = ""
-            if actual_crop_t > 0 or actual_crop_b > 0 or actual_crop_l > 0 or actual_crop_r > 0:
-                crop_filter = f"crop=iw-{actual_crop_l}-{actual_crop_r}:ih-{actual_crop_t}-{actual_crop_b}:{actual_crop_l}:{actual_crop_t},"
+        # Compute final scale width pixel_w relative to cropped virtual width
+        cropped_w_virt = max(10.0, layer_w_virt - crop_l - crop_r)
+        pixel_w = int(int(w) * (cropped_w_virt / ws_w_virt))
+        # Ensure even width for FFmpeg compatibility
+        pixel_w = max(4, (pixel_w // 2) * 2)
 
-            # 6. Compute final scale width pixel_w relative to cropped virtual width
-            cropped_w_virt = max(10.0, layer_w_virt - crop_l - crop_r)
-            pixel_w = int(int(w) * (cropped_w_virt / 400.0))
-            # Ensure even width for FFmpeg compatibility
-            pixel_w = max(4, (pixel_w // 2) * 2)
+        # Build filter for scaling, crop, format conversion
+        filter_parts.append(
+            f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
+            f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
+        )
+        
+        # Position calculations with scaled margins
+        scale_x = int(w) / ws_w_virt
+        scale_y = int(h) / ws_h_virt
+        
+        ml = int(layer.margin_l * scale_x)
+        mr = int(layer.margin_r * scale_x)
+        mt = int(layer.margin_t * scale_y)
+        mb = int(layer.margin_b * scale_y)
 
-            # 7. Build filter for scaling, crop, format conversion
-            filter_parts.append(
-                f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
-                f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
-            )
-            
-            # 8. Position calculations with scaled margins
-            scale_x = int(w) / 400.0
-            scale_y = int(h) / 225.0
-            
-            ml = int(layer.margin_l * scale_x)
-            mr = int(layer.margin_r * scale_x)
-            mt = int(layer.margin_t * scale_y)
-            mb = int(layer.margin_b * scale_y)
-
-            # Combo positions: 4: Center, 0: BR, 1: BL, 2: TR, 3: TL
-            if layer.position == 4: # Center
-                overlay_pos = f"x=trunc((W-w)/2)+trunc(({ml}-{mr})/2):y=trunc((H-h)/2)+trunc(({mt}-{mb})/2)"
-            elif layer.position == 0:  # Bottom-Right
-                overlay_pos = f"x=W-w-{mr}:y=H-h-{mb}"
-            elif layer.position == 1:  # Bottom-Left
-                overlay_pos = f"x={ml}:y=H-h-{mb}"
-            elif layer.position == 2:  # Top-Right
-                overlay_pos = f"x=W-w-{mr}:y={mt}"
-            else:  # 3: Top-Left
-                overlay_pos = f"x={ml}:y={mt}"
+        # Combo positions: 4: Center, 0: BR, 1: BL, 2: TR, 3: TL
+        if layer.position == 4: # Center
+            overlay_pos = f"x=trunc((W-w)/2)+trunc(({ml}-{mr})/2):y=trunc((H-h)/2)+trunc(({mt}-{mb})/2)"
+        elif layer.position == 0:  # Bottom-Right
+            overlay_pos = f"x=W-w-{mr}:y=H-h-{mb}"
+        elif layer.position == 1:  # Bottom-Left
+            overlay_pos = f"x={ml}:y=H-h-{mb}"
+        elif layer.position == 2:  # Top-Right
+            overlay_pos = f"x=W-w-{mr}:y={mt}"
+        else:  # 3: Top-Left
+            overlay_pos = f"x={ml}:y={mt}"
             
         next_base = f"v_base_next_{idx}" if idx < len(active_layers) - 1 else "vout"
         filter_parts.append(f"[{current_base}][{layer_output}]overlay={overlay_pos}[{next_base}]")

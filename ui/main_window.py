@@ -832,10 +832,13 @@ class MainWindow(QMainWindow):
         )
         self.logo_layers = []
         for i in range(1, 6):
-            ctrl = ImageLayerControl(i)
+            ctrl = VideoLayerConfigWidget(i)
             ctrl.changed.connect(self._on_logo_settings_changed)
+            ctrl.eyedropperRequested.connect(self._on_logo_eyedropper_requested)
+            ctrl.cropModeToggled.connect(self._on_logo_crop_toggled)
             self.logo_layers.append(ctrl)
             self.layer_tab_widget.addTab(ctrl, f"L {i}")
+        self.layer_tab_widget.currentChanged.connect(self._on_logo_tab_changed)
 
         self.video_tab_widget = QTabWidget()
         self.video_tab_widget.setStyleSheet(
@@ -1135,6 +1138,11 @@ class MainWindow(QMainWindow):
         sub_view_lay = QVBoxLayout(self.middle_sub_container)
         sub_view_lay.setContentsMargins(0, 0, 0, 0)
         self.preview_widget = self.style_panel._preview
+        self.preview_widget.colorPicked.connect(self._on_logo_preview_color_picked)
+        self.preview_widget.layerSelected.connect(self._on_logo_preview_layer_selected)
+        self.preview_widget.layerMoved.connect(self._on_logo_preview_layer_moved)
+        self.preview_widget.layerResized.connect(self._on_logo_preview_layer_resized)
+        self.preview_widget.layerCropped.connect(self._on_logo_preview_layer_cropped)
         self.preview_widget.setMinimumHeight(240)
         self.preview_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -1142,6 +1150,7 @@ class MainWindow(QMainWindow):
         self.preview_widget.clicked.connect(self._on_refresh_preview_frame)
         self.preview_widget.setCursor(Qt.CursorShape.PointingHandCursor)
         self.preview_widget.setToolTip("Click để làm mới khung hình xem trước")
+        self.preview_widget.setVisible(True)
         sub_view_lay.addWidget(self.preview_widget)
         viewer_lay.addWidget(self.middle_sub_container)
 
@@ -1176,9 +1185,12 @@ class MainWindow(QMainWindow):
         self._on_logo_settings_changed()
 
     def _on_logo_settings_changed(self):
+        self._update_logo_preview_frames()
+
+    def _update_logo_preview_frames(self):
         if not hasattr(self, "preview_widget") or not hasattr(self, "logo_layers") or not self.logo_layers:
             return
-        
+            
         configs = []
         for idx, ctrl in enumerate(self.logo_layers):
             cfg_obj = ctrl.get_config()
@@ -1186,8 +1198,64 @@ class MainWindow(QMainWindow):
             status = " (•)" if cfg_obj.enabled and cfg_obj.path else ""
             self.layer_tab_widget.setTabText(idx, f"Layer {idx+1}{status}")
             
+            # Extract video/image frame for logo preview
+            layer_img = None
+            if cfg_obj.enabled:
+                src_idx = ctrl.cmb_source_type.currentIndex()
+                path_to_load = ""
+                if src_idx == 0:  # Video nền (Background video)
+                    bg_files = self.pick_vid_bg.selected_files()
+                    if bg_files:
+                        path_to_load = bg_files[0]
+                elif src_idx == 1:  # Theo danh sách chạy (Video nguồn)
+                    selected_ranges = self.vid_batch_table.selectedRanges()
+                    if selected_ranges:
+                        row = selected_ranges[0].topRow()
+                        if 0 <= row < len(self._pairs):
+                            path_to_load = self._pairs[row].audio_path
+                else:  # File cố định (Static file)
+                    path_to_load = ctrl.edit_path.text().strip()
+                
+                if path_to_load and os.path.exists(path_to_load):
+                    layer_img = self._get_logo_preview_frame(path_to_load)
+            
+            if layer_img:
+                self.preview_widget._logo_images[cfg_obj.path] = layer_img
+                
         self.preview_widget.set_logo_layers(configs)
         self._save_timer.start(1000)
+
+    def _get_logo_preview_frame(self, path):
+        if not path or not os.path.exists(path):
+            return None
+        if not hasattr(self, "_video_frame_cache"):
+            self._video_frame_cache = {}
+        if path in self._video_frame_cache:
+            return self._video_frame_cache[path]
+            
+        lower_path = path.lower()
+        if any(lower_path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".bmp", ".webp"]):
+            img = QImage(path)
+            if not img.isNull():
+                self._add_frame_to_cache(path, img)
+                return self._video_frame_cache[path]
+                
+        # Asynchronous extraction for videos to prevent UI freezing
+        if path in self.running_extractions:
+            return None
+            
+        self.running_extractions.add(path)
+        task = FrameExtractTask(path)
+        task.signals.loaded.connect(self._on_logo_frame_loaded)
+        self.frame_pool.start(task)
+        return None
+
+    def _on_logo_frame_loaded(self, path: str, image: QImage):
+        if path in self.running_extractions:
+            self.running_extractions.remove(path)
+        if image and not image.isNull():
+            self._add_frame_to_cache(path, image)
+            self._update_logo_preview_frames()
 
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
@@ -1272,7 +1340,7 @@ class MainWindow(QMainWindow):
         tab_sub_lay.addWidget(preset_bar)
 
         # Configure and connect pre-instantiated Subtitle Style Editor
-        self.style_panel._preview.setVisible(False) # Hidden preview inside inspector
+        # self.style_panel._preview.setVisible(False) # Keep it visible since it's moved to middle panel
         self.style_panel.style_changed.connect(self._on_style_changed)
         tab_sub_lay.addWidget(self.style_panel, 1)
 
@@ -1683,26 +1751,43 @@ class MainWindow(QMainWindow):
 
         self._load_presets()
 
-        # Restore logo settings (3 layers)
+        # Restore logo settings (5 layers)
         for idx, ctrl in enumerate(self.logo_layers):
             layer_num = idx + 1
             ctrl.chk_enabled.setChecked(s.get(f"logo_enabled_{layer_num}", False))
             
-            logo_path = s.get(f"logo_path_{layer_num}", "")
-            if logo_path:
-                ctrl.pick_logo.set_selected_files([logo_path])
-                ctrl.pick_logo.edit.setText(Path(logo_path).name)
-            else:
-                ctrl.pick_logo.set_selected_files([])
-                ctrl.pick_logo.edit.clear()
-                
-            ctrl.cmb_logo_pos.setCurrentIndex(s.get(f"logo_position_{layer_num}", 0))
-            ctrl.spn_logo_size.setValue(s.get(f"logo_size_{layer_num}", 100))
-            ctrl.spn_logo_opacity.setValue(s.get(f"logo_opacity_{layer_num}", 90))
+            src_type = s.get(f"logo_source_type_{layer_num}", 2) # Default to Static file
+            ctrl.cmb_source_type.setCurrentIndex(src_type)
+            
+            path_val = s.get(f"logo_path_{layer_num}", "")
+            ctrl.edit_path.setText(path_val)
+            
+            # Map legacy logo_position (4: Center, 0: BR, 1: BL, 2: TR, 3: TL) to new combo (0: Center, 1: BR, 2: BL, 3: TR, 4: TL)
+            legacy_pos = s.get(f"logo_position_{layer_num}", 4)
+            legacy_to_new_combo = {4: 0, 0: 1, 1: 2, 2: 3, 3: 4}
+            ctrl.cmb_pos.setCurrentIndex(legacy_to_new_combo.get(legacy_pos, 0))
+            
+            ctrl.spn_size.setValue(s.get(f"logo_size_{layer_num}", 100))
+            ctrl.spn_opacity.setValue(s.get(f"logo_opacity_{layer_num}", 90))
+            
             ctrl.spn_margin_t.setValue(s.get(f"logo_margin_t_{layer_num}", 20))
             ctrl.spn_margin_b.setValue(s.get(f"logo_margin_b_{layer_num}", 20))
             ctrl.spn_margin_l.setValue(s.get(f"logo_margin_l_{layer_num}", 20))
             ctrl.spn_margin_r.setValue(s.get(f"logo_margin_r_{layer_num}", 20))
+            
+            ctrl.spn_crop_t.setValue(s.get(f"logo_crop_t_{layer_num}", 0))
+            ctrl.spn_crop_b.setValue(s.get(f"logo_crop_b_{layer_num}", 0))
+            ctrl.spn_crop_l.setValue(s.get(f"logo_crop_l_{layer_num}", 0))
+            ctrl.spn_crop_r.setValue(s.get(f"logo_crop_r_{layer_num}", 0))
+            ctrl.spn_speed.setValue(s.get(f"logo_speed_{layer_num}", 100))
+            
+            ctrl.chk_chroma_enabled.setChecked(s.get(f"logo_chroma_enabled_{layer_num}", False))
+            ctrl.spn_chroma_sim.setValue(s.get(f"logo_chroma_sim_{layer_num}", 0.38))
+            ctrl.spn_chroma_blend.setValue(s.get(f"logo_chroma_blend_{layer_num}", 0.08))
+            ctrl.set_chroma_color(s.get(f"logo_chroma_color_{layer_num}", "#00FF00"))
+            ctrl.chroma_params_frame.setVisible(ctrl.chk_chroma_enabled.isChecked())
+            
+            ctrl._update_speed_visibility()
             
         self._on_logo_settings_changed()
 
@@ -1825,19 +1910,29 @@ class MainWindow(QMainWindow):
             "max_concurrent_renders": self.spn_concurrent.value(),
         }
 
-        # Save 3 layers logo settings
+        # Save logo settings (5 layers)
         for idx, ctrl in enumerate(self.logo_layers):
             layer_num = idx + 1
             cfg_obj = ctrl.get_config()
             settings_dict[f"logo_enabled_{layer_num}"] = cfg_obj.enabled
-            settings_dict[f"logo_path_{layer_num}"] = cfg_obj.path
-            settings_dict[f"logo_position_{layer_num}"] = cfg_obj.position
+            settings_dict[f"logo_source_type_{layer_num}"] = ctrl.cmb_source_type.currentIndex()
+            settings_dict[f"logo_path_{layer_num}"] = ctrl.edit_path.text()
+            settings_dict[f"logo_position_{layer_num}"] = ctrl.cmb_pos.currentIndex()
             settings_dict[f"logo_size_{layer_num}"] = cfg_obj.size
             settings_dict[f"logo_opacity_{layer_num}"] = int(cfg_obj.opacity * 100)
             settings_dict[f"logo_margin_t_{layer_num}"] = cfg_obj.margin_t
             settings_dict[f"logo_margin_b_{layer_num}"] = cfg_obj.margin_b
             settings_dict[f"logo_margin_l_{layer_num}"] = cfg_obj.margin_l
             settings_dict[f"logo_margin_r_{layer_num}"] = cfg_obj.margin_r
+            settings_dict[f"logo_crop_t_{layer_num}"] = cfg_obj.crop_t
+            settings_dict[f"logo_crop_b_{layer_num}"] = cfg_obj.crop_b
+            settings_dict[f"logo_crop_l_{layer_num}"] = cfg_obj.crop_l
+            settings_dict[f"logo_crop_r_{layer_num}"] = cfg_obj.crop_r
+            settings_dict[f"logo_speed_{layer_num}"] = ctrl.spn_speed.value()
+            settings_dict[f"logo_chroma_enabled_{layer_num}"] = ctrl.chk_chroma_enabled.isChecked()
+            settings_dict[f"logo_chroma_sim_{layer_num}"] = ctrl.spn_chroma_sim.value()
+            settings_dict[f"logo_chroma_blend_{layer_num}"] = ctrl.spn_chroma_blend.value()
+            settings_dict[f"logo_chroma_color_{layer_num}"] = ctrl.chroma_key_color
 
         # Save Edit Video layers (5 layers)
         for idx, widget in enumerate(self.video_layer_widgets):
@@ -2684,6 +2779,97 @@ class MainWindow(QMainWindow):
             widget = self.video_layer_widgets[layer_num - 1]
             widget.set_chroma_color(color_hex)
             self._on_video_layer_changed()
+
+    def _on_logo_eyedropper_requested(self, layer_num: int):
+        if hasattr(self, "preview_widget"):
+            # SubtitlePreviewWidget doesn't have multiple selections, but it tracks layers.
+            # Tell the preview widget to activate eyedropper mode for layer_num.
+            self.preview_widget.set_eyedropper_active(layer_num)
+
+    def _on_logo_preview_color_picked(self, layer_num: int, color_hex: str):
+        if 1 <= layer_num <= len(self.logo_layers):
+            widget = self.logo_layers[layer_num - 1]
+            widget.set_chroma_color(color_hex)
+            self._on_logo_settings_changed()
+
+    def _on_logo_preview_layer_selected(self, index: int):
+        if 1 <= index <= len(self.logo_layers):
+            self.layer_tab_widget.setCurrentIndex(index - 1)
+
+    def _on_logo_preview_layer_moved(self, index: int, t: int, b: int, l: int, r: int):
+        if 1 <= index <= len(self.logo_layers):
+            widget = self.logo_layers[index - 1]
+            widget.spn_margin_t.blockSignals(True)
+            widget.spn_margin_b.blockSignals(True)
+            widget.spn_margin_l.blockSignals(True)
+            widget.spn_margin_r.blockSignals(True)
+            
+            widget.spn_margin_t.setValue(t)
+            widget.spn_margin_b.setValue(b)
+            widget.spn_margin_l.setValue(l)
+            widget.spn_margin_r.setValue(r)
+            
+            widget.spn_margin_t.blockSignals(False)
+            widget.spn_margin_b.blockSignals(False)
+            widget.spn_margin_l.blockSignals(False)
+            widget.spn_margin_r.blockSignals(False)
+            
+            self._on_logo_settings_changed()
+
+    def _on_logo_preview_layer_resized(self, index: int, scale_pct: int):
+        if 1 <= index <= len(self.logo_layers):
+            widget = self.logo_layers[index - 1]
+            widget.spn_size.blockSignals(True)
+            widget.spn_size.setValue(scale_pct)
+            widget.spn_size.blockSignals(False)
+            
+            self._on_logo_settings_changed()
+
+    def _on_logo_preview_layer_cropped(self, index: int, t: int, b: int, l: int, r: int):
+        if 1 <= index <= len(self.logo_layers):
+            widget = self.logo_layers[index - 1]
+            widget.spn_crop_t.blockSignals(True)
+            widget.spn_crop_t.setValue(t)
+            widget.spn_crop_t.blockSignals(False)
+            
+            widget.spn_crop_b.blockSignals(True)
+            widget.spn_crop_b.setValue(b)
+            widget.spn_crop_b.blockSignals(False)
+            
+            widget.spn_crop_l.blockSignals(True)
+            widget.spn_crop_l.setValue(l)
+            widget.spn_crop_l.blockSignals(False)
+            
+            widget.spn_crop_r.blockSignals(True)
+            widget.spn_crop_r.setValue(r)
+            widget.spn_crop_r.blockSignals(False)
+            
+            self._on_logo_settings_changed()
+
+    def _on_logo_tab_changed(self, index: int):
+        if not hasattr(self, "preview_widget") or not hasattr(self, "logo_layers"):
+            return
+        self.preview_widget.select_layer(index + 1)
+        if 0 <= index < len(self.logo_layers):
+            widget = self.logo_layers[index]
+            self.preview_widget.set_crop_mode(widget.btn_crop_mode.isChecked())
+
+    def _on_logo_crop_toggled(self, enabled: bool):
+        sender_widget = self.sender()
+        if not sender_widget:
+            return
+            
+        current_idx = self.layer_tab_widget.currentIndex()
+        if 0 <= current_idx < len(self.logo_layers):
+            active_widget = self.logo_layers[current_idx]
+            if sender_widget == active_widget:
+                self.preview_widget.set_crop_mode(enabled)
+                
+        for widget in self.logo_layers:
+            if widget != sender_widget and widget.btn_crop_mode.isChecked():
+                widget.btn_crop_mode.blockSignals(True)
+                widget.btn_crop_mode.setChecked(False)
+                widget.btn_crop_mode.blockSignals(False)
 
     def _on_video_tab_changed(self, index: int):
         if not hasattr(self, "video_layout_preview") or not hasattr(self, "video_layer_widgets"):

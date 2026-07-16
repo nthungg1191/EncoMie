@@ -861,6 +861,7 @@ class SubtitlePreviewWidget(QWidget):
     """
 
     clicked = pyqtSignal()
+    colorPicked = pyqtSignal(int, str) # index (1-based), hex_color
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -868,11 +869,19 @@ class SubtitlePreviewWidget(QWidget):
         self._sample_text = "Day la phu de mau\nNhiep anh dep trai"
         self._entries: list[SubtitleEntry] = []
         self._srt_path: str | None = None
+        self._eyedropper_active = 0
         self.setMinimumHeight(180)  # Expand default height for better visibility
         self.setStyleSheet(
             f"background: {C_PREVIEW_BG}; border-radius: 6px; "
             f"border: 1px solid {C_PREVIEW_BORDER};"
         )
+
+    def set_eyedropper_active(self, layer_num: int):
+        self._eyedropper_active = layer_num
+        if layer_num > 0:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def set_style(self, style: SubtitleStylePreset):
         self._style = style
@@ -917,6 +926,14 @@ class SubtitlePreviewWidget(QWidget):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+            if hasattr(self, "_eyedropper_active") and self._eyedropper_active > 0:
+                pos = event.position().toPoint()
+                grab_img = self.grab().toImage()
+                px_color = grab_img.pixelColor(pos)
+                self.colorPicked.emit(self._eyedropper_active, px_color.name())
+                self.set_eyedropper_active(0)
+                self.update()
+                return
             self.clicked.emit()
         super().mousePressEvent(event)
 
@@ -1201,9 +1218,14 @@ class LiveFramePreview(SubtitlePreviewWidget):
     Displays a video frame (or image) as the background, then overlays
     the styled subtitle on top using the exact same rendering pipeline.
     """
+    layerSelected = pyqtSignal(int)
+    layerMoved = pyqtSignal(int, int, int, int, int)
+    layerResized = pyqtSignal(int, int)
+    layerCropped = pyqtSignal(int, int, int, int, int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setMouseTracking(True)
         self._frame_img: QImage | None = None
         self._logo_img: QImage | None = None
         self._logo_path: str | None = None
@@ -1212,6 +1234,25 @@ class LiveFramePreview(SubtitlePreviewWidget):
         self._logo_opacity: float = 0.8
         self._logo_layers = []
         self._logo_images = {}
+        
+        self._selected_index = 1
+        self._is_crop_mode = False
+        self._active_drag = None
+        self._resize_handle = None
+        self._crop_handle = None
+        self._start_mouse = QPoint()
+        
+        self._ws_w = 1280
+        self._ws_h = 720
+        self._ws_x = 0
+        self._ws_y = 0
+        self._ws_w_rendered = 0
+        self._ws_h_rendered = 0
+        
+        self._layer_rects = {}
+        self._uncropped_layer_rects = {}
+        self._crop_rect = QRect()
+        
         self.setStyleSheet(
             f"background: #0a0a0a; border-radius: 6px; "
             f"border: 1px solid {C_PREVIEW_BORDER};"
@@ -1246,79 +1287,543 @@ class LiveFramePreview(SubtitlePreviewWidget):
             self._logo_layers.append(layer)
             if layer.path and os.path.exists(layer.path):
                 if layer.path not in self._logo_images:
-                    self._logo_images[layer.path] = QImage(layer.path)
+                    lower_path = layer.path.lower()
+                    if any(lower_path.endswith(ext) for ext in [".png", ".jpg", ".jpeg", ".bmp", ".webp"]):
+                        self._logo_images[layer.path] = QImage(layer.path)
         self.update()
+
+    def select_layer(self, index: int | None):
+        if index is None or (1 <= index <= 5):
+            self._selected_index = index
+            self.layerSelected.emit(index if index is not None else 0)
+            self.update()
+
+    def set_crop_mode(self, enabled: bool):
+        self._is_crop_mode = enabled
+        self._active_drag = None
+        self.update()
+
+    def _get_layer_rect(self, index: int, vx: int, vy: int, vw: int, vh: int) -> QRect:
+        cfg = self._logo_layers[index - 1] if 1 <= index <= len(self._logo_layers) else None
+        if not cfg or not cfg.enabled:
+            return QRect()
+            
+        orig_img = self._logo_images.get(cfg.path)
+        if orig_img and not orig_img.isNull():
+            lw = orig_img.width()
+            lh = orig_img.height()
+        else:
+            lw, lh = 16, 9
+            
+        if cfg.size <= 100:
+            max_w = vw * (cfg.size / 100.0)
+            max_h = vh * (cfg.size / 100.0)
+            scale_factor = min(max_w / float(lw), max_h / float(lh)) if lw > 0 and lh > 0 else 1.0
+            layer_w = int(lw * scale_factor)
+            layer_h = int(lh * scale_factor)
+        else:
+            layer_w = int(vw * (cfg.size / float(self._ws_w))) if self._ws_w > 0 else int(cfg.size)
+            layer_h = int(layer_w * lh / float(lw)) if lw > 0 else 10
+        
+        scale_x = vw / float(self._ws_w) if self._ws_w > 0 else 1.0
+        scale_y = vh / float(self._ws_h) if self._ws_h > 0 else 1.0
+        
+        ml = int(cfg.margin_l * scale_x)
+        mr = int(cfg.margin_r * scale_x)
+        mt = int(cfg.margin_t * scale_y)
+        mb = int(cfg.margin_b * scale_y)
+        
+        # position combo mapping index:
+        # 0: Center, 1: BR, 2: BL, 3: TR, 4: TL
+        if cfg.position == 0:  # Center
+            lx = vx + (vw - layer_w) // 2 + (ml - mr) // 2
+            ly = vy + (vh - layer_h) // 2 + (mt - mb) // 2
+        elif cfg.position == 1:  # BR
+            lx = vx + vw - layer_w - mr
+            ly = vy + vh - layer_h - mb
+        elif cfg.position == 2:  # BL
+            lx = vx + ml
+            ly = vy + vh - layer_h - mb
+        elif cfg.position == 3:  # TR
+            lx = vx + vw - layer_w - mr
+            ly = vy + mt
+        else:  # 4: TL
+            lx = vx + ml
+            ly = vy + mt
+            
+        return QRect(int(lx), int(ly), int(layer_w), int(layer_h))
+
+    def _get_processed_logo(self, index: int, img: QImage, layer) -> QImage:
+        if not hasattr(self, "_processed_logos_cache"):
+            self._processed_logos_cache = {}
+            
+        chroma_enabled = getattr(layer, "chroma_key_enabled", False)
+        sim = getattr(layer, "chroma_key_similarity", 0.38)
+        blend = getattr(layer, "chroma_key_blend", 0.08)
+        color = getattr(layer, "chroma_key_color", "#00FF00")
+        
+        crop_t = getattr(layer, "crop_t", 0)
+        crop_b = getattr(layer, "crop_b", 0)
+        crop_l = getattr(layer, "crop_l", 0)
+        crop_r = getattr(layer, "crop_r", 0)
+        size_val = getattr(layer, "size", 100)
+        
+        cache_key = img.cacheKey()
+        cached = self._processed_logos_cache.get(index)
+        if (cached and cached[0] == cache_key and cached[1] == chroma_enabled 
+                and cached[2] == sim and cached[3] == blend and cached[4] == color 
+                and cached[5] == crop_t and cached[6] == crop_b and cached[7] == crop_l 
+                and cached[8] == crop_r and cached[9] == size_val):
+            return cached[10]
+            
+        # 1. Apply Crop
+        layer_w_virt = size_val
+        layer_h_virt = size_val * (img.height() / float(img.width())) if img.width() > 0 else 100
+        
+        src_l = int(img.width() * (crop_l / float(layer_w_virt))) if layer_w_virt > 0 else 0
+        src_r = int(img.width() * (crop_r / float(layer_w_virt))) if layer_w_virt > 0 else 0
+        src_t = int(img.height() * (crop_t / float(layer_h_virt))) if layer_h_virt > 0 else 0
+        src_b = int(img.height() * (crop_b / float(layer_h_virt))) if layer_h_virt > 0 else 0
+        
+        src_l = max(0, min(img.width() - 10, src_l))
+        src_r = max(0, min(img.width() - src_l - 10, src_r))
+        src_t = max(0, min(img.height() - 10, src_t))
+        src_b = max(0, min(img.height() - src_t - 10, src_b))
+        
+        proc_img = img.copy(src_l, src_t, img.width() - src_l - src_r, img.height() - src_t - src_b)
+        
+        # 2. Apply Chroma Key
+        if chroma_enabled:
+            proc_img = self._apply_chroma_key(proc_img, sim, blend, color)
+            
+        self._processed_logos_cache[index] = (
+            cache_key, chroma_enabled, sim, blend, color, 
+            crop_t, crop_b, crop_l, crop_r, size_val, proc_img
+        )
+        return proc_img
+
+    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float, color: str) -> QImage:
+        if img.isNull():
+            return img
+            
+        scaled_img = img.scaled(QSize(400, 400), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
+        scaled_img = scaled_img.convertToFormat(QImage.Format.Format_ARGB32)
+        
+        width = scaled_img.width()
+        height = scaled_img.height()
+        
+        ptr = scaled_img.bits()
+        ptr.setsize(height * width * 4)
+        buf = memoryview(ptr)
+        
+        hex_val = color.lstrip('#')
+        if len(hex_val) == 6:
+            tr = int(hex_val[0:2], 16) / 255.0
+            tg = int(hex_val[2:4], 16) / 255.0
+            tb = int(hex_val[4:6], 16) / 255.0
+        else:
+            tr, tg, tb = 0.0, 1.0, 0.0
+        
+        for i in range(0, len(buf), 4):
+            b = buf[i]
+            g = buf[i+1]
+            r = buf[i+2]
+            
+            rn = r / 255.0
+            gn = g / 255.0
+            bn = b / 255.0
+            
+            cd_sq = (rn - tr)*(rn - tr) + (gn - tg)*(gn - tg) + (bn - tb)*(bn - tb)
+            cd = cd_sq ** 0.5
+            
+            if cd < similarity:
+                buf[i+3] = 0
+            elif blend > 0.001 and cd < similarity + blend:
+                alpha = int(255 * (cd - similarity) / blend)
+                buf[i+3] = max(0, min(255, alpha))
+                
+        return scaled_img
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+
+        pos = event.position().toPoint()
+
+        # Eyedropper mode check
+        if hasattr(self, "_eyedropper_active") and self._eyedropper_active > 0:
+            grab_img = self.grab().toImage()
+            px_color = grab_img.pixelColor(pos)
+            self.colorPicked.emit(self._eyedropper_active, px_color.name())
+            self.set_eyedropper_active(0)
+            self.update()
+            return
+
+        # 1. Check Crop Mode click interaction
+        if self._is_crop_mode:
+            active_rect = self._uncropped_layer_rects.get(self._selected_index)
+            if active_rect:
+                if self._hit_test_handle(self._crop_rect.left() + self._crop_rect.width() // 2, self._crop_rect.top(), pos):
+                    self._active_drag = 'crop-resize'
+                    self._crop_handle = 'n'
+                elif self._hit_test_handle(self._crop_rect.left() + self._crop_rect.width() // 2, self._crop_rect.bottom(), pos):
+                    self._active_drag = 'crop-resize'
+                    self._crop_handle = 's'
+                elif self._hit_test_handle(self._crop_rect.left(), self._crop_rect.top() + self._crop_rect.height() // 2, pos):
+                    self._active_drag = 'crop-resize'
+                    self._crop_handle = 'w'
+                elif self._hit_test_handle(self._crop_rect.right(), self._crop_rect.top() + self._crop_rect.height() // 2, pos):
+                    self._active_drag = 'crop-resize'
+                    self._crop_handle = 'e'
+                elif self._crop_rect.contains(pos):
+                    self._active_drag = 'crop-move'
+                else:
+                    return
+
+                self._start_mouse = pos
+                cfg = self._logo_layers[self._selected_index - 1]
+                self._start_crop_t = cfg.crop_t
+                self._start_crop_b = cfg.crop_b
+                self._start_crop_l = cfg.crop_l
+                self._start_crop_r = cfg.crop_r
+                self._start_crop_rect = QRect(self._crop_rect)
+            return
+
+        # 2. Check standard Layout Mode click interaction
+        active_rect = self._layer_rects.get(self._selected_index)
+        if active_rect:
+            if self._hit_test_handle(active_rect.left(), active_rect.top(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'nw'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.right(), active_rect.top(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'ne'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.left(), active_rect.bottom(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'sw'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.right(), active_rect.bottom(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'se'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.left() + active_rect.width() // 2, active_rect.top(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'n'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.left() + active_rect.width() // 2, active_rect.bottom(), pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 's'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.left(), active_rect.top() + active_rect.height() // 2, pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'w'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+            elif self._hit_test_handle(active_rect.right(), active_rect.top() + active_rect.height() // 2, pos):
+                self._active_drag = 'resize'
+                self._resize_handle = 'e'
+                self._start_mouse = pos
+                self._start_size = self._logo_layers[self._selected_index - 1].size
+                return
+
+        # Click inside any enabled layer
+        for i in sorted(self._layer_rects.keys(), reverse=True):
+            rect = self._layer_rects[i]
+            if rect.contains(pos):
+                self.select_layer(i)
+                self._active_drag = 'move'
+                self._start_mouse = pos
+                cfg = self._logo_layers[i - 1]
+                self._start_margin_l = cfg.margin_l
+                self._start_margin_r = cfg.margin_r
+                self._start_margin_t = cfg.margin_t
+                self._start_margin_b = cfg.margin_b
+                return
+
+        # Click outside all layers -> deselect
+        self.select_layer(None)
+
+    def _hit_test_handle(self, hx: int, hy: int, mouse_pos: QPoint) -> bool:
+        return abs(hx - mouse_pos.x()) <= 8 and abs(hy - mouse_pos.y()) <= 8
+
+    def mouseMoveEvent(self, event):
+        pos = event.position().toPoint()
+        if not self._active_drag:
+            self._update_cursor(pos)
+            return
+
+        dx = pos.x() - self._start_mouse.x()
+        dy = pos.y() - self._start_mouse.y()
+
+        scale_x = self._ws_w_rendered / float(self._ws_w) if self._ws_w_rendered > 0 else 1.0
+        scale_y = self._ws_h_rendered / float(self._ws_h) if self._ws_h_rendered > 0 else 1.0
+
+        ws_dx = int(dx / scale_x)
+        ws_dy = int(dy / scale_y)
+
+        # 1. Moving layer position
+        if self._active_drag == 'move':
+            cfg = self._logo_layers[self._selected_index - 1]
+            if cfg.position == 1:  # BR (1 is Bottom-Right in VideoLayerConfigWidget)
+                cfg.margin_r = max(0, self._start_margin_r - ws_dx)
+                cfg.margin_b = max(0, self._start_margin_b - ws_dy)
+            elif cfg.position == 2:  # BL
+                cfg.margin_l = max(0, self._start_margin_l + ws_dx)
+                cfg.margin_b = max(0, self._start_margin_b - ws_dy)
+            elif cfg.position == 3:  # TR
+                cfg.margin_r = max(0, self._start_margin_r - ws_dx)
+                cfg.margin_t = max(0, self._start_margin_t + ws_dy)
+            elif cfg.position == 4:  # TL
+                cfg.margin_l = max(0, self._start_margin_l + ws_dx)
+                cfg.margin_t = max(0, self._start_margin_t + ws_dy)
+            else:  # Center (0)
+                cfg.margin_l = max(0, self._start_margin_l + ws_dx)
+                cfg.margin_r = max(0, self._start_margin_r - ws_dx)
+                cfg.margin_t = max(0, self._start_margin_t + ws_dy)
+                cfg.margin_b = max(0, self._start_margin_b - ws_dy)
+
+            self.layerMoved.emit(self._selected_index, cfg.margin_t, cfg.margin_b, cfg.margin_l, cfg.margin_r)
+            self.update()
+
+        # 2. Resizing layer
+        elif self._active_drag == 'resize':
+            cfg = self._logo_layers[self._selected_index - 1]
+            if self._resize_handle in ('se', 'ne', 'e'):
+                new_size = max(20, min(500, self._start_size + ws_dx))
+            elif self._resize_handle in ('sw', 'nw', 'w'):
+                new_size = max(20, min(500, self._start_size - ws_dx))
+            elif self._resize_handle == 's':
+                new_size = max(20, min(500, self._start_size + ws_dy))
+            else: # 'n'
+                new_size = max(20, min(500, self._start_size - ws_dy))
+                
+            cfg.size = new_size
+            self.layerResized.emit(self._selected_index, new_size)
+            self.update()
+
+        # 3. Cropping layer
+        elif self._active_drag == 'crop-resize':
+            cfg = self._logo_layers[self._selected_index - 1]
+            uncropped_rect = self._uncropped_layer_rects[self._selected_index]
+            ws_layer_w = int(uncropped_rect.width() / scale_x)
+            ws_layer_h = int(uncropped_rect.height() / scale_y)
+
+            if self._crop_handle == 'n':
+                cfg.crop_t = max(0, min(ws_layer_h - cfg.crop_b - 10, self._start_crop_t + ws_dy))
+            elif self._crop_handle == 's':
+                cfg.crop_b = max(0, min(ws_layer_h - cfg.crop_t - 10, self._start_crop_b - ws_dy))
+            elif self._crop_handle == 'w':
+                cfg.crop_l = max(0, min(ws_layer_w - cfg.crop_r - 10, self._start_crop_l + ws_dx))
+            elif self._crop_handle == 'e':
+                cfg.crop_r = max(0, min(ws_layer_w - cfg.crop_l - 10, self._start_crop_r - ws_dx))
+
+            self.layerCropped.emit(self._selected_index, cfg.crop_t, cfg.crop_b, cfg.crop_l, cfg.crop_r)
+            self.update()
+
+    def mouseReleaseEvent(self, event):
+        self._active_drag = None
+        self._resize_handle = None
+        self._crop_handle = None
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def _update_cursor(self, pos: QPoint):
+        if hasattr(self, "_eyedropper_active") and self._eyedropper_active > 0:
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            return
+
+        if self._is_crop_mode:
+            active_rect = self._layer_rects.get(self._selected_index)
+            if active_rect:
+                if self._hit_test_handle(self._crop_rect.left() + self._crop_rect.width() // 2, self._crop_rect.top(), pos):
+                    self.setCursor(Qt.CursorShape.SizeVerCursor)
+                elif self._hit_test_handle(self._crop_rect.left() + self._crop_rect.width() // 2, self._crop_rect.bottom(), pos):
+                    self.setCursor(Qt.CursorShape.SizeVerCursor)
+                elif self._hit_test_handle(self._crop_rect.left(), self._crop_rect.top() + self._crop_rect.height() // 2, pos):
+                    self.setCursor(Qt.CursorShape.SizeHorCursor)
+                elif self._hit_test_handle(self._crop_rect.right(), self._crop_rect.top() + self._crop_rect.height() // 2, pos):
+                    self.setCursor(Qt.CursorShape.SizeHorCursor)
+                elif self._crop_rect.contains(pos):
+                    self.setCursor(Qt.CursorShape.SizeAllCursor)
+                else:
+                    self.setCursor(Qt.CursorShape.ArrowCursor)
+            return
+
+        active_rect = self._layer_rects.get(self._selected_index)
+        if active_rect:
+            if (self._hit_test_handle(active_rect.left(), active_rect.top(), pos) or
+                self._hit_test_handle(active_rect.right(), active_rect.bottom(), pos)):
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                return
+            elif (self._hit_test_handle(active_rect.right(), active_rect.top(), pos) or
+                  self._hit_test_handle(active_rect.left(), active_rect.bottom(), pos)):
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+                return
+            elif (self._hit_test_handle(active_rect.left() + active_rect.width() // 2, active_rect.top(), pos) or
+                  self._hit_test_handle(active_rect.left() + active_rect.width() // 2, active_rect.bottom(), pos)):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+                return
+            elif (self._hit_test_handle(active_rect.left(), active_rect.top() + active_rect.height() // 2, pos) or
+                  self._hit_test_handle(active_rect.right(), active_rect.top() + active_rect.height() // 2, pos)):
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+                return
+
+        for rect in self._layer_rects.values():
+            if rect.contains(pos):
+                self.setCursor(Qt.CursorShape.SizeAllCursor)
+                return
+
+        self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _draw_logo(self, p: QPainter, vx: int, vy: int, vw: int, vh: int, scale_factor: float):
         if not hasattr(self, "_logo_layers") or not self._logo_layers:
-            # Fallback to single legacy logo if it exists
-            if self._logo_img and not self._logo_img.isNull():
-                p.save()
-                p.translate(vx, vy)
-                lw = self._logo_size * scale_factor
-                lh = lw * (self._logo_img.height() / float(self._logo_img.width()))
-                margin = 20 * scale_factor
-                if self._logo_position == 0:
-                    lx = vw - lw - margin
-                    ly = vh - lh - margin
-                elif self._logo_position == 1:
-                    lx = margin
-                    ly = vh - lh - margin
-                elif self._logo_position == 2:
-                    lx = vw - lw - margin
-                    ly = margin
-                elif self._logo_position == 3:
-                    lx = margin
-                    ly = margin
-                else:
-                    lx = (vw - lw) / 2
-                    ly = margin
-                p.setOpacity(self._logo_opacity)
-                p.drawImage(QRect(int(lx), int(ly), int(lw), int(lh)), self._logo_img)
-                p.restore()
             return
             
-        p.save()
-        p.translate(vx, vy)
+        self._layer_rects.clear()
+        self._uncropped_layer_rects.clear()
         
-        for layer in self._logo_layers:
+        colors = {
+            1: (QColor(37, 99, 235), QColor(96, 165, 250), "L1"),
+            2: (QColor(16, 185, 129), QColor(52, 211, 153), "L2"),
+            3: (QColor(217, 70, 239), QColor(240, 171, 252), "L3"),
+            4: (QColor(245, 158, 11), QColor(251, 191, 36), "L4"),
+            5: (QColor(99, 102, 241), QColor(129, 140, 248), "L5")
+        }
+        
+        p.save()
+        
+        for idx in range(1, 6):
+            if idx > len(self._logo_layers):
+                continue
+            layer = self._logo_layers[idx - 1]
             if not layer.enabled or not layer.path:
                 continue
-            
-            img = self._logo_images.get(layer.path)
-            if not img or img.isNull():
+                
+            orig_img = self._logo_images.get(layer.path)
+            if not orig_img or orig_img.isNull():
                 continue
                 
-            # Logo size and scaling
-            lw = layer.size * scale_factor
-            lh = lw * (img.height() / float(img.width()))
-            
-            # Margins scaling
-            mt = layer.margin_t * scale_factor
-            mb = layer.margin_b * scale_factor
-            ml = layer.margin_l * scale_factor
-            mr = layer.margin_r * scale_factor
-            
-            # 0: bottom-right, 1: bottom-left, 2: top-right, 3: top-left, 4: top-center
-            if layer.position == 0:  # Bottom-Right
-                lx = vw - lw - mr
-                ly = vh - lh - mb
-            elif layer.position == 1:  # Bottom-Left
-                lx = ml
-                ly = vh - lh - mb
-            elif layer.position == 2:  # Top-Right
-                lx = vw - lw - mr
-                ly = mt
-            elif layer.position == 3:  # Top-Left
-                lx = ml
-                ly = mt
-            else:  # 4: Top-Center
-                lx = (vw - lw) / 2
-                ly = mt
+            rect = self._get_layer_rect(idx, vx, vy, vw, vh)
+            if rect.isEmpty():
+                continue
                 
-            p.setOpacity(layer.opacity)
-            p.drawImage(QRect(int(lx), int(ly), int(lw), int(lh)), img)
+            bg_color, border_color, name = colors[idx]
             
+            crop_t = getattr(layer, "crop_t", 0)
+            crop_b = getattr(layer, "crop_b", 0)
+            crop_l = getattr(layer, "crop_l", 0)
+            crop_r = getattr(layer, "crop_r", 0)
+            
+            scale_x = vw / float(self._ws_w) if self._ws_w > 0 else 1.0
+            scale_y = vh / float(self._ws_h) if self._ws_h > 0 else 1.0
+            rl = int(crop_l * scale_x)
+            rr = int(crop_r * scale_x)
+            rt = int(crop_t * scale_y)
+            rb = int(crop_b * scale_y)
+            
+            cropped_rect = QRect(
+                rect.left() + rl,
+                rect.top() + rt,
+                rect.width() - rl - rr,
+                rect.height() - rt - rb
+            )
+            
+            self._uncropped_layer_rects[idx] = rect
+            self._layer_rects[idx] = cropped_rect
+            
+            p.save()
+            if self._is_crop_mode and idx == self._selected_index:
+                p.setPen(QPen(QColor(border_color.red(), border_color.green(), border_color.blue(), 80), 1, Qt.PenStyle.DotLine))
+                p.setBrush(QBrush(QColor(bg_color.red(), bg_color.green(), bg_color.blue(), 15)))
+                p.drawRect(rect)
+                
+            img = self._get_processed_logo(idx, orig_img, layer)
+            if img and not img.isNull():
+                p.save()
+                p.setOpacity(layer.opacity)
+                p.drawImage(cropped_rect, img)
+                p.restore()
+                
+                if idx == self._selected_index:
+                    p.fillRect(cropped_rect, QColor(bg_color.red(), bg_color.green(), bg_color.blue(), 25))
+            
+            p.setPen(QPen(border_color, 2 if idx == self._selected_index else 1))
+            if idx == self._selected_index:
+                p.setPen(QPen(border_color, 2, Qt.PenStyle.DashLine))
+            p.drawRect(cropped_rect)
+            
+            p.setPen(QPen(QColor("#000000")))
+            p.setFont(QFont("Segoe UI", 8, QFont.Weight.Bold))
+            p.drawText(cropped_rect.translated(1, 1), Qt.AlignmentFlag.AlignCenter, name)
+            p.setPen(QPen(QColor("#FFFFFF")))
+            p.drawText(cropped_rect, Qt.AlignmentFlag.AlignCenter, name)
+            p.restore()
+            
+        active_rect = self._layer_rects.get(self._selected_index)
+        if active_rect and not active_rect.isEmpty() and not self._is_crop_mode:
+            p.save()
+            border_color = colors[self._selected_index][1]
+            p.setBrush(QBrush(border_color))
+            p.setPen(QPen(QColor("#FFFFFF"), 1))
+            
+            p.drawRect(active_rect.left() - 3, active_rect.top() - 3, 6, 6)
+            p.drawRect(active_rect.right() - 3, active_rect.top() - 3, 6, 6)
+            p.drawRect(active_rect.left() - 3, active_rect.bottom() - 3, 6, 6)
+            p.drawRect(active_rect.right() - 3, active_rect.bottom() - 3, 6, 6)
+            p.drawRect(active_rect.left() + active_rect.width() // 2 - 3, active_rect.top() - 3, 6, 6)
+            p.drawRect(active_rect.left() + active_rect.width() // 2 - 3, active_rect.bottom() - 3, 6, 6)
+            p.drawRect(active_rect.left() - 3, active_rect.top() + active_rect.height() // 2 - 3, 6, 6)
+            p.drawRect(active_rect.right() - 3, active_rect.top() + active_rect.height() // 2 - 3, 6, 6)
+            p.restore()
+            
+        uncropped_rect = self._uncropped_layer_rects.get(self._selected_index)
+        if self._is_crop_mode and uncropped_rect:
+            p.save()
+            layer = self._logo_layers[self._selected_index - 1]
+            scale_x = vw / float(self._ws_w) if self._ws_w > 0 else 1.0
+            scale_y = vh / float(self._ws_h) if self._ws_h > 0 else 1.0
+            rl = int(layer.crop_l * scale_x)
+            rr = int(layer.crop_r * scale_x)
+            rt = int(layer.crop_t * scale_y)
+            rb = int(layer.crop_b * scale_y)
+            
+            self._crop_rect = QRect(
+                uncropped_rect.left() + rl,
+                uncropped_rect.top() + rt,
+                uncropped_rect.width() - rl - rr,
+                uncropped_rect.height() - rt - rb
+            )
+            
+            p.setClipRect(uncropped_rect)
+            p.fillRect(uncropped_rect, QColor(0, 0, 0, 100))
+            p.setClipping(False)
+            
+            p.setPen(QPen(QColor("#f59e0b"), 2, Qt.PenStyle.DashLine))
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRect(self._crop_rect)
+            
+            p.setBrush(QBrush(QColor("#f59e0b")))
+            p.setPen(QPen(QColor("#FFFFFF"), 1))
+            
+            p.drawRect(self._crop_rect.left() + self._crop_rect.width() // 2 - 3, self._crop_rect.top() - 3, 6, 6)
+            p.drawRect(self._crop_rect.left() + self._crop_rect.width() // 2 - 3, self._crop_rect.bottom() - 3, 6, 6)
+            p.drawRect(self._crop_rect.left() - 3, self._crop_rect.top() + self._crop_rect.height() // 2 - 3, 6, 6)
+            p.drawRect(self._crop_rect.right() - 3, self._crop_rect.top() + self._crop_rect.height() // 2 - 3, 6, 6)
+            p.restore()
         p.restore()
 
     def paintEvent(self, event):
@@ -1327,22 +1832,25 @@ class LiveFramePreview(SubtitlePreviewWidget):
         cw = self.width()
         ch = self.height()
 
-        # Fill background with a very dark placeholder color
         p.fillRect(0, 0, cw, ch, QColor("#0A0A0A"))
 
-        # 1. Draw background frame (aspect-ratio-preserved, centered)
         if self._frame_img and not self._frame_img.isNull():
             video_w = self._frame_img.width()
             video_h = self._frame_img.height()
             
-            # Calculate aspect ratio scale factor using min()
             scale_factor = min(cw / float(video_w), ch / float(video_h))
             vw = int(video_w * scale_factor)
             vh = int(video_h * scale_factor)
             vx = (cw - vw) // 2
             vy = (ch - vh) // 2
 
-            # Draw background frame matching computed dimensions
+            self._ws_w = video_w
+            self._ws_h = video_h
+            self._ws_x = vx
+            self._ws_y = vy
+            self._ws_w_rendered = vw
+            self._ws_h_rendered = vh
+
             scaled = self._frame_img.scaled(
                 vw, vh,
                 Qt.AspectRatioMode.IgnoreAspectRatio,
@@ -1350,7 +1858,6 @@ class LiveFramePreview(SubtitlePreviewWidget):
             )
             p.drawImage(QPoint(vx, vy), scaled)
 
-            # 2. Overlay semi-transparent vignette (clipped to video frame)
             vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
             vignette.setColorAt(0.0, QColor(0, 0, 0, 0))
             vignette.setColorAt(1.0, QColor(0, 0, 0, 60))
@@ -1360,16 +1867,13 @@ class LiveFramePreview(SubtitlePreviewWidget):
             p.fillRect(vx, vy, vw, vh, vignette)
             p.restore()
 
-            # 2.5 Draw logo
             self._draw_logo(p, vx, vy, vw, vh, scale_factor)
 
-            # 3. Draw subtitle relative to the video frame geometry (translate painter)
             p.save()
             p.translate(vx, vy)
             self._paint_subtitle(p, vw, vh, video_w, video_h)
             p.restore()
         else:
-            # Fallback if no frame loaded: draw centered in 16:9 virtual canvas
             video_w = 1280
             video_h = 720
             scale_factor = min(cw / float(video_w), ch / float(video_h))
@@ -1377,8 +1881,14 @@ class LiveFramePreview(SubtitlePreviewWidget):
             vh = int(video_h * scale_factor)
             vx = (cw - vw) // 2
             vy = (ch - vh) // 2
+
+            self._ws_w = video_w
+            self._ws_h = video_h
+            self._ws_x = vx
+            self._ws_y = vy
+            self._ws_w_rendered = vw
+            self._ws_h_rendered = vh
             
-            # Draw logo on fallback
             self._draw_logo(p, vx, vy, vw, vh, scale_factor)
 
             p.save()
