@@ -449,7 +449,11 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
     }
     h_a, v_a = align_map.get(style.alignment, (0.5, 1.0))
 
+    active_intervals = []
+
     for entry in entries:
+        start_ms = entry.start_ms()
+        end_ms = entry.end_ms()
         start_ass = srt_time_to_ass(entry.start_time)
         end_ass = srt_time_to_ass(entry.end_time)
         raw_text = entry.text
@@ -482,6 +486,29 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
         box_w = txt_w + 2 * bg_pad_x
         box_h = txt_h + 2 * bg_pad_y
 
+        # Determine lane assignment to prevent overlap
+        occupied_lanes = set()
+        for act in active_intervals:
+            if act["start"] < end_ms and start_ms < act["end"]:
+                occupied_lanes.add(act["lane"])
+                
+        lane = 0
+        while lane in occupied_lanes:
+            lane += 1
+            
+        # Calculate shift_y based on occupied lanes below
+        shift_y = 0
+        for k in range(lane):
+            overlapping_active = None
+            for act in active_intervals:
+                if act["lane"] == k and act["start"] < end_ms and start_ms < act["end"]:
+                    overlapping_active = act
+                    break
+            if overlapping_active:
+                shift_y += overlapping_active["box_h"] + 10
+            else:
+                shift_y += int(line_h * 1.5)
+
         if h_a == 0.0:
             bx = margin_l
         elif h_a == 0.5:
@@ -490,11 +517,18 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
             bx = canvas_w - margin_r - box_w
 
         if v_a == 0.0:
-            by = margin_v
+            by = margin_v + shift_y
         elif v_a == 0.5:
-            by = int((canvas_h - box_h) / 2)
+            by = int((canvas_h - box_h) / 2) - shift_y
         else:
-            by = canvas_h - margin_v - box_h
+            by = canvas_h - margin_v - box_h - shift_y
+
+        active_intervals.append({
+            "start": start_ms,
+            "end": end_ms,
+            "lane": lane,
+            "box_h": box_h
+        })
 
         # 1. Shadow Box
         if style.shadow_enabled and style.bg_enabled and style.shadow_distance > 0:
@@ -536,7 +570,7 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
 # Subtitle ASS style string for FFmpeg
 # ---------------------------------------------------------------------------
 
-def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
+def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1280, video_h: int = 720) -> str:
     if not srt_path or not os.path.exists(srt_path):
         return ""
     
@@ -545,7 +579,7 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
         return f"subtitles='{safe_srt}'"
 
     """
-    Build FFmpeg subtitles filter with force_style.
+    Build FFmpeg subtitles filter with force_style and original_size reference resolution.
 
     BorderStyle mapping:
       1  = Outline + shadow only (no box)
@@ -604,7 +638,7 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle) -> str:
         f"MarginR={margin_r}"
     )
 
-    return f"subtitles='{safe_srt}':force_style='{force_style}'"
+    return f"subtitles='{safe_srt}':original_size={video_w}x{video_h}:force_style='{force_style}'"
 
 
 # ---------------------------------------------------------------------------
@@ -625,7 +659,7 @@ def build_ffmpeg_cmd(
     pts_expr = f"PTS/{speed_factor:.4f}"
     w, h = config.resolution.split("x")
 
-    sub_filter = _build_subtitle_filter(srt_path, config.subtitle_style)
+    sub_filter = _build_subtitle_filter(srt_path, config.subtitle_style, int(w), int(h))
 
     # ============================================================
     # DEBUG LOG: Layer Resolution
