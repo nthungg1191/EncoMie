@@ -121,6 +121,7 @@ class ImageLayerConfig:
     chroma_key_similarity: float = 0.38
     chroma_key_blend: float = 0.08
     chroma_key_color: str = "#00FF00"
+    chroma_key_spill: float = 0.0
 
 
 @dataclass
@@ -816,6 +817,18 @@ def build_ffmpeg_cmd(
             color_val = getattr(layer, "chroma_key_color", "#00FF00")
             color_hex = color_val.replace("#", "0x")
             chroma_filter = f"colorkey={color_hex}:{sim:.2f}:{blend:.2f},"
+            
+            spill = getattr(layer, "chroma_key_spill", 0.0)
+            if spill > 0.001:
+                hex_val = color_val.lstrip('#')
+                if len(hex_val) == 6:
+                    r_val = int(hex_val[0:2], 16)
+                    g_val = int(hex_val[2:4], 16)
+                    b_val = int(hex_val[4:6], 16)
+                else:
+                    r_val, g_val, b_val = 0, 255, 0
+                spill_type = "green" if g_val >= b_val and g_val >= r_val else ("blue" if b_val >= r_val else "green")
+                chroma_filter += f"despill=type={spill_type}:mix={spill:.2f},"
         
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)

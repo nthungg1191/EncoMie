@@ -1785,6 +1785,7 @@ class MainWindow(QMainWindow):
             ctrl.spn_chroma_sim.setValue(s.get(f"logo_chroma_sim_{layer_num}", 0.38))
             ctrl.spn_chroma_blend.setValue(s.get(f"logo_chroma_blend_{layer_num}", 0.08))
             ctrl.set_chroma_color(s.get(f"logo_chroma_color_{layer_num}", "#00FF00"))
+            ctrl.spn_chroma_spill.setValue(s.get(f"logo_chroma_spill_{layer_num}", 0.0))
             ctrl.chroma_params_frame.setVisible(ctrl.chk_chroma_enabled.isChecked())
             
             ctrl._update_speed_visibility()
@@ -1821,6 +1822,7 @@ class MainWindow(QMainWindow):
             widget.spn_chroma_sim.setValue(s.get(f"vlayer_chroma_sim_{layer_num}", 0.38))
             widget.spn_chroma_blend.setValue(s.get(f"vlayer_chroma_blend_{layer_num}", 0.08))
             widget.set_chroma_color(s.get(f"vlayer_chroma_color_{layer_num}", "#00FF00"))
+            widget.spn_chroma_spill.setValue(s.get(f"vlayer_chroma_spill_{layer_num}", 0.0))
             widget.chroma_params_frame.setVisible(widget.chk_chroma_enabled.isChecked())
             
             widget._update_speed_visibility()
@@ -1933,6 +1935,7 @@ class MainWindow(QMainWindow):
             settings_dict[f"logo_chroma_sim_{layer_num}"] = ctrl.spn_chroma_sim.value()
             settings_dict[f"logo_chroma_blend_{layer_num}"] = ctrl.spn_chroma_blend.value()
             settings_dict[f"logo_chroma_color_{layer_num}"] = ctrl.chroma_key_color
+            settings_dict[f"logo_chroma_spill_{layer_num}"] = ctrl.spn_chroma_spill.value()
 
         # Save Edit Video layers (5 layers)
         for idx, widget in enumerate(self.video_layer_widgets):
@@ -1957,6 +1960,7 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_chroma_sim_{layer_num}"] = widget.spn_chroma_sim.value()
             settings_dict[f"vlayer_chroma_blend_{layer_num}"] = widget.spn_chroma_blend.value()
             settings_dict[f"vlayer_chroma_color_{layer_num}"] = widget.chroma_key_color
+            settings_dict[f"vlayer_chroma_spill_{layer_num}"] = widget.spn_chroma_spill.value()
 
         # Legacy fallback
         if self.logo_layers:

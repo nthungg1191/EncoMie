@@ -305,6 +305,16 @@ class VideoLayerConfigWidget(QWidget):
         self.btn_eyedropper.clicked.connect(self._on_eyedropper_clicked)
         chroma_params_lay.addWidget(self.btn_eyedropper, 1, 2, 1, 2)
 
+        # Spill Reduction Row
+        chroma_params_lay.addWidget(QLabel("Khử tràn màu:"), 2, 0)
+        self.spn_chroma_spill = QDoubleSpinBox()
+        self.spn_chroma_spill.setRange(0.00, 1.00)
+        self.spn_chroma_spill.setSingleStep(0.05)
+        self.spn_chroma_spill.setValue(0.00)
+        self.spn_chroma_spill.setStyleSheet("font-size: 11px;")
+        self.spn_chroma_spill.valueChanged.connect(self._on_changed)
+        chroma_params_lay.addWidget(self.spn_chroma_spill, 2, 1)
+
         chroma_lay.addWidget(self.chroma_params_frame)
         self.chroma_params_frame.setVisible(False)
 
@@ -409,6 +419,7 @@ class VideoLayerConfigWidget(QWidget):
         cfg_obj.chroma_key_similarity = self.spn_chroma_sim.value()
         cfg_obj.chroma_key_blend = self.spn_chroma_blend.value()
         cfg_obj.chroma_key_color = self.chroma_key_color
+        cfg_obj.chroma_key_spill = self.spn_chroma_spill.value()
         cfg_obj.source_type = idx # Save index
         return cfg_obj
 
@@ -454,6 +465,7 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_sim.setValue(getattr(cfg_obj, "chroma_key_similarity", 0.38))
         self.spn_chroma_blend.setValue(getattr(cfg_obj, "chroma_key_blend", 0.08))
         self.set_chroma_color(getattr(cfg_obj, "chroma_key_color", "#00FF00"))
+        self.spn_chroma_spill.setValue(getattr(cfg_obj, "chroma_key_spill", 0.0))
         self.chroma_params_frame.setVisible(self.chk_chroma_enabled.isChecked())
         
         self._update_speed_visibility()

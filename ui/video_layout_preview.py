@@ -651,21 +651,23 @@ class VideoLayoutPreview(QWidget):
         sim = getattr(cfg, "chroma_key_similarity", 0.38)
         blend = getattr(cfg, "chroma_key_blend", 0.08)
         color = getattr(cfg, "chroma_key_color", "#00FF00")
+        spill = getattr(cfg, "chroma_key_spill", 0.0)
         
         if not chroma_enabled:
             return img
             
+        # Check cache
         cache_key = img.cacheKey()
         cached = self._keyed_images_cache.get(index)
-        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend and cached[4] == color:
-            return cached[5]
+        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend and cached[4] == color and cached[5] == spill:
+            return cached[6]
             
         # Process and cache
-        keyed_img = self._apply_chroma_key(img, sim, blend, color)
-        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, color, keyed_img)
+        keyed_img = self._apply_chroma_key(img, sim, blend, color, spill)
+        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, color, spill, keyed_img)
         return keyed_img
 
-    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float, color: str) -> QImage:
+    def _apply_chroma_key(self, img: QImage, similarity: float, blend: float, color: str, spill: float = 0.0) -> QImage:
         if img.isNull():
             return img
             
@@ -690,7 +692,14 @@ class VideoLayoutPreview(QWidget):
             tr, tg, tb = 0.0, 1.0, 0.0
         
         # In Format_ARGB32: bytes are ordered as B, G, R, A on little-endian
-        # cd = sqrt( (r - tr)^2 + (g - tg)^2 + (b - tb)^2 ) where channels are 0..1
+        # Determine dominant channel of key color
+        max_c = 'g'
+        if tg >= tr and tg >= tb:
+            max_c = 'g'
+        elif tb >= tr and tb >= tg:
+            max_c = 'b'
+        else:
+            max_c = 'r'
         
         for i in range(0, len(buf), 4):
             b = buf[i]
@@ -709,5 +718,20 @@ class VideoLayoutPreview(QWidget):
             elif blend > 0.001 and cd < similarity + blend:
                 alpha = int(255 * (cd - similarity) / blend)
                 buf[i+3] = max(0, min(255, alpha))
+                
+            # Apply Despill if spill is configured and pixel is not fully transparent
+            if spill > 0.001 and buf[i+3] > 0:
+                if max_c == 'g':
+                    tg_spill = (r + b) // 2
+                    if g > tg_spill:
+                        buf[i+1] = int(g - (g - tg_spill) * spill)
+                elif max_c == 'b':
+                    tb_spill = (r + g) // 2
+                    if b > tb_spill:
+                        buf[i] = int(b - (b - tb_spill) * spill)
+                elif max_c == 'r':
+                    tr_spill = (g + b) // 2
+                    if r > tr_spill:
+                        buf[i+2] = int(r - (r - tr_spill) * spill)
                 
         return scaled_img
