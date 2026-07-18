@@ -749,18 +749,18 @@ def build_ffmpeg_cmd(
     if config.use_gpu:
         vcodec = config.codec
         vf_parts.extend([
+            f"scale_cuda={w}:{h}:force_original_aspect_ratio=decrease",
             "hwdownload",
             "format=nv12",
             "format=yuv420p",
             f"setpts={pts_expr}",
-            f"scale={w}:{h}:flags=lanczos:force_original_aspect_ratio=decrease",
             f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
         ])
     else:
         vcodec = "libx265" if "hevc" in config.codec else "libx264"
         vf_parts.extend([
             f"setpts={pts_expr}",
-            f"scale={w}:{h}:flags=lanczos:force_original_aspect_ratio=decrease",
+            f"scale={w}:{h}:flags=bicubic:force_original_aspect_ratio=decrease",
             f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
         ])
 
@@ -872,7 +872,7 @@ def build_ffmpeg_cmd(
 
         # Build filter for scaling, crop, format conversion
         filter_parts.append(
-            f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2,format=rgba,"
+            f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2:flags=bicubic,format=rgba,"
             f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
         )
         
