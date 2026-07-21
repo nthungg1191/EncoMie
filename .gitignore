@@ -5,6 +5,7 @@
 
 /tools
 /Subtitle
+/.temp_srt
 
 /dist
 /build
@@ -15,4 +16,4 @@
 *__pycache__
 EncoMie.bat 
 html.html
-.temp_srt/temp_1.ass
+

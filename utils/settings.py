@@ -72,6 +72,20 @@ DEFAULTS = {
     "logo_margin_b_5": 20,
     "logo_margin_l_5": 20,
     "logo_margin_r_5": 20,
+
+    "audio_files": [],
+    "srt_files": [],
+    "vid_src_files": [],
+    "vid_bg_files": [],
+    "unchecked_audio_files": [],
+    "unchecked_video_files": [],
+    "active_tab_mode": "sub",
+    "active_preset_name": "",
+    "selected_audio_row": -1,
+    "selected_video_row": -1,
+    "active_logo_tab": 0,
+    "active_video_tab": 0,
+    "active_inspector_tab": 0,
 }
 
 

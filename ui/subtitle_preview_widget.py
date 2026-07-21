@@ -1334,20 +1334,20 @@ class LiveFramePreview(SubtitlePreviewWidget):
         mb = int(cfg.margin_b * scale_y)
         
         # position combo mapping index:
-        # 0: Center, 1: BR, 2: BL, 3: TR, 4: TL
-        if cfg.position == 0:  # Center
+        # 0: BR, 1: BL, 2: TR, 3: TL, 4: Center
+        if cfg.position == 4:  # Center
             lx = vx + (vw - layer_w) // 2 + (ml - mr) // 2
             ly = vy + (vh - layer_h) // 2 + (mt - mb) // 2
-        elif cfg.position == 1:  # BR
+        elif cfg.position == 0:  # BR
             lx = vx + vw - layer_w - mr
             ly = vy + vh - layer_h - mb
-        elif cfg.position == 2:  # BL
+        elif cfg.position == 1:  # BL
             lx = vx + ml
             ly = vy + vh - layer_h - mb
-        elif cfg.position == 3:  # TR
+        elif cfg.position == 2:  # TR
             lx = vx + vw - layer_w - mr
             ly = vy + mt
-        else:  # 4: TL
+        else:  # 3: TL
             lx = vx + ml
             ly = vy + mt
             
@@ -1604,19 +1604,19 @@ class LiveFramePreview(SubtitlePreviewWidget):
         # 1. Moving layer position
         if self._active_drag == 'move':
             cfg = self._logo_layers[self._selected_index - 1]
-            if cfg.position == 1:  # BR (1 is Bottom-Right in VideoLayerConfigWidget)
+            if cfg.position == 0:  # BR
                 cfg.margin_r = max(0, self._start_margin_r - ws_dx)
                 cfg.margin_b = max(0, self._start_margin_b - ws_dy)
-            elif cfg.position == 2:  # BL
+            elif cfg.position == 1:  # BL
                 cfg.margin_l = max(0, self._start_margin_l + ws_dx)
                 cfg.margin_b = max(0, self._start_margin_b - ws_dy)
-            elif cfg.position == 3:  # TR
+            elif cfg.position == 2:  # TR
                 cfg.margin_r = max(0, self._start_margin_r - ws_dx)
                 cfg.margin_t = max(0, self._start_margin_t + ws_dy)
-            elif cfg.position == 4:  # TL
+            elif cfg.position == 3:  # TL
                 cfg.margin_l = max(0, self._start_margin_l + ws_dx)
                 cfg.margin_t = max(0, self._start_margin_t + ws_dy)
-            else:  # Center (0)
+            else:  # Center (4)
                 cfg.margin_l = max(0, self._start_margin_l + ws_dx)
                 cfg.margin_r = max(0, self._start_margin_r - ws_dx)
                 cfg.margin_t = max(0, self._start_margin_t + ws_dy)

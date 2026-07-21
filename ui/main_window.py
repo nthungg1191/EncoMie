@@ -374,14 +374,23 @@ class PairTable(QTableWidget):
         self.setColumnWidth(3, 100)
         # Stylesheet is managed globally
 
-    def load_pairs(self, pairs: list[FilePair]):
+    def load_pairs(self, pairs: list[FilePair], unchecked_paths: set = None):
+        if unchecked_paths is None:
+            unchecked_paths = set()
         self.blockSignals(True)
         try:
             self.setRowCount(0)
             for pair in pairs:
                 row = self.rowCount()
                 self.insertRow(row)
-                self.setItem(row, 0, self._cell(pair.index, center=True, checkable=pair.matched))
+                
+                item_idx = self._cell(pair.index, center=True, checkable=pair.matched)
+                if pair.audio_path:
+                    item_idx.setData(Qt.ItemDataRole.UserRole, pair.audio_path)
+                if pair.audio_path in unchecked_paths:
+                    item_idx.setCheckState(Qt.CheckState.Unchecked)
+                self.setItem(row, 0, item_idx)
+                
                 self.setItem(row, 1, self._cell(Path(pair.audio_path).name if pair.audio_path else "—"))
                 self.setItem(row, 2, self._cell(Path(pair.srt_path).name if pair.srt_path else "—"))
                 status_text = "✓ Khớp" if pair.matched else f"✗ {pair.error}"
@@ -427,7 +436,7 @@ def _extract_video_frame(video_path: str, timestamp: str | None = None) -> QImag
                  "-show_entries", "format=duration",
                  "-of", "default=noprint_wrappers=1:nokey=1",
                  video_path],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, encoding="utf-8", errors="replace", timeout=10,
             )
             try:
                 duration = float(probe_result.stdout.strip())
@@ -447,7 +456,7 @@ def _extract_video_frame(video_path: str, timestamp: str | None = None) -> QImag
             tmp_path,
         ]
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=30,
+            cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=30,
         )
         if result.returncode != 0 or not os.path.exists(tmp_path):
             return None
@@ -772,15 +781,65 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(qss)
 
     def _build_ui(self):
+        # Setup File Menu for Project Save/Load
+        menu_bar = self.menuBar()
+        menu_bar.setStyleSheet(
+            "QMenuBar {"
+            "    background-color: #f9f8f6;"  # Premium iOS blue accent
+            "    color: #ffffff;"
+            "    font-size: 13px;"
+            "    font-weight: bold;"
+            "    border-bottom: 2px solid #005ecb;"
+            "    padding: 2px 4px;"
+            "}"
+            "QMenuBar::item {"
+            "    background: transparent;"
+            "    padding: 6px 12px;"
+            "    border-radius: 4px;"
+            "    color: #000000;"
+            "}"
+            "QMenuBar::item:selected {"
+            "    background-color: #005ecb;"
+            "    color: #ffffff;"
+            "}"
+            "QMenuBar::item:pressed {"
+            "    background-color: #004ba2;"
+            "    color: #ffffff;"
+            "}"
+            "QMenu {"
+            "    background-color: #ffffff;"
+            "    color: #1c1c1e;"
+            "    border: 1px solid #d1d1d6;"
+            "    font-size: 12px;"
+            "}"
+            "QMenu::item {"
+            "    padding: 6px 20px;"
+            "    background: transparent;"
+            "}"
+            "QMenu::item:selected {"
+            "    background-color: #007aff;"
+            "    color: #ffffff;"
+            "}"
+        )
+        file_menu = menu_bar.addMenu("Tập tin")
+        
+        save_action = file_menu.addAction("Lưu dự án...")
+        save_action.setShortcut("Ctrl+S")
+        save_action.triggered.connect(self._save_project_file)
+        
+        load_action = file_menu.addAction("Mở dự án...")
+        load_action.setShortcut("Ctrl+O")
+        load_action.triggered.connect(self._load_project_file)
+
         central = QWidget()
         self.setCentralWidget(central)
         root_lay = QVBoxLayout(central)
         root_lay.setContentsMargins(0, 0, 0, 0)
         root_lay.setSpacing(0)
 
-        # --- Title bar ---
-        title_bar = self._make_title_bar()
-        root_lay.addWidget(title_bar)
+        # --- Title bar (Removed as requested) ---
+        # title_bar = self._make_title_bar()
+        # root_lay.addWidget(title_bar)
 
         # --- Main Mode Tab Selector Bar ---
         mode_bar = QWidget()
@@ -969,6 +1028,8 @@ class MainWindow(QMainWindow):
 
     def _update_sysinfo(self):
         """Refresh system-info badges in the title bar."""
+        if not hasattr(self, "_cpu_load_lbl") or self._cpu_load_lbl is None:
+            return
         si = detect_system_info()
         self._cpu_load_lbl.setText(f"CPU: {si['cpu_load_pct']}%")
         self._ram_pct_lbl.setText(f"RAM: {si['ram_used_pct']}%")
@@ -1668,6 +1729,12 @@ class MainWindow(QMainWindow):
 
     def _apply_saved_settings(self):
         s = self._settings
+        self._apply_workspace_state(s)
+
+    def _apply_workspace_state(self, s: dict):
+        self._unchecked_audio_files = set(s.get("unchecked_audio_files", []))
+        self._unchecked_video_files = set(s.get("unchecked_video_files", []))
+
         saved_bg_files = s.get("bg_files", [])
         if isinstance(saved_bg_files, list) and saved_bg_files:
             self.pick_bg.set_selected_files(saved_bg_files)
@@ -1697,6 +1764,10 @@ class MainWindow(QMainWindow):
             self._log_debug(f"Applied hardcoded media path: {HARDCODED_AUDIO_DIR}")
         else:
             self._log_debug("No media files loaded from hardcoded path")
+            saved_audio_files = s.get("audio_files", [])
+            if isinstance(saved_audio_files, list) and saved_audio_files:
+                self.pick_audio.set_selected_files(saved_audio_files)
+                self._log_debug(f"Restored {len(saved_audio_files)} saved audio files")
 
         saved_srt_files = s.get("srt_files", [])
         if isinstance(saved_srt_files, list) and saved_srt_files:
@@ -1829,9 +1900,39 @@ class MainWindow(QMainWindow):
 
         self._on_video_layer_changed()
 
+        # Restore active mode tab
+        active_tab_mode = s.get("active_tab_mode", "sub")
+        if active_tab_mode == "video":
+            self._on_mode_video_clicked()
+        else:
+            self._on_mode_sub_clicked()
+
+        # Restore active presets and layer tabs
+        active_preset_name = s.get("active_preset_name", "")
+        if active_preset_name:
+            idx = self.cmb_preset.findText(active_preset_name)
+            if idx >= 0:
+                self.cmb_preset.setCurrentIndex(idx)
+
+        if hasattr(self, "layer_tab_widget"):
+            self.layer_tab_widget.setCurrentIndex(s.get("active_logo_tab", 0))
+        if hasattr(self, "video_tab_widget"):
+            self.video_tab_widget.setCurrentIndex(s.get("active_video_tab", 0))
+        if hasattr(self, "inspector_tab_widget"):
+            self.inspector_tab_widget.setCurrentIndex(s.get("active_inspector_tab", 0))
+
         # Auto-scan if files already set
         if self.pick_audio.selected_files() and self.pick_srt.selected_files():
             self._scan_pairs()
+
+        # Restore selected rows in tables
+        selected_audio_row = s.get("selected_audio_row", -1)
+        if selected_audio_row >= 0 and selected_audio_row < self.pair_table.rowCount():
+            self.pair_table.selectRow(selected_audio_row)
+
+        selected_video_row = s.get("selected_video_row", -1)
+        if selected_video_row >= 0 and selected_video_row < self.vid_batch_table.rowCount():
+            self.vid_batch_table.selectRow(selected_video_row)
 
     def _auto_export_json(self):
         if not self._pairs:
@@ -1867,7 +1968,7 @@ class MainWindow(QMainWindow):
         except Exception:
             pass
 
-    def _save_settings(self):
+    def _serialize_workspace_state(self) -> dict:
         style = self.style_panel.get_style()
         settings_dict = {
             "bg_folder": self.pick_bg.value(),
@@ -1962,6 +2063,34 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_chroma_color_{layer_num}"] = widget.chroma_key_color
             settings_dict[f"vlayer_chroma_spill_{layer_num}"] = widget.spn_chroma_spill.value()
 
+        # Collect unchecked audio files from pair_table
+        unchecked_audio_files = []
+        for row in range(self.pair_table.rowCount()):
+            item = self.pair_table.item(row, 0)
+            if item and item.checkState() == Qt.CheckState.Unchecked:
+                path = item.data(Qt.ItemDataRole.UserRole)
+                if path:
+                    unchecked_audio_files.append(path)
+                    
+        # Collect unchecked video files from vid_batch_table
+        unchecked_video_files = []
+        for row in range(self.vid_batch_table.rowCount()):
+            item = self.vid_batch_table.item(row, 0)
+            if item and item.checkState() == Qt.CheckState.Unchecked:
+                path = item.data(Qt.ItemDataRole.UserRole)
+                if path:
+                    unchecked_video_files.append(path)
+
+        settings_dict["unchecked_audio_files"] = unchecked_audio_files
+        settings_dict["unchecked_video_files"] = unchecked_video_files
+        settings_dict["active_tab_mode"] = "video" if self.btn_tab_video.isChecked() else "sub"
+        settings_dict["active_preset_name"] = self.cmb_preset.currentText()
+        settings_dict["selected_audio_row"] = self.pair_table.currentRow()
+        settings_dict["selected_video_row"] = self.vid_batch_table.currentRow()
+        settings_dict["active_logo_tab"] = self.layer_tab_widget.currentIndex() if hasattr(self, "layer_tab_widget") else 0
+        settings_dict["active_video_tab"] = self.video_tab_widget.currentIndex() if hasattr(self, "video_tab_widget") else 0
+        settings_dict["active_inspector_tab"] = self.inspector_tab_widget.currentIndex() if hasattr(self, "inspector_tab_widget") else 0
+
         # Legacy fallback
         if self.logo_layers:
             layer1 = self.logo_layers[0].get_config()
@@ -1971,8 +2100,48 @@ class MainWindow(QMainWindow):
             settings_dict["logo_size"] = layer1.size
             settings_dict["logo_opacity"] = int(layer1.opacity * 100)
 
+        return settings_dict
+
+    def _save_settings(self):
+        settings_dict = self._serialize_workspace_state()
         cfg.save(settings_dict)
         self._auto_export_json()
+
+    def _save_project_file(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Lưu dự án", "", "EncoMie Project files (*.emie);;JSON files (*.json)"
+        )
+        if not path:
+            return
+        state = self._serialize_workspace_state()
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+            self._log_debug(f"Saved project file to {path}")
+            QMessageBox.information(self, "Lưu dự án", "Đã lưu dự án thành công!")
+        except Exception as e:
+            self._log_debug(f"Failed to save project file: {e}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể lưu dự án: {e}")
+
+    def _load_project_file(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Mở dự án", "", "EncoMie Project files (*.emie);;JSON files (*.json)"
+        )
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            self._apply_workspace_state(state)
+            self._log_debug(f"Loaded project file from {path}")
+            QMessageBox.information(self, "Mở dự án", "Đã tải dự án thành công!")
+        except Exception as e:
+            self._log_debug(f"Failed to load project file: {e}")
+            QMessageBox.critical(self, "Lỗi", f"Không thể mở dự án: {e}")
+
+    def closeEvent(self, event):
+        self._save_settings()
+        event.accept()
 
     def _export_json(self):
         path, _ = QFileDialog.getSaveFileName(
@@ -2059,7 +2228,8 @@ class MainWindow(QMainWindow):
 
     def _on_pairs_ready(self, pairs: list[FilePair]):
         self._pairs = pairs
-        self.pair_table.load_pairs(pairs)
+        unchecked_audios = getattr(self, "_unchecked_audio_files", set())
+        self.pair_table.load_pairs(pairs, unchecked_audios)
         matched = sum(1 for p in pairs if p.matched)
         total = len(pairs)
         fuzzy_matched = sum(1 for p in pairs if p.matched and p.error.startswith("Ghép gần đúng"))
@@ -2590,6 +2760,7 @@ class MainWindow(QMainWindow):
                 self.lbl_vid_summary.setText("Tìm thấy 0 video")
                 return
 
+            unchecked_video_files = getattr(self, "_unchecked_video_files", set())
             for idx, file_path in enumerate(src_files):
                 row = self.vid_batch_table.rowCount()
                 self.vid_batch_table.insertRow(row)
@@ -2597,7 +2768,12 @@ class MainWindow(QMainWindow):
                 item_idx = QTableWidgetItem(str(idx + 1))
                 item_idx.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item_idx.setFlags(item_idx.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-                item_idx.setCheckState(Qt.CheckState.Checked)
+                item_idx.setData(Qt.ItemDataRole.UserRole, file_path)
+                
+                if file_path in unchecked_video_files:
+                    item_idx.setCheckState(Qt.CheckState.Unchecked)
+                else:
+                    item_idx.setCheckState(Qt.CheckState.Checked)
                 self.vid_batch_table.setItem(row, 0, item_idx)
                 
                 self.vid_batch_table.setItem(row, 1, QTableWidgetItem(os.path.basename(file_path)))
