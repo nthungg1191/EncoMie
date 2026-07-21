@@ -912,6 +912,7 @@ def build_ffmpeg_cmd(
         *quality_flags,
         "-c:a", "aac",
         "-b:a", "192k",
+        "-threads", "4",
         "-shortest",
         "-movflags", "+faststart",
         output_path
@@ -1069,7 +1070,7 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
     import sys
     creationflags = 0
     if sys.platform == "win32":
-        creationflags = 0x00000020 | 0x08000000  # NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
+        creationflags = 0x00004000 | 0x08000000  # BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
 
     process = subprocess.Popen(
         cmd,
