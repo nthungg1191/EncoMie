@@ -748,21 +748,14 @@ def build_ffmpeg_cmd(
     vf_parts = []
     if config.use_gpu:
         vcodec = config.codec
-        vf_parts.extend([
-            f"scale_cuda={w}:{h}:force_original_aspect_ratio=decrease",
-            "hwdownload",
-            "format=nv12",
-            "format=yuv420p",
-            f"setpts={pts_expr}",
-            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-        ])
     else:
         vcodec = "libx265" if "hevc" in config.codec else "libx264"
-        vf_parts.extend([
-            f"setpts={pts_expr}",
-            f"scale={w}:{h}:flags=bicubic:force_original_aspect_ratio=decrease",
-            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-        ])
+
+    vf_parts.extend([
+        f"setpts={pts_expr}",
+        f"scale={w}:{h}:flags=bicubic:force_original_aspect_ratio=decrease",
+        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+    ])
 
     if sub_filter:
         vf_parts.append(sub_filter)
@@ -772,11 +765,6 @@ def build_ffmpeg_cmd(
     cmd = [
         FFMPEG_PATH, "-y",
     ]
-    if config.use_gpu:
-        cmd.extend([
-            "-hwaccel", "cuda",
-            "-hwaccel_output_format", "cuda",
-        ])
         
     cmd.extend([
         "-ss", f"{bg_start:.3f}",
@@ -1081,7 +1069,7 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
     import sys
     creationflags = 0
     if sys.platform == "win32":
-        creationflags = 0x00004000  # BELOW_NORMAL_PRIORITY_CLASS
+        creationflags = 0x00000020 | 0x08000000  # NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
 
     process = subprocess.Popen(
         cmd,
