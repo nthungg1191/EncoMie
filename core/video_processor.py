@@ -745,44 +745,75 @@ def build_ffmpeg_cmd(
         fallback_layer._resolved_path = config.logo_path
         active_layers.append(fallback_layer)
 
-    vf_parts = []
-    if config.use_gpu:
-        vcodec = config.codec
-    else:
-        vcodec = "libx265" if "hevc" in config.codec else "libx264"
-
-    vf_parts.extend([
-        f"setpts={pts_expr}",
-        f"scale={w}:{h}:flags=bicubic:force_original_aspect_ratio=decrease",
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-    ])
-
-    if sub_filter:
-        vf_parts.append(sub_filter)
-
-    vf = ",".join(vf_parts)
-
     cmd = [
         FFMPEG_PATH, "-y",
     ]
-        
+
+    fps_val = getattr(config, "fps", 30)
+
+    # Tính toán số luồng CPU động để chừa luồng cho hệ điều hành
+    logical_cpus = os.cpu_count() or 4
+    max_concurrent = getattr(config, "max_concurrent_renders", 2)
+    allocated_threads = max(1, (logical_cpus - 2) // max_concurrent)
+
+    if config.use_gpu:
+        vcodec = config.codec
+        # Giải mã trực tiếp vào VRAM GPU
+        cmd.extend([
+            "-hwaccel", "cuda",
+            "-hwaccel_output_format", "cuda",
+        ])
+    else:
+        vcodec = "libx265" if "hevc" in config.codec else "libx264"
+
     cmd.extend([
+        "-thread_queue_size", "1024",  # Tối ưu hóa hàng đợi đọc dữ liệu đầu vào
         "-ss", f"{bg_start:.3f}",
         "-t", f"{bg_segment_duration:.3f}",
         "-i", bg_video,
+        "-thread_queue_size", "1024",
         "-i", audio_path,
     ])
     for layer in active_layers:
         is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
         if is_video:
-            cmd.extend(["-stream_loop", "-1", "-i", layer._resolved_path])
+            # Giải mã layer video bằng GPU nếu bật GPU
+            if config.use_gpu:
+                cmd.extend(["-hwaccel", "cuda"])
+            cmd.extend([
+                "-thread_queue_size", "1024",
+                "-stream_loop", "-1",
+                "-i", layer._resolved_path
+            ])
         else:
-            cmd.extend(["-i", layer._resolved_path])
+            cmd.extend([
+                "-thread_queue_size", "1024",
+                "-i", layer._resolved_path
+            ])
 
+    # Sử dụng preset p1 (Fastest) cho NVENC để đạt tốc độ mã hóa tối đa trên GPU RTX
     quality_flags = ["-qp", "23"] if config.use_gpu else ["-crf", "23"]
-    preset_flags  = ["-preset", "fast"]
+    preset_flags  = ["-preset", "p1"] if config.use_gpu else ["-preset", "fast"]
 
-    # Build filter complex for sequential overlays
+    # Tối ưu hóa: Co giãn trên GPU trước (scale_cuda), sau đó tải về CPU để pad và xử lý tiếp.
+    # Điều này giúp giảm băng thông truyền qua PCIe tối đa (chỉ truyền video đã thu nhỏ).
+    if config.use_gpu:
+        vf_parts = [
+            f"setpts={pts_expr}",
+            f"fps=fps={fps_val}",
+            f"scale_cuda={w}:{h}:interp_algo=bilinear:force_original_aspect_ratio=decrease",
+            "hwdownload,format=nv12",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+        ]
+    else:
+        vf_parts = [
+            f"setpts={pts_expr}",
+            f"fps=fps={fps_val}",
+            f"scale={w}:{h}:flags=bilinear:force_original_aspect_ratio=decrease",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+        ]
+
+    vf = ",".join(vf_parts)
     filter_parts = [f"[0:v]{vf}[v_base]"]
     current_base = "v_base"
 
@@ -858,9 +889,9 @@ def build_ffmpeg_cmd(
         # Ensure even width for FFmpeg compatibility
         pixel_w = max(4, (pixel_w // 2) * 2)
 
-        # Build filter for scaling, crop, format conversion
+        # Build filter for scaling, crop, format conversion (chạy trên CPU để hỗ trợ định dạng RGBA ổn định)
         filter_parts.append(
-            f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2:flags=bicubic,format=rgba,"
+            f"[{input_index}:v]{crop_filter}{pts_filter}{chroma_filter}scale={pixel_w}:-2:flags=bilinear,format=rgba,"
             f"colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
         )
         
@@ -873,28 +904,40 @@ def build_ffmpeg_cmd(
         mt = int(layer.margin_t * scale_y)
         mb = int(layer.margin_b * scale_y)
 
+        # Uncropped dimensions in output video pixels
+        layer_w_pixel = int(layer_w_virt * scale_x)
+        layer_h_pixel = int(layer_h_virt * scale_y)
+
+        crop_l_pixel = int(crop_l * scale_x)
+        crop_t_pixel = int(crop_t * scale_y)
+
         # Combo positions: 4: Center, 0: BR, 1: BL, 2: TR, 3: TL
         if layer.position == 4: # Center
-            overlay_pos = f"x=trunc((W-w)/2)+trunc(({ml}-{mr})/2):y=trunc((H-h)/2)+trunc(({mt}-{mb})/2)"
+            overlay_pos = f"x=trunc((W-{layer_w_pixel})/2)+trunc(({ml}-{mr})/2)+{crop_l_pixel}:y=trunc((H-{layer_h_pixel})/2)+trunc(({mt}-{mb})/2)+{crop_t_pixel}"
         elif layer.position == 0:  # Bottom-Right
-            overlay_pos = f"x=W-w-{mr}:y=H-h-{mb}"
+            overlay_pos = f"x=W-{layer_w_pixel}-{mr}+{crop_l_pixel}:y=H-{layer_h_pixel}-{mb}+{crop_t_pixel}"
         elif layer.position == 1:  # Bottom-Left
-            overlay_pos = f"x={ml}:y=H-h-{mb}"
+            overlay_pos = f"x={ml}+{crop_l_pixel}:y=H-{layer_h_pixel}-{mb}+{crop_t_pixel}"
         elif layer.position == 2:  # Top-Right
-            overlay_pos = f"x=W-w-{mr}:y={mt}"
+            overlay_pos = f"x=W-{layer_w_pixel}-{mr}+{crop_l_pixel}:y={mt}+{crop_t_pixel}"
         else:  # 3: Top-Left
-            overlay_pos = f"x={ml}:y={mt}"
+            overlay_pos = f"x={ml}+{crop_l_pixel}:y={mt}+{crop_t_pixel}"
             
-        next_base = f"v_base_next_{idx}" if idx < len(active_layers) - 1 else "vout"
+        next_base = f"v_base_next_{idx}" if idx < len(active_layers) - 1 else "v_layers_out"
         filter_parts.append(f"[{current_base}][{layer_output}]overlay={overlay_pos}[{next_base}]")
         current_base = next_base
 
-    if not active_layers:
-        filter_expr = f"[0:v]{vf}[vout]"
+    # Bước cuối cùng: Áp dụng phụ đề trên CPU sau khi đã gộp layers
+    final_base = current_base if active_layers else "v_base"
+    if sub_filter:
+        filter_parts.append(f"[{final_base}]{sub_filter}[vout]")
     else:
-        filter_expr = ";".join(filter_parts)
+        filter_parts.append(f"[{final_base}]null[vout]")
+
+    filter_expr = ";".join(filter_parts)
 
     cmd += [
+        "-filter_threads", str(allocated_threads),  # Tự động hóa song song hóa bộ lọc trên CPU
         "-filter_complex",
         filter_expr,
         "-map", "[vout]",
@@ -902,8 +945,6 @@ def build_ffmpeg_cmd(
         "-c:v", vcodec,
     ]
 
-    # Custom frame rate
-    fps_val = getattr(config, "fps", 30)
     if fps_val:
         cmd += ["-r", str(fps_val)]
 
@@ -912,7 +953,7 @@ def build_ffmpeg_cmd(
         *quality_flags,
         "-c:a", "aac",
         "-b:a", "192k",
-        "-threads", "4",
+        "-threads", str(allocated_threads),
         "-shortest",
         "-movflags", "+faststart",
         output_path

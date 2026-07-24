@@ -209,13 +209,34 @@ class VideoLayoutPreview(QWidget):
             crop_r = getattr(cfg, "crop_r", 0)
             radius = getattr(cfg, "radius", 0)
 
-            # Scale crop values to rendered size
+            # Scale factor for virtual units
             scale_x = vw / 400.0
             scale_y = vh / 225.0
-            rl = int(crop_l * scale_x)
-            rr = int(crop_r * scale_x)
-            rt = int(crop_t * scale_y)
-            rb = int(crop_b * scale_y)
+            
+            # Uncropped virtual dimensions
+            layer_w_virt = rect.width() / scale_x if scale_x > 0 else 1.0
+            layer_h_virt = rect.height() / scale_y if scale_y > 0 else 1.0
+            
+            # Calculate fractions of crop relative to the layer's virtual size
+            frac_l = min(1.0, max(0.0, crop_l / float(layer_w_virt))) if layer_w_virt > 0 else 0.0
+            frac_r = min(1.0, max(0.0, crop_r / float(layer_w_virt))) if layer_w_virt > 0 else 0.0
+            frac_t = min(1.0, max(0.0, crop_t / float(layer_h_virt))) if layer_h_virt > 0 else 0.0
+            frac_b = min(1.0, max(0.0, crop_b / float(layer_h_virt))) if layer_h_virt > 0 else 0.0
+            
+            # Clamp sum of opposite crops
+            if frac_l + frac_r > 0.9:
+                total = frac_l + frac_r
+                frac_l = (frac_l / total) * 0.9
+                frac_r = (frac_r / total) * 0.9
+            if frac_t + frac_b > 0.9:
+                total = frac_t + frac_b
+                frac_t = (frac_t / total) * 0.9
+                frac_b = (frac_b / total) * 0.9
+
+            rl = int(rect.width() * frac_l)
+            rr = int(rect.width() * frac_r)
+            rt = int(rect.height() * frac_t)
+            rb = int(rect.height() * frac_b)
 
             # Calculate cropped rectangle
             cropped_rect = QRect(
@@ -247,14 +268,10 @@ class VideoLayoutPreview(QWidget):
                 lw = layer_img.width()
                 lh = layer_img.height()
                 
-                # Uncropped virtual dimensions
-                layer_w_virt = rect.width() / scale_x
-                layer_h_virt = rect.height() / scale_y
-                
-                src_l = int(lw * (crop_l / float(layer_w_virt))) if layer_w_virt > 0 else 0
-                src_r = int(lw * (crop_r / float(layer_w_virt))) if layer_w_virt > 0 else 0
-                src_t = int(lh * (crop_t / float(layer_h_virt))) if layer_h_virt > 0 else 0
-                src_b = int(lh * (crop_b / float(layer_h_virt))) if layer_h_virt > 0 else 0
+                src_l = int(lw * frac_l)
+                src_r = int(lw * frac_r)
+                src_t = int(lh * frac_t)
+                src_b = int(lh * frac_b)
                 
                 # Clamp crop to avoid empty source rect
                 src_l = max(0, min(lw - 10, src_l))
@@ -321,10 +338,30 @@ class VideoLayoutPreview(QWidget):
             cfg = self._configs.get(self._selected_index)
             scale_x = vw / 400.0
             scale_y = vh / 225.0
-            rl = int(cfg.crop_l * scale_x)
-            rr = int(cfg.crop_r * scale_x)
-            rt = int(cfg.crop_t * scale_y)
-            rb = int(cfg.crop_b * scale_y)
+
+            layer_w_virt = uncropped_rect.width() / scale_x if scale_x > 0 else 1.0
+            layer_h_virt = uncropped_rect.height() / scale_y if scale_y > 0 else 1.0
+
+            # Calculate fractions of crop relative to the layer's virtual size
+            frac_l = min(1.0, max(0.0, cfg.crop_l / float(layer_w_virt))) if layer_w_virt > 0 else 0.0
+            frac_r = min(1.0, max(0.0, cfg.crop_r / float(layer_w_virt))) if layer_w_virt > 0 else 0.0
+            frac_t = min(1.0, max(0.0, cfg.crop_t / float(layer_h_virt))) if layer_h_virt > 0 else 0.0
+            frac_b = min(1.0, max(0.0, cfg.crop_b / float(layer_h_virt))) if layer_h_virt > 0 else 0.0
+
+            # Clamp sum of opposite crops
+            if frac_l + frac_r > 0.9:
+                total = frac_l + frac_r
+                frac_l = (frac_l / total) * 0.9
+                frac_r = (frac_r / total) * 0.9
+            if frac_t + frac_b > 0.9:
+                total = frac_t + frac_b
+                frac_t = (frac_t / total) * 0.9
+                frac_b = (frac_b / total) * 0.9
+
+            rl = int(uncropped_rect.width() * frac_l)
+            rr = int(uncropped_rect.width() * frac_r)
+            rt = int(uncropped_rect.height() * frac_t)
+            rb = int(uncropped_rect.height() * frac_b)
 
             self._crop_rect = QRect(
                 uncropped_rect.left() + rl,

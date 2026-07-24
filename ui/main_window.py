@@ -2519,7 +2519,7 @@ class MainWindow(QMainWindow):
         self._log("--- Render tiếp tục ---")
 
     def _on_progress(self, pct: float, msg: str):
-        self.progress_bar.setValue(int(pct))
+        self.progress_bar.setValue(round(pct))
         self.lbl_status.setText(msg)
 
     def _on_log(self, line: str):
