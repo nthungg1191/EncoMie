@@ -2104,6 +2104,18 @@ class MainWindow(QMainWindow):
 
     def _save_settings(self):
         settings_dict = self._serialize_workspace_state()
+        # Loại bỏ các thông tin tiến trình dự án trước khi lưu vào settings.json toàn cục
+        project_keys = [
+            "audio_files", "srt_files", "vid_src_files", "vid_bg_files",
+            "unchecked_audio_files", "unchecked_video_files",
+            "bg_folder", "audio_folder", "srt_folder", "output_folder",
+            "vid_src_folder", "vid_bg_folder", "vid_output_folder",
+            "selected_audio_row", "selected_video_row", "bg_files",
+            "logo_path", "logo_files"
+        ]
+        for key in project_keys:
+            settings_dict.pop(key, None)
+            
         cfg.save(settings_dict)
         self._auto_export_json()
 
