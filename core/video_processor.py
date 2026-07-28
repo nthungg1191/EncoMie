@@ -874,9 +874,9 @@ def build_ffmpeg_cmd(
         # Ensure even width for FFmpeg compatibility
         pixel_w = max(4, (pixel_w // 2) * 2)
 
-        # Build filter for scaling, crop, format conversion (Chạy scale trước để giảm độ phân giải xuống, sau đó mới colorkey tách nền xanh trên ảnh nhỏ)
+        # Build filter for scaling, crop, format conversion (Đặt format=rgba trước scale để giữ kênh alpha/độ trong suốt của ảnh, tránh bị nền trắng/đen)
         filter_parts.append(
-            f"[{input_index}:v]{crop_filter}{pts_filter}scale={pixel_w}:-2:flags=bilinear,format=rgba,"
+            f"[{input_index}:v]{crop_filter}{pts_filter}format=rgba,scale={pixel_w}:-2:flags=bilinear,"
             f"{chroma_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
         )
         

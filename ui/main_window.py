@@ -1242,6 +1242,20 @@ class MainWindow(QMainWindow):
             self.preview_widget.set_style(style)
         self._active_preset = None
 
+    def _on_resolution_changed(self):
+        """Sync resolution changes to video_layout_preview and preview_widget."""
+        res_val = self.cmb_resolution.currentText().split(" ")[0]
+        if "x" in res_val:
+            try:
+                w, h = map(int, res_val.split("x"))
+                if hasattr(self, "video_layout_preview"):
+                    self.video_layout_preview.set_target_resolution(w, h)
+                if hasattr(self, "preview_widget"):
+                    if hasattr(self.preview_widget, "set_target_resolution"):
+                        self.preview_widget.set_target_resolution(w, h)
+            except Exception as e:
+                print(f"[DEBUG] Error setting target resolution on previews: {e}")
+
     def _on_logo_changed(self, files):
         self._on_logo_settings_changed()
 
@@ -1469,6 +1483,7 @@ class MainWindow(QMainWindow):
         self.cmb_resolution.addItem("720x1280 (Dọc - TikTok)")
         self.cmb_resolution.addItem("1080x1920 (Dọc FullHD)")
         self.cmb_resolution.setStyleSheet("font-size: 11px;")
+        self.cmb_resolution.currentIndexChanged.connect(self._on_resolution_changed)
         r_lay.addWidget(self.cmb_resolution)
 
         codec_lbl = QLabel("Codec xuất:")
@@ -1933,6 +1948,9 @@ class MainWindow(QMainWindow):
         selected_video_row = s.get("selected_video_row", -1)
         if selected_video_row >= 0 and selected_video_row < self.vid_batch_table.rowCount():
             self.vid_batch_table.selectRow(selected_video_row)
+
+        # Trigger resolution update on preview widgets after settings load
+        self._on_resolution_changed()
 
     def _auto_export_json(self):
         if not self._pairs:

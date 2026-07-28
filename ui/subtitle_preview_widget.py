@@ -870,11 +870,18 @@ class SubtitlePreviewWidget(QWidget):
         self._entries: list[SubtitleEntry] = []
         self._srt_path: str | None = None
         self._eyedropper_active = 0
+        self._ws_w = 1280
+        self._ws_h = 720
         self.setMinimumHeight(180)  # Expand default height for better visibility
         self.setStyleSheet(
             f"background: {C_PREVIEW_BG}; border-radius: 6px; "
             f"border: 1px solid {C_PREVIEW_BORDER};"
         )
+
+    def set_target_resolution(self, w: int, h: int):
+        self._ws_w = w
+        self._ws_h = h
+        self.update()
 
     def set_eyedropper_active(self, layer_num: int):
         self._eyedropper_active = layer_num
@@ -1025,8 +1032,9 @@ class SubtitlePreviewWidget(QWidget):
 
             shadow_col = QColor(style.shadow_color)
             shadow_col.setAlphaF(style.shadow_opacity)
-            p.setPen(shadow_col)
-            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.save()
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(shadow_col)
 
             for i, line in enumerate(lines):
                 line_w = fm.horizontalAdvance(line)
@@ -1038,14 +1046,18 @@ class SubtitlePreviewWidget(QWidget):
                     lx = x + (txt_w - line_w)
 
                 ty = y + i * (line_h + spacing)
-                p.drawText(int(lx + dx), int(ty + dy), line)
+                path = QPainterPath()
+                path.addText(lx + dx, ty + dy, font, line)
+                p.drawPath(path)
+            p.restore()
 
-        # 2. Text Stroke/Outline
+        # 2. Text Stroke/Outline (drawn using QPainterPath to support contour width)
         if style.stroke_enabled and style.stroke_width > 0:
             stroke_col = QColor(style.stroke_color)
             pen_stroke = QPen(stroke_col)
             pen_stroke.setWidthF(style.stroke_width * 2)
             pen_stroke.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            p.save()
             p.setPen(pen_stroke)
             p.setBrush(Qt.BrushStyle.NoBrush)
 
@@ -1059,12 +1071,16 @@ class SubtitlePreviewWidget(QWidget):
                     lx = x + (txt_w - line_w)
 
                 ty = y + i * (line_h + spacing)
-                p.drawText(int(lx), int(ty), line)
+                path = QPainterPath()
+                path.addText(lx, ty, font, line)
+                p.drawPath(path)
+            p.restore()
 
-        # 3. Text Fill
+        # 3. Text Fill (drawn as solid path on top of outline)
         fill_col = QColor(style.font_color)
-        p.setPen(fill_col)
-        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.save()
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(fill_col)
         for i, line in enumerate(lines):
             line_w = fm.horizontalAdvance(line)
             if h_anchor == 0.0:  # Left
@@ -1075,17 +1091,18 @@ class SubtitlePreviewWidget(QWidget):
                 lx = x + (txt_w - line_w)
 
             ty = y + i * (line_h + spacing)
-            p.drawText(int(lx), int(ty), line)
+            path = QPainterPath()
+            path.addText(lx, ty, font, line)
+            p.drawPath(path)
+        p.restore()
 
     # ------------------------------------------------------------------
     # Shared paint pipeline
     # ------------------------------------------------------------------
 
     def _paint_subtitle(self, p: QPainter, cw: int, ch: int, video_w: int = 1280, video_h: int = 720):
-        # Since the output video is scaled to the target render resolution (default 1280x720),
-        # the subtitle canvas in FFmpeg is always 720px tall. Therefore, we scale the preview
-        # coordinates relative to the 720px reference height to ensure a 1:1 match.
-        scale = ch / 720.0
+        # Scale coordinates relative to the reference height to ensure a 1:1 match with target resolution.
+        scale = ch / float(video_h) if video_h > 0 else ch / 720.0
         if scale <= 0:
             scale = 1.0
 
@@ -1851,6 +1868,7 @@ class LiveFramePreview(SubtitlePreviewWidget):
             p.restore()
         p.restore()
 
+
     def paintEvent(self, event):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -1859,67 +1877,59 @@ class LiveFramePreview(SubtitlePreviewWidget):
 
         p.fillRect(0, 0, cw, ch, QColor("#0A0A0A"))
 
-        if self._frame_img and not self._frame_img.isNull():
-            video_w = self._frame_img.width()
-            video_h = self._frame_img.height()
-            
-            scale_factor = min(cw / float(video_w), ch / float(video_h))
-            vw = int(video_w * scale_factor)
-            vh = int(video_h * scale_factor)
-            vx = (cw - vw) // 2
-            vy = (ch - vh) // 2
+        # Base workspace coordinates on the target resolution (self._ws_w and self._ws_h)
+        target_w = self._ws_w
+        target_h = self._ws_h
+        
+        scale_factor = min(cw / float(target_w), ch / float(target_h))
+        vw = int(target_w * scale_factor)
+        vh = int(target_h * scale_factor)
+        vx = (cw - vw) // 2
+        vy = (ch - vh) // 2
 
-            self._ws_w = video_w
-            self._ws_h = video_h
-            self._ws_x = vx
-            self._ws_y = vy
-            self._ws_w_rendered = vw
-            self._ws_h_rendered = vh
+        self._ws_x = vx
+        self._ws_y = vy
+        self._ws_w_rendered = vw
+        self._ws_h_rendered = vh
+
+        # Draw workspace background (simulates output video canvas area)
+        p.fillRect(vx, vy, vw, vh, QColor("#1e293b"))
+
+        # Draw frame image letterboxed/pillarboxed inside the target workspace if available
+        if self._frame_img and not self._frame_img.isNull():
+            img_w = self._frame_img.width()
+            img_h = self._frame_img.height()
+            img_scale = min(vw / float(img_w), vh / float(img_h))
+            draw_w = int(img_w * img_scale)
+            draw_h = int(img_h * img_scale)
+            draw_x = vx + (vw - draw_w) // 2
+            draw_y = vy + (vh - draw_h) // 2
 
             scaled = self._frame_img.scaled(
-                vw, vh,
+                draw_w, draw_h,
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
-            p.drawImage(QPoint(vx, vy), scaled)
+            p.drawImage(QPoint(draw_x, draw_y), scaled)
 
-            vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
-            vignette.setColorAt(0.0, QColor(0, 0, 0, 0))
-            vignette.setColorAt(1.0, QColor(0, 0, 0, 60))
-            
-            p.save()
-            p.setClipRect(vx, vy, vw, vh)
-            p.fillRect(vx, vy, vw, vh, vignette)
-            p.restore()
+        # Vignette overlay (optional, only within workspace)
+        vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
+        vignette.setColorAt(0.0, QColor(0, 0, 0, 0))
+        vignette.setColorAt(1.0, QColor(0, 0, 0, 60))
+        
+        p.save()
+        p.setClipRect(vx, vy, vw, vh)
+        p.fillRect(vx, vy, vw, vh, vignette)
+        p.restore()
 
-            self._draw_logo(p, vx, vy, vw, vh, scale_factor)
+        # Draw logo layers (using the target resolution's coordinates)
+        self._draw_logo(p, vx, vy, vw, vh, scale_factor)
 
-            p.save()
-            p.translate(vx, vy)
-            self._paint_subtitle(p, vw, vh, video_w, video_h)
-            p.restore()
-        else:
-            video_w = 1280
-            video_h = 720
-            scale_factor = min(cw / float(video_w), ch / float(video_h))
-            vw = int(video_w * scale_factor)
-            vh = int(video_h * scale_factor)
-            vx = (cw - vw) // 2
-            vy = (ch - vh) // 2
-
-            self._ws_w = video_w
-            self._ws_h = video_h
-            self._ws_x = vx
-            self._ws_y = vy
-            self._ws_w_rendered = vw
-            self._ws_h_rendered = vh
-            
-            self._draw_logo(p, vx, vy, vw, vh, scale_factor)
-
-            p.save()
-            p.translate(vx, vy)
-            self._paint_subtitle(p, vw, vh, video_w, video_h)
-            p.restore()
+        # Paint subtitles
+        p.save()
+        p.translate(vx, vy)
+        self._paint_subtitle(p, vw, vh, target_w, target_h)
+        p.restore()
 
 
 # ---------------------------------------------------------------------------
@@ -2005,7 +2015,9 @@ class SubtitleStyleEditor(QWidget):
     style_changed = pyqtSignal(object)
 
     FONTS = [
-        "Arial", "Roboto", "Montserrat", "Open Sans",
+        "Arial", "Roboto", "Montserrat", "Open Sans", "Inter",
+        "Be Vietnam Pro", "Noto Sans", "Helvetica", "Calibri",
+        "Impact", "Lexend", "Oswald", "Quicksand", "Segoe UI",
         "Verdana", "Tahoma", "Georgia", "Times New Roman",
     ]
 

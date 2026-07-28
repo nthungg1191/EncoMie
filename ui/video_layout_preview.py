@@ -58,6 +58,12 @@ class VideoLayoutPreview(QWidget):
         self._configs = configs
         self.update()
 
+    def set_target_resolution(self, w: int, h: int):
+        # Update virtual workspace size matching the target aspect ratio
+        self._ws_w = 400
+        self._ws_h = int(400 * (h / float(w))) if w > 0 else 225
+        self.update()
+
     def set_bg_image(self, img: QImage | None):
         self._bg_image = img
         self.update()
