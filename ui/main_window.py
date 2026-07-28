@@ -1848,10 +1848,8 @@ class MainWindow(QMainWindow):
             path_val = s.get(f"logo_path_{layer_num}", "")
             ctrl.edit_path.setText(path_val)
             
-            # Map legacy logo_position (4: Center, 0: BR, 1: BL, 2: TR, 3: TL) to new combo (0: Center, 1: BR, 2: BL, 3: TR, 4: TL)
-            legacy_pos = s.get(f"logo_position_{layer_num}", 4)
-            legacy_to_new_combo = {4: 0, 0: 1, 1: 2, 2: 3, 3: 4}
-            ctrl.cmb_pos.setCurrentIndex(legacy_to_new_combo.get(legacy_pos, 0))
+            # Restore logo_position directly 1:1 from combobox index (0: Center, 1: BR, 2: BL, 3: TR, 4: TL)
+            ctrl.cmb_pos.setCurrentIndex(s.get(f"logo_position_{layer_num}", 0))
             
             ctrl.spn_size.setValue(s.get(f"logo_size_{layer_num}", 100))
             ctrl.spn_opacity.setValue(s.get(f"logo_opacity_{layer_num}", 90))
@@ -1889,7 +1887,7 @@ class MainWindow(QMainWindow):
             path_val = s.get(f"vlayer_path_{layer_num}", "logo.png" if layer_num == 3 else "")
             widget.edit_path.setText(path_val)
             
-            widget.cmb_pos.setCurrentIndex(s.get(f"vlayer_position_{layer_num}", 0 if layer_num in (1, 2) else 1)) # Combo 0 is Center, 1 is BR
+            widget.cmb_pos.setCurrentIndex(s.get(f"vlayer_position_{layer_num}", 0 if layer_num in (1, 2) else 1))
             widget.spn_size.setValue(s.get(f"vlayer_size_{layer_num}", 100 if layer_num == 1 else 40 if layer_num == 2 else 15))
             widget.spn_opacity.setValue(s.get(f"vlayer_opacity_{layer_num}", 90 if layer_num == 1 else 100))
             
