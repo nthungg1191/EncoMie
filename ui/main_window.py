@@ -425,12 +425,24 @@ class PairTable(QTableWidget):
                 item_srt.setForeground(QColor("#007aff"))
                 self.setItem(row, 2, item_srt)
 
-                status_text = "✓ Khớp" if pair.matched else f"✗ {pair.error}"
-                status_item = self._cell(status_text, center=True)
-                if pair.matched:
-                    status_item.setForeground(QColor("#10b981"))
+                if not pair.audio_path:
+                    status_text = "✗ Thiếu file media"
+                    status_color = QColor("#ef4444")
+                elif not pair.srt_path:
+                    status_text = "✗ Thiếu file SRT"
+                    status_color = QColor("#ef4444")
+                elif pair.error == "Lệch file":
+                    status_text = "⚠️ Lệch file"
+                    status_color = QColor("#d97706")
+                elif pair.matched:
+                    status_text = "✓ Khớp"
+                    status_color = QColor("#10b981")
                 else:
-                    status_item.setForeground(QColor("#ef4444"))
+                    status_text = f"✗ {pair.error}"
+                    status_color = QColor("#ef4444")
+
+                status_item = self._cell(status_text, center=True)
+                status_item.setForeground(status_color)
                 self.setItem(row, 3, status_item)
         finally:
             self.blockSignals(False)
@@ -1091,20 +1103,24 @@ class MainWindow(QMainWindow):
         self.pair_table.itemChanged.connect(self._on_table_item_changed)
         sub_lay.addWidget(self.pair_table, 1)
 
+        # Full-width summary label above action buttons
+        self.lbl_pair_summary = QLabel("Chưa quét")
+        self.lbl_pair_summary.setStyleSheet("font-size: 11px; font-weight: 500; color: #475569; padding: 2px 0;")
+        self.lbl_pair_summary.setWordWrap(True)
+        sub_lay.addWidget(self.lbl_pair_summary)
+
         pair_btn_lay = QHBoxLayout()
+        pair_btn_lay.setContentsMargins(0, 0, 0, 0)
+        pair_btn_lay.setSpacing(6)
         self.btn_pair_select_all = QPushButton("Chọn tất cả")
-        self.btn_pair_select_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
+        self.btn_pair_select_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_pair_select_all.clicked.connect(self._pair_select_all)
         self.btn_pair_deselect_all = QPushButton("Bỏ chọn tất cả")
-        self.btn_pair_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
+        self.btn_pair_deselect_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_pair_deselect_all.clicked.connect(self._pair_deselect_all)
         pair_btn_lay.addWidget(self.btn_pair_select_all)
         pair_btn_lay.addWidget(self.btn_pair_deselect_all)
         pair_btn_lay.addStretch(1)
-        
-        self.lbl_pair_summary = QLabel("Chưa quét")
-        self.lbl_pair_summary.setStyleSheet("font-size: 10px; color: #636366;")
-        pair_btn_lay.addWidget(self.lbl_pair_summary)
         sub_lay.addLayout(pair_btn_lay)
 
         lay.addWidget(self.left_sub_container, 1)
@@ -1151,20 +1167,24 @@ class MainWindow(QMainWindow):
         self.vid_batch_table.itemChanged.connect(self._on_table_item_changed)
         vid_lay.addWidget(self.vid_batch_table, 1)
 
+        # Full-width video summary label above action buttons
+        self.lbl_vid_summary = QLabel("Chưa quét")
+        self.lbl_vid_summary.setStyleSheet("font-size: 11px; font-weight: 500; color: #475569; padding: 2px 0;")
+        self.lbl_vid_summary.setWordWrap(True)
+        vid_lay.addWidget(self.lbl_vid_summary)
+
         vid_btn_lay = QHBoxLayout()
+        vid_btn_lay.setContentsMargins(0, 0, 0, 0)
+        vid_btn_lay.setSpacing(6)
         self.btn_vid_select_all = QPushButton("Chọn tất cả")
-        self.btn_vid_select_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
+        self.btn_vid_select_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_vid_select_all.clicked.connect(self._vid_select_all)
         self.btn_vid_deselect_all = QPushButton("Bỏ chọn tất cả")
-        self.btn_vid_deselect_all.setStyleSheet("font-size: 10px; padding: 2px 6px;")
+        self.btn_vid_deselect_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_vid_deselect_all.clicked.connect(self._vid_deselect_all)
         vid_btn_lay.addWidget(self.btn_vid_select_all)
         vid_btn_lay.addWidget(self.btn_vid_deselect_all)
         vid_btn_lay.addStretch(1)
-
-        self.lbl_vid_summary = QLabel("Chưa quét")
-        self.lbl_vid_summary.setStyleSheet("font-size: 10px; color: #636366;")
-        vid_btn_lay.addWidget(self.lbl_vid_summary)
         vid_lay.addLayout(vid_btn_lay)
 
         lay.addWidget(self.left_video_container, 1)
@@ -2292,12 +2312,18 @@ class MainWindow(QMainWindow):
         self._pairs = pairs
         unchecked_audios = getattr(self, "_unchecked_audio_files", set())
         self.pair_table.load_pairs(pairs, unchecked_audios)
-        matched = sum(1 for p in pairs if p.matched)
+        
         total = len(pairs)
-        fuzzy_matched = sum(1 for p in pairs if p.matched and p.error.startswith("Ghép gần đúng"))
-        summary = f"Tìm thấy {total} file  —  {matched} khớp ✓  —  {total - matched} thiếu cặp ✗"
-        if fuzzy_matched:
-            summary += f"  —  {fuzzy_matched} cặp ghép theo tên gần đúng"
+        matched_clean = sum(1 for p in pairs if p.matched and not p.error)
+        mismatched = sum(1 for p in pairs if p.matched and p.error == "Lệch file")
+        missing = sum(1 for p in pairs if not p.matched)
+
+        summary = f"Tìm thấy {total} file  —  {matched_clean} khớp ✓"
+        if mismatched:
+            summary += f"  —  {mismatched} lệch file ⚠️"
+        if missing:
+            summary += f"  —  {missing} thiếu tệp ✗"
+
         self._log_debug(f"Pair summary: {summary}")
         self.lbl_pair_summary.setText(summary)
         self._auto_export_json()

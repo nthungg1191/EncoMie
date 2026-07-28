@@ -245,17 +245,34 @@ def build_pairs(audio_sources: list[str], srt_sources: list[str]) -> list[FilePa
         matched = bool(audio_path and srt_path)
         error = ""
         if not audio_path:
-            error = "Thiếu file audio"
+            error = "Thiếu file media"
+            matched = False
         elif not srt_path:
             error = "Thiếu file SRT"
+            matched = False
+        else:
+            # Check if file names / numbers match
+            audio_stem = Path(audio_path).stem
+            srt_stem = Path(srt_path).stem
+            
+            audio_nums = re.findall(r'\d+', audio_stem)
+            srt_nums = re.findall(r'\d+', srt_stem)
+            
+            if audio_nums and srt_nums:
+                if int(audio_nums[0]) != int(srt_nums[0]):
+                    error = "Lệch file"
+            else:
+                clean_audio = re.sub(r'[^\w]', '', audio_stem).lower()
+                clean_srt = re.sub(r'[^\w]', '', srt_stem).lower()
+                if clean_audio != clean_srt:
+                    error = "Lệch file"
 
-        display_name = Path(audio_path).stem if audio_path else Path(srt_path).stem if srt_path else str(idx + 1)
         pairs.append(FilePair(
             index=str(idx + 1),
             audio_path=audio_path,
             srt_path=srt_path,
             matched=matched,
-            error=error or f"Ghép theo thứ tự thủ công #{idx + 1}",
+            error=error,
         ))
 
     return pairs

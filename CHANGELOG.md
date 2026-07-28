@@ -17,10 +17,11 @@
 
 ### 📊 3. Khôi Phục Bảng Dánh Sách Tệp Tật Trung Mật Độ Cao (High-Density Grid Table)
 - **Hiển thị 23+ dòng cùng lúc**: Khôi phục bảng dữ liệu lưới `PairTable` gọn gàng (`row height: 26px`), cho phép người dùng quan sát số lượng lớn tệp tin trên một màn hình mà không cần cuộn nhiều.
-- **Màu sắc thông tin rõ ràng**:
+- **Màu sắc thông tin rõ ràng & Bổ sung trạng thái `⚠️ Lệch file`**:
   - Cột **AUDIO / MEDIA**: Nhãn file hiển thị màu xanh lam tươi `#007AFF`.
   - Cột **PHỤ ĐỀ (.SRT)**: Nhãn file hiển thị màu xanh lam tươi `#007AFF`.
-  - Cột **TRẠNG THÁI**: `✓ Khớp` màu xanh lá ngọc `#10B981`, thông báo lỗi màu đỏ `#EF4444`.
+  - Cột **TRẠNG THÁI**: `✓ Khớp` (Xanh ngọc `#10B981`), `⚠️ Lệch file` (Màu cam hổ phách `#D97706` khi số hiệu hoặc tên tệp audio và phụ đề không khớp nhau), `✗ Thiếu file` (Màu đỏ `#EF4444`).
+- **Tự động nhận diện lệch số hiệu/tệp**: Hàm `build_pairs()` tự động trích xuất chỉ số (ví dụ: Audio `[226]` vs SRT `228`) để phát hiện và cảnh báo `⚠️ Lệch file` lập tức.
 - **Sửa lỗi định dạng chuỗi chỉ số**: Thêm bộ xử lý `try ... except` ép kiểu an toàn khi format chỉ số `pair.index`, khắc phục triệt để lỗi `Unknown format code 'd' for object of type 'str'` khi quét danh sách lớn.
 
 ### 📐 4. Tối Ưu Bố Cục Khi Phóng To Màn Hình (Fullscreen Layout Stretch Fix)
