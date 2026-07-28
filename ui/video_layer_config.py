@@ -319,6 +319,7 @@ class VideoLayerConfigWidget(QWidget):
         self.chroma_params_frame.setVisible(False)
 
         content_lay.addWidget(self.chroma_grp)
+        content_lay.addStretch(1)
         
         # Set scroll area widget
         scroll.setWidget(content)

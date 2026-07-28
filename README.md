@@ -1,8 +1,9 @@
-# EncoMie - Auto Video Editor (Bộ Biên Tập Video Tự Động)
+# EncoMie - Auto Video Editor (v1.5)
 
-**EncoMie** là một ứng dụng Desktop chuyên nghiệp được phát triển bằng **Python + PyQt6** và bộ công cụ **FFmpeg/FFprobe**, hỗ trợ tối ưu tăng tốc phần cứng GPU (NVIDIA NVENC). 
+**EncoMie v1.5** là ứng dụng Desktop chuyên nghiệp biên tập video tự động được phát triển bằng **Python + PyQt6** và bộ công cụ **FFmpeg/FFprobe**, hỗ trợ tăng tốc phần cứng GPU (NVIDIA NVENC). 
 
-Ứng dụng giúp bạn tự động hóa quy trình sản xuất video bằng cách ghép phụ đề (SRT), chèn logo thương hiệu, chèn nhiều lớp video đè (Video Layers) đè lên một video nền (Background Video) với các công cụ căn chỉnh vị trí trực quan theo thời gian thực.
+* 📌 **Phiên bản hiện tại**: `v1.5` (Modern Light Theme & Reorganized UI)
+* 📜 **Xem chi tiết bản cập nhật**: [CHANGELOG.md](file:///d:/Cursor/Workspace/EncoMie/CHANGELOG.md)
 
 ---
 

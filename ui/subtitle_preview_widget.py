@@ -2157,34 +2157,33 @@ class SubtitleStyleEditor(QWidget):
         self._preset_bar = self._build_preset_bar()
         ctrlLay.addWidget(self._preset_bar)
 
-        # Create a QScrollArea for horizontal scrolling of sections
+        # Create a QScrollArea for VERTICAL scrolling of sections
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setStyleSheet(f"""
             QScrollArea {{
                 border: none;
                 background-color: transparent;
             }}
         """)
-        scroll.setFixedHeight(185)
 
-        # Container widget for sections arranged horizontally
+        # Container widget for sections arranged VERTICALLY
         scroll_widget = QWidget()
-        scroll_widget.setStyleSheet(f"background-color: transparent;")
-        scroll_layout = QHBoxLayout(scroll_widget)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(8)
+        scroll_widget.setStyleSheet("background-color: transparent;")
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(0, 4, 0, 4)
+        scroll_layout.setSpacing(10)
 
-        # Build and add sections horizontally
+        # Build and add sections VERTICALLY
         scroll_layout.addWidget(self._build_text_section())
         scroll_layout.addWidget(self._build_appearance_section())
         scroll_layout.addWidget(self._build_layout_section())
         scroll_layout.addStretch()
 
         scroll.setWidget(scroll_widget)
-        ctrlLay.addWidget(scroll)
+        ctrlLay.addWidget(scroll, 1)
 
         # Right: live preview
         self._preview = LiveFramePreview()

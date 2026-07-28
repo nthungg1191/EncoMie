@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EncoMie - Proposed Light Theme UI Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #f8fafc;
+      --bg-panel: #ffffff;
+      --bg-card: #f1f5f9;
+      --bg-card-hover: #e2e8f0;
+      --border-color: #e2e8f0;
+      --border-accent: #cbd5e1;
+      
+      --accent-primary: #007aff;
+      --accent-gradient: linear-gradient(135deg, #007aff 0%, #4f46e5 100%);
+      --accent-success: #059669;
+      --accent-warning: #d97706;
+      --accent-danger: #dc2626;
+      
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #64748b;
+      
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      
+      --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03);
+      --shadow-glow: 0 0 20px rgba(0, 122, 255, 0.2);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Top Navigation Header */
+    header {
+      height: 56px;
+      background: var(--bg-panel);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      z-index: 10;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 32px;
+      height: 32px;
+      background: var(--accent-gradient);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .brand-title {
+      font-weight: 700;
+      font-size: 16px;
+      color: var(--text-main);
+      letter-spacing: -0.3px;
+    }
+
+    .brand-tag {
+      font-size: 10px;
+      background: rgba(16, 185, 129, 0.12);
+      color: var(--accent-success);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-weight: 600;
+    }
+
+    /* Mode Switcher Tabs */
+    .mode-switcher {
+      display: flex;
+      background: #f1f5f9;
+      padding: 3px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+    }
+
+    .mode-btn {
+      padding: 6px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mode-btn.active {
+      background: #ffffff;
+      color: var(--accent-primary);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .icon-btn {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-card);
+      border-color: var(--border-accent);
+    }
+
+    /* Main Workspace Layout */
+    .workspace {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 340px 1fr 390px;
+      overflow: hidden;
+    }
+
+    /* Left Sidebar: Batch Files & Queues */
+    .sidebar-left {
+      background: var(--bg-panel);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .panel-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 12px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+    }
+
+    .badge-count {
+      background: rgba(0, 122, 255, 0.1);
+      color: var(--accent-primary);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+
+    .folder-pickers {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      border-bottom: 1px solid var(--border-color);
+      background: #f8fafc;
+    }
+
+    .picker-box {
+      background: #ffffff;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      padding: 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .picker-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .picker-input-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .picker-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 11px;
+      outline: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .picker-btn {
+      background: #f1f5f9;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .picker-btn:hover {
+      background: #e2e8f0;
+    }
+
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #ffffff;
+    }
+
+    .file-item {
+      padding: 10px 12px;
+      border-radius: var(--radius-md);
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .file-item:hover {
+      background: #f1f5f9;
+      border-color: var(--border-accent);
+    }
+
+    .file-item.active {
+      background: #eff6ff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 2px 8px rgba(0, 122, 255, 0.08);
+    }
+
+    .file-checkbox {
+      margin-top: 3px;
+      accent-color: var(--accent-primary);
+    }
+
+    .file-info {
+      flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .file-pair-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 2px;
+    }
+
+    .pair-idx {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-primary);
+    }
+
+    .match-badge {
+      font-size: 9px;
+      font-weight: 600;
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--accent-success);
+      padding: 1px 6px;
+      border-radius: 8px;
+    }
+
+    .file-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-main);
+      overflow: hidden;
+    }
+
+    .file-line.sub-line {
+      color: var(--text-muted);
+    }
+
+    .file-icon {
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    .file-name-text {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Center Viewport: Canvas Container (Canvas area stays dark for contrast) */
+    .viewport-center {
+      background: #0f172a;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .viewport-bar {
+      height: 40px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      font-size: 12px;
+      color: #f8fafc;
+    }
+
+    .canvas-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      padding: 20px;
+    }
+
+    /* Simulated Video Frame Box */
+    .video-canvas {
+      width: 640px;
+      height: 360px;
+      background: #000;
+      border-radius: 6px;
+      position: relative;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      overflow: hidden;
+      background-image: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1280&q=80');
+      background-size: cover;
+      background-position: center;
+    }
+
+    /* Subtitle Overlay Box */
+    .subtitle-overlay {
+      position: absolute;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.65);
+      color: #fff;
+      padding: 6px 16px;
+      border-radius: 6px;
+      font-size: 18px;
+      font-weight: 700;
+      border: 2px solid #000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      cursor: move;
+    }
+
+    .layer-overlay {
+      position: absolute;
+      right: 20px;
+      bottom: 20px;
+      width: 140px;
+      height: 200px;
+      border: 2px stroke #007aff;
+      background-image: url('https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=300&q=80');
+      background-size: cover;
+      border-radius: 8px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+    }
+
+    .layer-overlay::after {
+      content: '';
+      position: absolute;
+      inset: -4px;
+      border: 2px dashed var(--accent-primary);
+      border-radius: 10px;
+    }
+
+    /* Right Sidebar: Inspector Tabs */
+    .sidebar-right {
+      background: var(--bg-panel);
+      border-left: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .right-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-color);
+      background: #f8fafc;
+    }
+
+    .right-tab-btn {
+      flex: 1;
+      padding: 12px 0;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+    }
+
+    .right-tab-btn.active {
+      color: var(--accent-primary);
+      border-bottom-color: var(--accent-primary);
+      background: #ffffff;
+    }
+
+    .inspector-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      background: #ffffff;
+    }
+
+    .tab-panel {
+      display: none;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tab-panel.active {
+      display: flex;
+    }
+
+    /* Cards in Light Mode */
+    .section-card {
+      background: #f8fafc;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .layer-selector {
+      display: flex;
+      gap: 4px;
+      background: #e2e8f0;
+      padding: 3px;
+      border-radius: var(--radius-sm);
+    }
+
+    .layer-sub-btn {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 11px;
+      font-weight: 600;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .layer-sub-btn.active {
+      background: #ffffff;
+      color: var(--accent-primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* Grid Form Layout */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .form-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .form-control {
+      background: #ffffff;
+      border: 1px solid var(--border-accent);
+      color: var(--text-main);
+      padding: 8px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .form-control:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.15);
+    }
+
+    /* 3x3 Position Grid Selector */
+    .pos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      width: 120px;
+      margin: 0 auto;
+    }
+
+    .pos-btn {
+      height: 32px;
+      background: #ffffff;
+      border: 1px solid var(--border-accent);
+      border-radius: 4px;
+      color: var(--text-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+
+    .pos-btn:hover {
+      background: #f1f5f9;
+      color: var(--text-main);
+    }
+
+    .pos-btn.active {
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 2px 8px rgba(0,122,255,0.3);
+    }
+
+    /* Action Footer in Export Tab */
+    .action-footer {
+      padding: 14px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-render {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent-gradient);
+      border: none;
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      box-shadow: var(--shadow-glow);
+      transition: transform 0.1s;
+    }
+
+    .btn-render:hover {
+      transform: translateY(-1px);
+    }
+
+    .progress-bar-container {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent-success);
+      transition: width 0.3s ease;
+    }
+
+    /* Custom Switch Toggle */
+    .switch-group {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background-color: #cbd5e1;
+      transition: .2s;
+      border-radius: 20px;
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .2s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent-primary);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header Navigation (Light Theme) -->
+  <header>
+    <div class="brand">
+      <div class="brand-logo">E</div>
+      <div class="brand-title">EncoMie</div>
+      <div class="brand-tag">LIGHT UI 2.5</div>
+    </div>
+
+    <!-- Operating Mode Switcher -->
+    <div class="mode-switcher">
+      <button class="mode-btn active" id="btn-mode-sub">
+        <span>📝</span> Biên tập Phụ đề (Subtitles)
+      </button>
+      <button class="mode-btn" id="btn-mode-video">
+        <span>🎬</span> Biên tập Video (Multi-Layer)
+      </button>
+    </div>
+
+    <!-- Actions -->
+    <div class="header-actions">
+      <button class="icon-btn">📂 Mở dự án</button>
+      <button class="icon-btn">💾 Lưu dự án</button>
+      <button class="icon-btn" style="background: #f1f5f9;">⚙️ Cài đặt</button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <div class="workspace">
+
+    <!-- Left Sidebar: Batch Queue -->
+    <div class="sidebar-left">
+      <div class="panel-header" id="sidebar-header-title">
+        <span>DANH SÁCH HÀNG ĐỜI (BATCH QUEUE)</span>
+        <span class="badge-count" id="badge-queue-count">249 Cặp đã ghép</span>
+      </div>
+
+      <!-- Pickers Container for Subtitle Mode -->
+      <div class="folder-pickers" id="pickers-sub-mode">
+        <div class="picker-box">
+          <div class="picker-label">Thư mục Video/Ảnh nền <span style="color:var(--accent-success)">✔ 6 files</span></div>
+          <div class="picker-input-group">
+            <input type="text" class="picker-input" value="D:/DOI DUOI/Backgrounds" readonly>
+            <button class="picker-btn">Chọn…</button>
+          </div>
+        </div>
+
+        <div class="picker-box">
+          <div class="picker-label">Thư mục Audio Gốc <span style="color:var(--accent-success)">✔ 251 files</span></div>
+          <div class="picker-input-group">
+            <input type="text" class="picker-input" value="D:/Work/TrietLiTBN/Audio" readonly>
+            <button class="picker-btn">Chọn…</button>
+          </div>
+        </div>
+
+        <div class="picker-box">
+          <div class="picker-label">Thư mục Subtitle (.SRT) <span style="color:var(--accent-success)">✔ 249 files</span></div>
+          <div class="picker-input-group">
+            <input type="text" class="picker-input" value="D:/Work/TrietLiTBN/Subtitles" readonly>
+            <button class="picker-btn">Chọn…</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pickers Container for Edit Video Mode (Hidden by default) -->
+      <div class="folder-pickers" id="pickers-video-mode" style="display:none;">
+        <div class="picker-box">
+          <div class="picker-label">Thư mục Video Nguồn <span style="color:var(--accent-success)">✔ 12 videos</span></div>
+          <div class="picker-input-group">
+            <input type="text" class="picker-input" value="D:/Work/Videos/Source" readonly>
+            <button class="picker-btn">Chọn…</button>
+          </div>
+        </div>
+
+        <div class="picker-box">
+          <div class="picker-label">Thư mục Background BG <span style="color:var(--accent-success)">✔ 5 backgrounds</span></div>
+          <div class="picker-input-group">
+            <input type="text" class="picker-input" value="D:/Work/Videos/Backgrounds" readonly>
+            <button class="picker-btn">Chọn…</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Queue List (Subtitle Mode Queue) -->
+      <div class="file-list" id="queue-sub-mode">
+        <div class="file-item active">
+          <input type="checkbox" class="file-checkbox" checked>
+          <div class="file-info">
+            <div class="file-pair-header">
+              <span class="pair-idx">Cặp #001</span>
+              <span class="match-badge">✔ Khớp 100%</span>
+            </div>
+            <div class="file-line audio-line">
+              <span class="file-icon">🎵</span>
+              <span class="file-name-text" title="001 - Nunca Hagas Estas 5 Cosas.mp3">001 - Nunca Hagas Estas 5 Cosas.mp3</span>
+            </div>
+            <div class="file-line sub-line">
+              <span class="file-icon">📝</span>
+              <span class="file-name-text" title="001 - Nunca Hagas Estas 5 Cosas.es.srt">001 - Nunca Hagas Estas 5 Cosas.es.srt</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="file-item">
+          <input type="checkbox" class="file-checkbox" checked>
+          <div class="file-info">
+            <div class="file-pair-header">
+              <span class="pair-idx">Cặp #002</span>
+              <span class="match-badge">✔ Khớp 100%</span>
+            </div>
+            <div class="file-line audio-line">
+              <span class="file-icon">🎵</span>
+              <span class="file-name-text" title="002 - El Poder del Estoicismo Hoy.mp3">002 - El Poder del Estoicismo Hoy.mp3</span>
+            </div>
+            <div class="file-line sub-line">
+              <span class="file-icon">📝</span>
+              <span class="file-name-text" title="002 - El Poder del Estoicismo Hoy.es.srt">002 - El Poder del Estoicismo Hoy.es.srt</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="file-item">
+          <input type="checkbox" class="file-checkbox" checked>
+          <div class="file-info">
+            <div class="file-pair-header">
+              <span class="pair-idx">Cặp #003</span>
+              <span class="match-badge">✔ Khớp 100%</span>
+            </div>
+            <div class="file-line audio-line">
+              <span class="file-icon">🎵</span>
+              <span class="file-name-text" title="003 - Como Controlar Tus Emociones.mp3">003 - Como Controlar Tus Emociones.mp3</span>
+            </div>
+            <div class="file-line sub-line">
+              <span class="file-icon">📝</span>
+              <span class="file-name-text" title="003 - Como Controlar Tus Emociones.es.srt">003 - Como Controlar Tus Emociones.es.srt</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File Queue List (Video Mode Queue - Hidden by default) -->
+      <div class="file-list" id="queue-video-mode" style="display:none;">
+        <div class="file-item active">
+          <input type="checkbox" class="file-checkbox" checked>
+          <div class="file-info">
+            <div class="file-pair-header">
+              <span class="pair-idx">Video #001</span>
+              <span class="match-badge">✔ Sẵn sàng</span>
+            </div>
+            <div class="file-line audio-line">
+              <span class="file-icon">🎬</span>
+              <span class="file-name-text" title="Scene_Intro_1080p.mp4">Scene_Intro_1080p.mp4</span>
+            </div>
+            <div class="file-line sub-line">
+              <span class="file-icon">🖼️</span>
+              <span class="file-name-text" title="Dynamic_Nature_4K.mp4">BG: Dynamic_Nature_4K.mp4</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Center Viewport: Live Canvas (Dark Monitor Viewport) -->
+    <div class="viewport-center">
+      <div class="viewport-bar">
+        <span>XEM TRƯỚC (LIVE PREVIEW)</span>
+        <div style="display:flex; gap:12px; align-items:center;">
+          <span style="color:#94a3b8">Khung hình xuất: <strong style="color:#fff">1280x720 (16:9 HD)</strong></span>
+          <span style="color:var(--accent-success)">● Live Sync 1:1</span>
+        </div>
+      </div>
+
+      <div class="canvas-container">
+        <!-- Canvas Mockup -->
+        <div class="video-canvas" id="canvas-frame">
+          <!-- Subtitle Overlay Box -->
+          <div class="subtitle-overlay" id="sub-box">
+            Existen cinco cosas que están robándote
+          </div>
+
+          <!-- Layer Overlay (Statue Image) -->
+          <div class="layer-overlay" id="layer-box"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Sidebar: Inspector Tabs (Phụ đề, Layer, Xuất Video) -->
+    <div class="sidebar-right">
+      <div class="right-tabs">
+        <button class="right-tab-btn active" data-tab="tab-sub">Phụ đề (Subtitles)</button>
+        <button class="right-tab-btn" data-tab="tab-layers">Layers (5 Lớp)</button>
+        <button class="right-tab-btn" data-tab="tab-export">Xuất Video</button>
+      </div>
+
+      <div class="inspector-content">
+
+        <!-- TAB 1: PHỤ ĐỀ (SUBTITLES) -->
+        <div class="tab-panel active" id="tab-sub">
+          <div class="section-card">
+            <div class="section-title">
+              <span>PRESETS PHỤ ĐỀ MẪU</span>
+              <span style="cursor:pointer; color:var(--accent-primary);">+ Lưu Preset</span>
+            </div>
+            <select class="form-control">
+              <option>Mặc định — Box đen mờ (Default)</option>
+              <option>Mẫu 1 — Chữ Vàng Viền Đen (TikTok Style)</option>
+              <option>Mẫu 2 — Neon Glow Modern</option>
+            </select>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">KIỂU CHỮ & KÍCH THƯỚC (TYPOGRAPHY)</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Font chữ</label>
+                <select class="form-control">
+                  <option selected>Be Vietnam Pro</option>
+                  <option>Inter</option>
+                  <option>Roboto</option>
+                  <option>Arial</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cỡ chữ (px)</label>
+                <input type="number" class="form-control" value="35">
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Màu chữ gốc</label>
+                <input type="color" class="form-control" value="#FFFFFF" style="height:36px; padding:2px;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Căn chữ trong dòng</label>
+                <select class="form-control">
+                  <option>Căn giữa (Center)</option>
+                  <option>Căn trái (Left)</option>
+                  <option>Căn phải (Right)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="switch-group">
+              <span class="section-title" style="margin:0;">NÉT VIỀN CHỮ (STROKE)</span>
+              <label class="switch">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div class="form-grid" style="margin-top:8px;">
+              <div class="form-group">
+                <label class="form-label">Màu viền</label>
+                <input type="color" class="form-control" value="#000000" style="height:36px; padding:2px;">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Độ rộng viền (px)</label>
+                <input type="number" class="form-control" value="3">
+              </div>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">VỊ TRÍ PHỤ ĐỀ TRÊN MÀN HÌNH</div>
+            <div class="pos-grid">
+              <button class="pos-btn">↖</button>
+              <button class="pos-btn">↑</button>
+              <button class="pos-btn">↗</button>
+              <button class="pos-btn">←</button>
+              <button class="pos-btn active">●</button>
+              <button class="pos-btn">→</button>
+              <button class="pos-btn">↙</button>
+              <button class="pos-btn">↓</button>
+              <button class="pos-btn">↘</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: LAYERS (5 LỚP) -->
+        <div class="tab-panel" id="tab-layers">
+          <div class="section-card">
+            <div class="section-title">CHỌN LỚP LAYER ĐỂ CẤU HÌNH</div>
+            <div class="layer-selector">
+              <button class="layer-sub-btn active">Lớp 1 (*)</button>
+              <button class="layer-sub-btn">Lớp 2 (*)</button>
+              <button class="layer-sub-btn">Lớp 3</button>
+              <button class="layer-sub-btn">Lớp 4</button>
+              <button class="layer-sub-btn">Lớp 5</button>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="switch-group">
+              <span class="section-title" style="margin:0;">KÍCH HOẠT LỚP LAYER 1</span>
+              <label class="switch">
+                <input type="checkbox" checked>
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div class="form-group" style="margin-top:8px;">
+              <label class="form-label">Nguồn file Layer</label>
+              <select class="form-control">
+                <option>File cố định (Static File...)</option>
+                <option>Video nền (Background)</option>
+                <option>Theo danh sách chạy (Folder Match)</option>
+              </select>
+            </div>
+
+            <div class="picker-input-group" style="margin-top:4px;">
+              <input type="text" class="form-control" value="C:/Users/Admin/Effect/audio_wave.mp4" readonly>
+              <button class="picker-btn">Chọn…</button>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">VỊ TRÍ & KÍCH THƯỚC LAYER</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Vị trí đè</label>
+                <select class="form-control">
+                  <option>Ở giữa (Center)</option>
+                  <option>Góc dưới - Phải (BR)</option>
+                  <option>Góc dưới - Trái (BL)</option>
+                  <option>Góc trên - Phải (TR)</option>
+                  <option>Góc trên - Trái (TL)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cỡ (%)</label>
+                <input type="number" class="form-control" value="50">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 3: XUẤT VIDEO (EXPORT CONFIG & RENDER PROGRESS) -->
+        <div class="tab-panel" id="tab-export">
+          <!-- Output Folder Picker -->
+          <div class="section-card">
+            <div class="section-title">
+              <span>THƯ MỤC LƯU VIDEO XUẤT (OUTPUT DIRECTORY)</span>
+              <span style="color:var(--accent-success); text-transform:none;">✔ Thư mục hợp lệ</span>
+            </div>
+            <div class="picker-input-group" style="margin-top:2px;">
+              <input type="text" class="form-control" value="D:/Work/TrietLiTBN/Export" readonly style="flex:1;">
+              <button class="picker-btn" style="padding:8px 12px; font-weight:600;">Chọn thư mục…</button>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">ĐỘ PHÂN GIẢI XUẤT (RESOLUTION)</div>
+            <div class="form-group">
+              <label class="form-label">Tỷ lệ & Kích thước khung hình</label>
+              <select class="form-control">
+                <option selected>1280x720 (HD - 16:9 ngang)</option>
+                <option>1920x1080 (FullHD - 16:9 ngang)</option>
+                <option>720x1280 (Dọc - TikTok 9:16)</option>
+                <option>1080x1920 (Dọc FullHD 9:16)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="section-card">
+            <div class="section-title">CARD ĐỒ HỌA & PHẦN CỨNG (GPU ENCODER)</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Codec xuất</label>
+                <select class="form-control">
+                  <option selected>h264_nvenc (NVIDIA GPU)</option>
+                  <option>hevc_nvenc (H.265 GPU)</option>
+                  <option>libx264 (CPU Standard)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Số luồng song song</label>
+                <input type="number" class="form-control" value="2" min="1" max="4">
+              </div>
+            </div>
+          </div>
+
+          <!-- Bảng Điều khiển Tiến trình Render (Start, Pause, Stop) -->
+          <div class="action-footer" style="margin-top:auto; border-radius:var(--radius-md); border:1px solid var(--border-color);">
+            <div class="section-title">
+              <span>TIẾN TRÌNH & ĐIỀU KHIỂN RENDER</span>
+              <span style="color:var(--accent-warning); text-transform:none;" id="render-status-badge">Sẵn sàng (0%)</span>
+            </div>
+
+            <div class="progress-bar-container" style="margin:4px 0;">
+              <div class="progress-fill" id="progress-bar"></div>
+            </div>
+
+            <!-- Group 3 nút: Bắt đầu, Tạm dừng, Dừng -->
+            <div style="display:grid; grid-template-columns: 2fr 1fr 1fr; gap:6px;">
+              <button class="btn-render" id="btn-start-render" style="padding:10px; font-size:12px;">🚀 BẮT ĐẦU</button>
+              <button class="icon-btn" id="btn-pause-render" style="justify-content:center; background:rgba(217,119,6,0.12); color:var(--accent-warning); border-color:rgba(217,119,6,0.3);">⏸ TẠM DỪNG</button>
+              <button class="icon-btn" id="btn-stop-render" style="justify-content:center; background:rgba(220,38,38,0.12); color:var(--accent-danger); border-color:rgba(220,38,38,0.3);">⏹ DỪNG HẲN</button>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-dim); margin-top:2px;">
+              <span>GPU: NVENC H.264</span>
+              <span>Tốc độ dự kiến: ~15s / video</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // Header Mode Switcher Toggle (Phụ đề vs Video Multi-Layer)
+    const btnSub = document.getElementById('btn-mode-sub');
+    const btnVideo = document.getElementById('btn-mode-video');
+    const pickersSub = document.getElementById('pickers-sub-mode');
+    const pickersVideo = document.getElementById('pickers-video-mode');
+    const queueSub = document.getElementById('queue-sub-mode');
+    const queueVideo = document.getElementById('queue-video-mode');
+    const sidebarTitle = document.getElementById('sidebar-header-title');
+    const badgeQueue = document.getElementById('badge-queue-count');
+
+    btnSub.addEventListener('click', () => {
+      btnSub.classList.add('active');
+      btnVideo.classList.remove('active');
+      pickersSub.style.display = 'flex';
+      pickersVideo.style.display = 'none';
+      queueSub.style.display = 'flex';
+      queueVideo.style.display = 'none';
+      sidebarTitle.innerHTML = '<span>DANH SÁCH HÀNG ĐỜI (BATCH QUEUE)</span>';
+      badgeQueue.innerText = '249 Cặp đã ghép';
+    });
+
+    btnVideo.addEventListener('click', () => {
+      btnVideo.classList.add('active');
+      btnSub.classList.remove('active');
+      pickersSub.style.display = 'none';
+      pickersVideo.style.display = 'flex';
+      queueSub.style.display = 'none';
+      queueVideo.style.display = 'flex';
+      sidebarTitle.innerHTML = '<span>HÀNG ĐỜI BIÊN TẬP VIDEO (VIDEO QUEUE)</span>';
+      badgeQueue.innerText = '12 Video nguồn';
+    });
+
+    // Right Sidebar Tab Switcher (Phụ đề, Layers, Xuất Video)
+    const rightTabBtns = document.querySelectorAll('.right-tab-btn');
+    const tabPanels = document.querySelectorAll('.tab-panel');
+
+    rightTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        rightTabBtns.forEach(b => b.classList.remove('active'));
+        tabPanels.forEach(p => p.classList.remove('active'));
+
+        btn.classList.add('active');
+        const targetId = btn.getAttribute('data-tab');
+        document.getElementById(targetId).classList.add('active');
+      });
+    });
+
+    // Layer Sub Selector Buttons (Lớp 1 .. Lớp 5)
+    const layerSubBtns = document.querySelectorAll('.layer-sub-btn');
+    layerSubBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        layerSubBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Render Progress Simulation
+    const btnRender = document.getElementById('btn-start-render');
+    const progressBar = document.getElementById('progress-bar');
+    const statusBadge = document.getElementById('render-status-badge');
+    let rendering = false;
+    let timer = null;
+
+    btnRender.addEventListener('click', () => {
+      if (!rendering) {
+        rendering = true;
+        btnRender.innerText = '⏸ ĐANG RENDER...';
+        statusBadge.innerText = 'Đang Render (45%)';
+        let progress = 0;
+        timer = setInterval(() => {
+          progress += 5;
+          progressBar.style.width = progress + '%';
+          statusBadge.innerText = `Đang Render (${progress}%)`;
+          if (progress >= 100) {
+            clearInterval(timer);
+            rendering = false;
+            btnRender.innerText = '✔ RENDER HOÀN TẤT';
+            statusBadge.innerText = 'Hoàn tất (100%)';
+            statusBadge.style.color = 'var(--accent-success)';
+          }
+        }, 250);
+      } else {
+        clearInterval(timer);
+        rendering = false;
+        btnRender.innerText = '🚀 BẮT ĐẦU';
+        statusBadge.innerText = 'Sẵn sàng (0%)';
+        progressBar.style.width = '0%';
+      }
+    });
+  </script>
+</body>
+</html>
