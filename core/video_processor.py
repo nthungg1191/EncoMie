@@ -624,6 +624,14 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1
     margin_r = style.margin_r + style.bg_padding_x
     margin_v = style.margin_v + style.bg_padding_y
 
+    # Map keypad alignment (1-9) to ASS/SSA legacy style alignment codes (1-3 bottom, 5-7 top, 9-11 middle)
+    keypad_to_legacy = {
+        1: 1, 2: 2, 3: 3,   # Bottom
+        4: 9, 5: 10, 6: 11, # Middle
+        7: 5, 8: 6, 9: 7    # Top
+    }
+    ass_alignment = keypad_to_legacy.get(style.alignment, style.alignment)
+
     force_style = (
         f"FontName={style.font_name},"
         f"FontSize={style.font_size},"
@@ -632,7 +640,7 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1
         f"OutlineColour={stroke_color_ass},"
         f"Outline={outline_val},"
         f"Shadow={shadow_val},"
-        f"Alignment={style.alignment},"
+        f"Alignment={ass_alignment},"
         f"BorderStyle={border_style},"
         f"MarginV={margin_v},"
         f"MarginL={margin_l},"

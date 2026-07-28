@@ -1018,7 +1018,8 @@ class SubtitlePreviewWidget(QWidget):
                                style: SubtitleStylePreset,
                                fm):
         """Draw text lines with stroke (outline) then fill, supporting alignment & shadows."""
-        font = QFont(style.font_name, style.font_size)
+        font = QFont(style.font_name)
+        font.setPixelSize(style.font_size)
         p.setFont(font)
 
         line_h = fm.height()
@@ -1137,7 +1138,8 @@ class SubtitlePreviewWidget(QWidget):
         margin_r = style.margin_r
         margin_v = style.margin_v
 
-        font = QFont(style.font_name, style.font_size)
+        font = QFont(style.font_name)
+        font.setPixelSize(style.font_size)
         p.setFont(font)
         fm = p.fontMetrics()
 
@@ -2255,7 +2257,15 @@ class SubtitleStyleEditor(QWidget):
         # Row 0: Font | Size
         lay.addWidget(QLabel("Font"), 0, 0)
         self._cmb_font = QComboBox()
-        self._cmb_font.addItems(self.FONTS)
+        
+        # Lọc danh sách FONTS để chỉ hiển thị những font chữ thực sự đã cài trên hệ thống
+        from PyQt6.QtGui import QFontDatabase
+        system_fonts = QFontDatabase.families()
+        available_fonts = [f for f in self.FONTS if f in system_fonts]
+        if not available_fonts:
+            available_fonts = ["Arial"]
+            
+        self._cmb_font.addItems(available_fonts)
         self._cmb_font.setStyleSheet(self._cmb_style(26))
         self._cmb_font.currentIndexChanged.connect(self._on_changed)
         lay.addWidget(self._cmb_font, 0, 1)
