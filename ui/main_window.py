@@ -18,7 +18,7 @@ if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+    QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView,
     QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox,
@@ -41,6 +41,9 @@ from ui.video_layer_config import VideoLayerConfigWidget
 from ui.video_layout_preview import VideoLayoutPreview
 from utils import settings as cfg
 from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
+from core.license_manager import LicenseManager, LicenseStatus
+from license.license_window import LicenseWindow, LicenseInfoDialog
+from core.security import is_debugger_present, scan_suspicious_processes
 
 if getattr(sys, 'frozen', False):
     EXPORT_PATH = Path(sys.executable).parent / "selections.json"
@@ -558,10 +561,122 @@ class MainWindow(QMainWindow):
         self._save_timer.setSingleShot(True)
         self._save_timer.timeout.connect(self._save_settings)
 
+        self.license_manager = LicenseManager()
+
+        # Real-time Security Watchdog (Scans for debuggers and cracking tools every 3 seconds)
+        self._security_watchdog_timer = QTimer(self)
+        self._security_watchdog_timer.setInterval(3000)
+        self._security_watchdog_timer.timeout.connect(self._run_realtime_security_watchdog)
+        self._security_watchdog_timer.start()
+
+        # Background Periodic License Heartbeat (Verifies with Cloudflare Server every 2 minutes)
+        self._license_timer = QTimer(self)
+        self._license_timer.setInterval(2 * 60 * 1000)
+        self._license_timer.timeout.connect(self._periodic_license_check)
+        self._license_timer.start()
+
         self._build_ui()
+        self._create_menu_bar()
         self._apply_saved_settings()
         self._check_deps()
         self._log_debug("MainWindow initialized")
+        QTimer.singleShot(500, self._check_license_on_startup)
+
+    def _run_realtime_security_watchdog(self):
+        """Active real-time security watchdog running every 3 seconds."""
+        if is_debugger_present():
+            print("[Security Watchdog] Active debugger detected! Terminating app.")
+            self._security_watchdog_timer.stop()
+            QMessageBox.critical(
+                self,
+                "Cảnh Báo Bảo Mật",
+                "Phát hiện công cụ Debugger đính kèm vào tiến trình ứng dụng.\nỨng dụng sẽ ngắt ngay lập tức!"
+            )
+            sys.exit(0)
+
+        suspicious_proc = scan_suspicious_processes()
+        if suspicious_proc:
+            print(f"[Security Watchdog] Suspicious process detected: {suspicious_proc}")
+            self._security_watchdog_timer.stop()
+            QMessageBox.critical(
+                self,
+                "Cảnh Báo Bảo Mật",
+                f"Phát hiện công cụ can thiệp '{suspicious_proc}' đang hoạt động trên hệ thống.\nỨng dụng sẽ ngắt ngay lập tức!"
+            )
+            sys.exit(0)
+
+    def _periodic_license_check(self):
+        """Periodic background check to detect license expiration while app is left open."""
+        info = self.license_manager.check_license()
+        if not info.is_valid:
+            print("[Security] Heartbeat: License is no longer valid or has expired.")
+            QMessageBox.warning(
+                self,
+                "Bản Quyền Hết Hạn",
+                "Thời hạn bản quyền ứng dụng EncoMie của bạn đã kết thúc.\nVui lòng kích hoạt key mới để tiếp tục sử dụng."
+            )
+            self._show_license_window(mandatory=True)
+
+    def _guard_license_active(self) -> bool:
+        """Pre-action security guard before running batch render or core tasks."""
+        info = self.license_manager.check_license(force_refresh=True)
+        if not info.is_valid:
+            QMessageBox.warning(
+                self,
+                "Bản Quyền Hết Hạn / Không Hợp Lệ",
+                "Không thể thực hiện tác vụ: Bản quyền ứng dụng đã hết hạn hoặc bị thu hồi.\nVui lòng gia hạn key mới."
+            )
+            self._show_license_window(mandatory=True)
+            return False
+        return True
+
+    def _check_license_on_startup(self):
+        info = self.license_manager.check_license()
+        if info.status == LicenseStatus.SECURITY_VIOLATION:
+            err_msg = info.raw_data.get("error", {}).get("message", "Cảnh báo bảo mật: Phát hiện công cụ can thiệp hoặc gian lận hệ thống.")
+            QMessageBox.critical(
+                self,
+                "Cảnh Báo Bảo Mật (Security Alert)",
+                f"Ứng dụng từ chối hoạt động:\n{err_msg}"
+            )
+            sys.exit(0)
+        elif info.status == LicenseStatus.NOT_FOUND:
+            self._show_license_window(mandatory=True)
+        elif info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.INVALID]:
+            QMessageBox.warning(
+                self,
+                "Bản Quyền Hết Hạn / Không Hợp Lệ",
+                "Bản quyền ứng dụng EncoMie của bạn đã hết hạn hoặc không hợp lệ.\nVui lòng kích hoạt key mới."
+            )
+            self._show_license_window(mandatory=True)
+
+    def _create_menu_bar(self):
+        menubar = self.menuBar()
+        help_menu = menubar.addMenu("Trợ Giúp")
+        
+        info_act = help_menu.addAction("Thông Tin License")
+        info_act.triggered.connect(self._show_license_info)
+        
+        act_act = help_menu.addAction("Kích Hoạt License")
+        act_act.triggered.connect(lambda: self._show_license_window(mandatory=False))
+
+    def _show_license_window(self, mandatory=False):
+        dlg = LicenseWindow(self.license_manager, self)
+        res = dlg.exec()
+        if mandatory and res != QDialog.DialogCode.Accepted:
+            info = self.license_manager.check_license()
+            if not info.is_valid:
+                QMessageBox.information(
+                    self,
+                    "Thông Báo",
+                    "Bạn chưa kích hoạt bản quyền hợp lệ. Ứng dụng sẽ thoát."
+                )
+                sys.exit(0)
+
+    def _show_license_info(self):
+        info = self.license_manager.check_license()
+        dlg = LicenseInfoDialog(self.license_manager, info, self)
+        dlg.exec()
 
     def _log_debug(self, message: str):
         line = f"[DEBUG] {message}"
@@ -2531,6 +2646,8 @@ class MainWindow(QMainWindow):
         return True
 
     def _start_render(self):
+        if not self._guard_license_active():
+            return
         if not self._validate():
             return
 
@@ -2560,6 +2677,7 @@ class MainWindow(QMainWindow):
         self._worker.pair_done.connect(self._on_pair_done)
         self._worker.pair_error.connect(self._on_pair_error)
         self._worker.all_done.connect(self._on_all_done)
+        self._worker.license_expired.connect(self._on_render_license_expired)
         self._worker.stopped.connect(self._on_stopped)
         self._worker.paused.connect(self._on_paused)
         self._worker.resumed.connect(self._on_resumed)
@@ -2643,6 +2761,21 @@ class MainWindow(QMainWindow):
         self.btn_stop.setEnabled(False)
         self.lbl_status.setText("Đã dừng")
         self._log("--- Render bị dừng bởi người dùng ---")
+
+    def _on_render_license_expired(self, msg: str):
+        self.btn_render.setEnabled(True)
+        self.btn_pause.setEnabled(False)
+        self.btn_pause.setText("⏸  Tạm dừng")
+        self.btn_stop.setEnabled(False)
+        self.lbl_status.setText("Tạm dừng render do hết hạn bản quyền")
+        self._log("=" * 60)
+        self._log(f"⚠️ {msg}")
+        QMessageBox.warning(
+            self,
+            "Bản Quyền Hết Hạn",
+            f"{msg}\nVui lòng kích hoạt key mới để tiếp tục render các video còn lại."
+        )
+        self._show_license_window(mandatory=True)
 
     def _on_refresh_preview_frame(self):
         """Extract a frame from the first selected video and set it as preview background."""

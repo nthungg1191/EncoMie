@@ -55,6 +55,7 @@ class RenderWorker(QThread):
     pair_done = pyqtSignal(str, str)        # index, output_path
     pair_error = pyqtSignal(str, str)       # index, error_message
     all_done = pyqtSignal(int, int)         # success_count, error_count
+    license_expired = pyqtSignal(str)       # license expired during batch queue
     stopped = pyqtSignal()
     paused = pyqtSignal()
     resumed = pyqtSignal()
@@ -137,6 +138,18 @@ class RenderWorker(QThread):
 
         max_concurrent = getattr(self.config, "max_concurrent_renders", 2)
         while len(self._active_jobs) < max_concurrent and self._pending_pairs:
+            # Check license validity before starting next queued video item
+            try:
+                from core.license_manager import LicenseManager
+                info = LicenseManager().check_license()
+                if not info.is_valid:
+                    self._abort = True
+                    self.license_expired.emit("Thời hạn bản quyền đã kết thúc. Video đang chạy dở sẽ hoàn tất, nhưng các video còn lại trong hàng chờ đã bị ngắt.")
+                    self.quit()
+                    return
+            except Exception:
+                pass
+
             pair = self._pending_pairs.pop(0)
             
             # Batch index is sequence number starting from 1
