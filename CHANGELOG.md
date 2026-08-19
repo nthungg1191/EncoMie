@@ -9,8 +9,9 @@
 - **Hệ thống màu sắc mới**: Chuyển sang tone màu sáng hiện đại chuẩn macOS/iOS với màu nền chính `#F8FAFC`, đường viền mịn `#E2E8F0`, màu tương tác xanh iOS `#007AFF` và chữ sắc nét `#0F172A`.
 - **Tối ưu hóa mã nguồn QSS**: Gom và nhúng trực tiếp toàn bộ chuỗi định dạng StyleSheet vào hàm `MainWindow._apply_theme()`, loại bỏ file phụ giúp dự án gọn gàng, khởi chạy nhanh nhẹn.
 
-### 🧭 2. Tái Cấu Trúc Thanh Navigation (Header Bar Rearrangement)
+### 🧭 2. Tái Cấu Trúc Thanh Navigation & Panel Trái
 - **Căn lề góc trái**: Đưa 2 nút quản lý tiến trình **📂 Mở dự án** và **💾 Lưu dự án** về sát góc trái ngoài cùng.
+- **Thống nhất ô chọn thư mục Xuất (Output Folder)**: Loại bỏ ô chọn "Xuất:" dư thừa ở cột trái của chế độ `🎬 Edit Video Scale`. Cả 2 chế độ (Biên tập Phụ đề & Biên tập Video) giờ đây dùng chung 1 thư mục xuất duy nhất trong tab **Cài đặt xuất** (`self.pick_output`), giúp giao diện cực kỳ tối giản.
 - **Căn CHÍNH GIỮA cụm chuyển chế độ (Mode Switcher)**:
   - Đưa cụm nút chuyển mode **`📝  Biên tập Phụ đề`** và **`🎬  Edit Video Scale`** vào **chính giữa trung tâm** thanh Header với khoảng giãn cách cân đối 2 bên.
   - Tối ưu nhãn nút bấm và khoảng lề padding (`white-space: nowrap`), loại bỏ 100% tình trạng che khuất hoặc mất chữ.

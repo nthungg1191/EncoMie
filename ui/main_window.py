@@ -1133,7 +1133,6 @@ class MainWindow(QMainWindow):
 
         self.pick_vid_src = FolderPicker("🎥 Nguồn:", "Chọn thư mục video nguồn")
         self.pick_vid_bg = FolderPicker("📁 Nền:", "Chọn file video nền (tùy chọn)")
-        self.pick_vid_output = FolderPicker("📤 Xuất:", "Chọn thư mục xuất video")
 
         self.pick_vid_bg.set_mode("files")
         self.pick_vid_bg.set_file_dialog(
@@ -1145,7 +1144,7 @@ class MainWindow(QMainWindow):
         self.pick_vid_src.set_callback(self._on_video_selection_change)
         self.pick_vid_bg.set_callback(self._on_video_selection_change)
 
-        for w in [self.pick_vid_src, self.pick_vid_bg, self.pick_vid_output]:
+        for w in [self.pick_vid_src, self.pick_vid_bg]:
             vid_lay.addWidget(w)
 
         self.vid_batch_table = QTableWidget(0, 4)
@@ -1824,8 +1823,6 @@ class MainWindow(QMainWindow):
         if isinstance(vid_bg_files, list) and vid_bg_files:
             self.pick_vid_bg.set_selected_files(vid_bg_files)
             self._log_debug(f"Restored {len(vid_bg_files)} video background files")
-        
-        self.pick_vid_output.set_value(s.get("vid_output_folder", ""))
 
         hardcoded_media_files = self._resolve_hardcoded_media_files()
         if hardcoded_media_files:
@@ -2050,7 +2047,6 @@ class MainWindow(QMainWindow):
             "vid_src_files": self.pick_vid_src.selected_files(),
             "vid_bg_folder": self.pick_vid_bg.value(),
             "vid_bg_files": self.pick_vid_bg.selected_files(),
-            "vid_output_folder": self.pick_vid_output.value(),
             "font_name": style.font_name,
             "font_size": style.font_size,
             "font_color": style.font_color,
@@ -2461,7 +2457,7 @@ class MainWindow(QMainWindow):
                 bg_videos=self.pick_vid_bg.selected_files(),
                 audio_folder="",
                 srt_folder="",
-                output_folder=self.pick_vid_output.value(),
+                output_folder=self.pick_output.value(),
                 subtitle_style=SubtitleStyle(font_size=0, stroke_enabled=False, bg_enabled=False),
                 slow_min=self.spn_slow_min.value(),
                 slow_max=self.spn_slow_max.value(),
@@ -2506,12 +2502,13 @@ class MainWindow(QMainWindow):
 
     def _validate(self) -> bool:
         errs = []
+        if not self.pick_output.value():
+            errs.append("• Chưa chọn thư mục Output (ở tab Cài đặt xuất)")
+
         if self.btn_tab_video.isChecked():
             # Validate Edit Video mode
             if not self.pick_vid_src.value():
                 errs.append("• Chưa chọn thư mục video nguồn để scale")
-            if not self.pick_vid_output.value():
-                errs.append("• Chưa chọn thư mục Output")
             if not self._pairs:
                 errs.append("• Chưa có video nào trong danh sách (hãy quét lại)")
         else:
@@ -2522,8 +2519,6 @@ class MainWindow(QMainWindow):
                 errs.append("• Chưa chọn file media nguồn")
             if not self.pick_srt.selected_files():
                 errs.append("• Chưa chọn file Subtitle SRT")
-            if not self.pick_output.value():
-                errs.append("• Chưa chọn thư mục Output")
             if not self._pairs:
                 errs.append("• Chưa có file nào được ghép (hãy quét lại)")
             matched = [p for p in self._pairs if p.matched]
