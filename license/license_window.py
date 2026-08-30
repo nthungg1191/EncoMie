@@ -199,8 +199,8 @@ class LicenseInfoDialog(QDialog):
         self._init_ui()
 
     def _init_ui(self):
-        self.setWindowTitle("Thông Tin Bản Quyền - EncoMie")
-        self.setFixedSize(440, 300)
+        self.setWindowTitle("Thông Tin Bản Quyền - EncoMie Pro")
+        self.setFixedSize(480, 400)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0f172a;
@@ -208,54 +208,128 @@ class LicenseInfoDialog(QDialog):
                 font-family: 'Segoe UI', Arial, sans-serif;
             }
             QLabel {
-                color: #cbd5e1;
+                color: #e2e8f0;
                 font-size: 13px;
             }
+            QFrame#infoFrame {
+                background-color: #1e293b;
+                border: 1px solid #334155;
+                border-radius: 12px;
+            }
             QPushButton#btnDeactivate {
-                background-color: rgba(239, 68, 68, 0.2);
+                background-color: rgba(239, 68, 68, 0.15);
                 border: 1px solid rgba(239, 68, 68, 0.4);
                 color: #fca5a5;
                 border-radius: 8px;
-                padding: 8px 16px;
+                padding: 9px 18px;
                 font-size: 12px;
+                font-weight: 600;
             }
             QPushButton#btnDeactivate:hover {
-                background-color: rgba(239, 68, 68, 0.4);
+                background-color: rgba(239, 68, 68, 0.35);
+                color: #ffffff;
             }
             QPushButton#btnClose {
-                background-color: #334155;
+                background-color: #3b82f6;
                 color: #ffffff;
                 border: none;
                 border-radius: 8px;
-                padding: 8px 20px;
+                padding: 9px 24px;
                 font-weight: bold;
+                font-size: 12px;
+            }
+            QPushButton#btnClose:hover {
+                background-color: #2563eb;
             }
         """)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 20, 24, 20)
-        layout.setSpacing(14)
+        layout.setSpacing(16)
 
-        title = QLabel("Thông Tin Bản Quyền App", self)
-        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
-        layout.addWidget(title)
+        header_lay = QHBoxLayout()
+        icon_lbl = QLabel("🛡️", self)
+        icon_lbl.setStyleSheet("font-size: 24px;")
+        header_lay.addWidget(icon_lbl)
+
+        title = QLabel("Thông Tin Bản Quyền Ứng Dụng", self)
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #ffffff;")
+        header_lay.addWidget(title)
+        header_lay.addStretch()
+        layout.addLayout(header_lay)
 
         frame = QFrame(self)
-        frame.setStyleSheet("background-color: #1e293b; border-radius: 8px; padding: 12px;")
+        frame.setObjectName("infoFrame")
         f_lay = QVBoxLayout(frame)
-        f_lay.setSpacing(8)
+        f_lay.setContentsMargins(18, 16, 18, 16)
+        f_lay.setSpacing(12)
 
-        status_text = "Hợp lệ (Active)" if self.info.is_valid else self.info.status.value.upper()
-        expires = self.info.expires_at.strftime("%d/%m/%Y") if self.info.expires_at else "Vĩnh viễn (Lifetime)"
-        machine_preview = f"{self.info.machine_id[:8]}...{self.info.machine_id[-4:]}" if self.info.machine_id else "-"
+        key_val = getattr(self.info, 'key', '') or 'Chưa xác định'
+        
+        # Determine status icon, text & color dynamically based on LicenseStatus
+        status_enum = getattr(self.info, 'status', None)
+        if self.info.is_valid or status_enum == LicenseStatus.VALID:
+            status_icon = "🟢"
+            status_display = "Hợp Lệ (Active)"
+            status_color = "#10b981"  # Emerald Green
+        elif status_enum == LicenseStatus.EXPIRED:
+            status_icon = "🟠"
+            status_display = "Đã Hết Hạn (Expired)"
+            status_color = "#f97316"  # Vibrant Orange
+        elif status_enum == LicenseStatus.REVOKED:
+            status_icon = "🔴"
+            status_display = "Đã Thu Hồi (Revoked)"
+            status_color = "#ef4444"  # Bright Red
+        elif status_enum == LicenseStatus.SECURITY_VIOLATION:
+            status_icon = "⚠️"
+            status_display = "Vi Phạm Bảo Mật (Security Alert)"
+            status_color = "#dc2626"  # Dark Red
+        elif status_enum == LicenseStatus.NOT_FOUND:
+            status_icon = "⚪"
+            status_display = "Chưa Kích Hoạt (Not Activated)"
+            status_color = "#94a3b8"  # Slate Gray
+        elif status_enum == LicenseStatus.SERVER_ERROR:
+            status_icon = "🟡"
+            status_display = "Không Thể Kết Nối Máy Chủ"
+            status_color = "#eab308"  # Amber Yellow
+        else:
+            status_icon = "🔴"
+            status_display = "Không Hợp Lệ (Invalid)"
+            status_color = "#ef4444"  # Red
+        
+        # Format Dates
+        created_val = "Không xác định"
+        if getattr(self.info, 'created_at', None):
+            created_val = self.info.created_at.strftime("%d/%m/%Y")
+        elif self.info.raw_data.get("created_at"):
+            try:
+                dt = datetime.fromisoformat(self.info.raw_data["created_at"].replace("Z", "+00:00"))
+                created_val = dt.strftime("%d/%m/%Y")
+            except Exception:
+                pass
 
-        f_lay.addWidget(QLabel(f"<b>License Key:</b> <font color='#38bdf8'>{self.info.key or 'N/A'}</font>"))
-        f_lay.addWidget(QLabel(f"<b>Trạng thái:</b> <font color='#10b981'>{status_text}</font>"))
-        f_lay.addWidget(QLabel(f"<b>Thời hạn:</b> {expires}"))
-        f_lay.addWidget(QLabel(f"<b>Mã máy (HWID):</b> {machine_preview}"))
+        expires_val = "Vĩnh viễn (Lifetime)"
+        if getattr(self.info, 'expires_at', None):
+            expires_val = self.info.expires_at.strftime("%d/%m/%Y")
+        elif self.info.raw_data.get("expires_at"):
+            try:
+                dt = datetime.fromisoformat(self.info.raw_data["expires_at"].replace("Z", "+00:00"))
+                expires_val = dt.strftime("%d/%m/%Y")
+            except Exception:
+                pass
+
+        max_devices_val = getattr(self.info, 'max_devices', 1) or 1
+        machine_id_val = getattr(self.info, 'machine_id', '') or ''
+        machine_preview = f"{machine_id_val[:8]}...{machine_id_val[-4:]}" if len(machine_id_val) > 12 else (machine_id_val or "Chưa bind")
+
+        f_lay.addWidget(QLabel(f"<b>🔑 Mã License Key:</b> &nbsp;<font color='#38bdf8' style='font-family: monospace; font-size: 14px;'>{key_val}</font>"))
+        f_lay.addWidget(QLabel(f"<b>{status_icon} Trạng thái:</b> &nbsp;<font color='{status_color}'><b>{status_display}</b></font>"))
+        f_lay.addWidget(QLabel(f"<b>📅 Ngày bắt đầu:</b> &nbsp;<font color='#f1f5f9'>{created_val}</font>"))
+        f_lay.addWidget(QLabel(f"<b>⏳ Ngày hết hạn:</b> &nbsp;<font color='#f59e0b'><b>{expires_val}</b></font>"))
+        f_lay.addWidget(QLabel(f"<b>🖥️ Số thiết bị tối đa:</b> &nbsp;<font color='#f1f5f9'>{max_devices_val} Máy</font>"))
+        f_lay.addWidget(QLabel(f"<b>🆔 Mã máy (HWID):</b> &nbsp;<font color='#94a3b8' style='font-family: monospace;'>{machine_preview}</font>"))
 
         layout.addWidget(frame)
-        layout.addStretch()
 
         btn_lay = QHBoxLayout()
         btn_deact = QPushButton("Hủy Kích Hoạt Máy", self)

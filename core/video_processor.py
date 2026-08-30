@@ -144,6 +144,8 @@ class RenderConfig:
     layers: list[ImageLayerConfig] = field(default_factory=lambda: [ImageLayerConfig() for _ in range(5)])
     fps: int = 30
     max_concurrent_renders: int = 2
+    # Set by core.entitlements.apply_to_render_config from the signed license token.
+    watermark_enabled: bool = False
 
     def __post_init__(self):
         if self.subtitle_style is None:

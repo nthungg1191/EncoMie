@@ -140,9 +140,9 @@ class RenderWorker(QThread):
         while len(self._active_jobs) < max_concurrent and self._pending_pairs:
             # Check license validity before starting next queued video item
             try:
-                from core.license_manager import LicenseManager
-                info = LicenseManager().check_license()
-                if not info.is_valid:
+                from core.license_manager import LicenseManager, LicenseStatus
+                info = LicenseManager().check_license(force_refresh=False)
+                if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.INVALID, LicenseStatus.SECURITY_VIOLATION]:
                     self._abort = True
                     self.license_expired.emit("Thời hạn bản quyền đã kết thúc. Video đang chạy dở sẽ hoàn tất, nhưng các video còn lại trong hàng chờ đã bị ngắt.")
                     self.quit()

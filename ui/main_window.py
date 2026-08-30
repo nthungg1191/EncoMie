@@ -28,7 +28,7 @@ from PyQt6.QtWidgets import (
     QScrollArea
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject, QTimer
-from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap
+from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap, QKeySequence
 
 from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
 from core.worker import RenderWorker
@@ -608,7 +608,7 @@ class MainWindow(QMainWindow):
     def _periodic_license_check(self):
         """Periodic background check to detect license expiration while app is left open."""
         info = self.license_manager.check_license()
-        if not info.is_valid:
+        if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.SECURITY_VIOLATION]:
             print("[Security] Heartbeat: License is no longer valid or has expired.")
             QMessageBox.warning(
                 self,
@@ -620,6 +620,7 @@ class MainWindow(QMainWindow):
     def _guard_license_active(self) -> bool:
         """Pre-action security guard before running batch render or core tasks."""
         info = self.license_manager.check_license(force_refresh=True)
+        self._license_info = info
         if not info.is_valid:
             QMessageBox.warning(
                 self,
@@ -652,26 +653,177 @@ class MainWindow(QMainWindow):
 
     def _create_menu_bar(self):
         menubar = self.menuBar()
-        help_menu = menubar.addMenu("Trợ Giúp")
+        self.setMenuBar(menubar)
+        menubar.setVisible(True)
+        menubar.setStyleSheet("""
+            QMenuBar {
+                background-color: #ffffff;
+                color: #0f172a;
+                font-family: 'Segoe UI', 'Outfit', sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                padding: 3px 6px;
+                border-bottom: 1px solid #e2e8f0;
+            }
+            QMenuBar::item {
+                background-color: transparent;
+                color: #334155;
+                padding: 6px 12px;
+                border-radius: 6px;
+                margin-right: 2px;
+            }
+            QMenuBar::item:selected {
+                background-color: #f1f5f9;
+                color: #2563eb;
+                font-weight: 600;
+            }
+            QMenuBar::item:pressed {
+                background-color: #e2e8f0;
+                color: #1d4ed8;
+            }
+            QMenu {
+                background-color: #ffffff;
+                color: #1e293b;
+                border: 1px solid #cbd5e1;
+                padding: 6px;
+                border-radius: 8px;
+            }
+            QMenu::item {
+                padding: 7px 28px 7px 12px;
+                border-radius: 6px;
+                font-size: 13px;
+                color: #334155;
+            }
+            QMenu::item:selected {
+                background-color: #2563eb;
+                color: #ffffff;
+            }
+            QMenu::separator {
+                height: 1px;
+                background-color: #e2e8f0;
+                margin: 5px 8px;
+            }
+        """)
+
+        # 1. File Menu
+        file_menu = menubar.addMenu("File")
         
-        info_act = help_menu.addAction("Thông Tin License")
+        open_act = file_menu.addAction("Mở Dự Án...")
+        open_act.setShortcut(QKeySequence("Ctrl+O"))
+        open_act.triggered.connect(self._load_project_file)
+
+        save_act = file_menu.addAction("Lưu Dự Án")
+        save_act.setShortcut(QKeySequence("Ctrl+S"))
+        save_act.triggered.connect(self._save_project_file)
+
+        file_menu.addSeparator()
+
+        scan_act = file_menu.addAction("Quét Lại Video & SRT")
+        scan_act.setShortcut(QKeySequence("F5"))
+        scan_act.triggered.connect(self._scan_pairs)
+
+        file_menu.addSeparator()
+
+        exit_act = file_menu.addAction("Thoát")
+        exit_act.setShortcut(QKeySequence("Alt+F4"))
+        exit_act.triggered.connect(self.close)
+
+        # 2. View Menu
+        view_menu = menubar.addMenu("View")
+        mode_sub_act = view_menu.addAction("Chế Độ Subtitle + Logo")
+        mode_sub_act.setShortcut(QKeySequence("Ctrl+1"))
+        mode_sub_act.triggered.connect(self._on_mode_sub_clicked)
+
+        mode_vid_act = view_menu.addAction("Chế Độ Trộn Layer Video")
+        mode_vid_act.setShortcut(QKeySequence("Ctrl+2"))
+        mode_vid_act.triggered.connect(self._on_mode_video_clicked)
+
+        view_menu.addSeparator()
+        clear_log_act = view_menu.addAction("Xóa Nhật Ký Render")
+        clear_log_act.setShortcut(QKeySequence("Ctrl+L"))
+        clear_log_act.triggered.connect(self.log_text.clear)
+
+        # 3. Run Menu
+        run_menu = menubar.addMenu("Run")
+        start_run_act = run_menu.addAction("🚀 Bắt Đầu Render")
+        start_run_act.setShortcut(QKeySequence("Ctrl+R"))
+        start_run_act.triggered.connect(self._start_render)
+
+        pause_run_act = run_menu.addAction("⏸ Tạm Dừng Render")
+        pause_run_act.setShortcut(QKeySequence("Ctrl+P"))
+        pause_run_act.triggered.connect(self._toggle_pause_render)
+
+        stop_run_act = run_menu.addAction("⏹ Dừng Render")
+        stop_run_act.setShortcut(QKeySequence("Ctrl+Shift+R"))
+        stop_run_act.triggered.connect(self._stop_render)
+
+        # 4. Help Menu
+        help_menu = menubar.addMenu("Help")
+        info_act = help_menu.addAction("🔑 Thông Tin License...")
+        info_act.setShortcut(QKeySequence("Ctrl+I"))
         info_act.triggered.connect(self._show_license_info)
-        
-        act_act = help_menu.addAction("Kích Hoạt License")
+
+        act_act = help_menu.addAction("⚡ Kích Hoạt Key License...")
+        act_act.setShortcut(QKeySequence("Ctrl+K"))
         act_act.triggered.connect(lambda: self._show_license_window(mandatory=False))
 
+        help_menu.addSeparator()
+        about_act = help_menu.addAction("ℹ️ Giới Thiệu EncoMie Pro...")
+        about_act.setShortcut(QKeySequence("F1"))
+        about_act.triggered.connect(self._show_about_dialog)
+
+    def _open_output_folder(self):
+        try:
+            config = self._build_config()
+            out_dir = Path(config.output_folder)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            os.startfile(str(out_dir))
+        except Exception as e:
+            QMessageBox.warning(self, "Lỗi", f"Không thể mở thư mục: {e}")
+
+    def _show_gpu_info(self):
+        try:
+            info = detect_system_info()
+            msg = (
+                f"Card Đồ Họa (GPU): {info.get('gpu', 'N/A')}\n"
+                f"Bộ Vi Xử Lý (CPU): {info.get('cpu', 'N/A')}\n"
+                f"Bộ Nhớ (RAM): {info.get('ram', 'N/A')}\n"
+                f"FFmpeg Hardware Acceleration: {'Đã cài đặt' if info.get('ffmpeg') else 'Không tìm thấy'}"
+            )
+            QMessageBox.information(self, "Thông Tin Phần Cứng Hỗ Trợ", msg)
+        except Exception as e:
+            QMessageBox.warning(self, "Lỗi", f"Không thể lấy thông tin phần cứng: {e}")
+
+    def _show_about_dialog(self):
+        QMessageBox.about(
+            self,
+            "Giới Thiệu EncoMie Pro",
+            "<b>EncoMie Pro - Enterprise Commercial Video Suite</b><br>"
+            "Phiên bản: <b>v1.5.1 Pro</b><br>"
+            "Core Render: FFmpeg GPU Acceleration Engine<br>"
+            "License: Cloudflare Global D1 Worker Engine 2026<br>"
+
+        )
+
     def _show_license_window(self, mandatory=False):
-        dlg = LicenseWindow(self.license_manager, self)
-        res = dlg.exec()
-        if mandatory and res != QDialog.DialogCode.Accepted:
+        if mandatory:
+            self.setDisabled(True)
+
+        try:
+            dlg = LicenseWindow(self.license_manager, self)
+            res = dlg.exec()
             info = self.license_manager.check_license()
-            if not info.is_valid:
-                QMessageBox.information(
+
+            if mandatory and (res != QDialog.DialogCode.Accepted or not info.is_valid):
+                QMessageBox.critical(
                     self,
-                    "Thông Báo",
-                    "Bạn chưa kích hoạt bản quyền hợp lệ. Ứng dụng sẽ thoát."
+                    "Truy Cập Bị Từ Chối",
+                    "Bản quyền ứng dụng của bạn chưa được kích hoạt hoặc đã hết hạn.\nỨng dụng sẽ tự động thoát."
                 )
                 sys.exit(0)
+        finally:
+            if mandatory and hasattr(self, "setEnabled"):
+                self.setEnabled(True)
 
     def _show_license_info(self):
         info = self.license_manager.check_license()
@@ -899,100 +1051,26 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(qss)
 
     def _build_ui(self):
-        # Hide native MenuBar in favor of sleek Header Bar
+        # Enable top MenuBar
         menu_bar = self.menuBar()
-        menu_bar.setVisible(False)
+        menu_bar.setVisible(True)
+
+        # Mode state buttons (internal state tracking)
+        self.btn_tab_sub = QPushButton()
+        self.btn_tab_sub.setCheckable(True)
+        self.btn_tab_sub.setChecked(True)
+        self.btn_tab_sub.clicked.connect(self._on_mode_sub_clicked)
+
+        self.btn_tab_video = QPushButton()
+        self.btn_tab_video.setCheckable(True)
+        self.btn_tab_video.setChecked(False)
+        self.btn_tab_video.clicked.connect(self._on_mode_video_clicked)
 
         central = QWidget()
         self.setCentralWidget(central)
         root_lay = QVBoxLayout(central)
         root_lay.setContentsMargins(0, 0, 0, 0)
         root_lay.setSpacing(0)
-
-        # --- Title bar (Removed as requested) ---
-        # title_bar = self._make_title_bar()
-        # root_lay.addWidget(title_bar)
-
-        # --- Header Navigation Bar ---
-        header_bar = QWidget()
-        header_bar.setObjectName("headerBar")
-        header_bar.setFixedHeight(50)
-        header_bar.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #e2e8f0;")
-        header_lay = QHBoxLayout(header_bar)
-        header_lay.setContentsMargins(12, 6, 12, 6)
-        header_lay.setSpacing(10)
-
-        # Left Actions (Load / Save Project)
-        actions_lay = QHBoxLayout()
-        actions_lay.setSpacing(8)
-
-        btn_open_proj = QPushButton("📂 Mở dự án")
-        btn_open_proj.setFixedHeight(32)
-        btn_open_proj.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_open_proj.setStyleSheet(
-            "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; color: #0f172a; }"
-            "QPushButton:hover { background-color: #f1f5f9; border-color: #007aff; color: #007aff; }"
-        )
-        btn_open_proj.clicked.connect(self._load_project_file)
-
-        btn_save_proj = QPushButton("💾 Lưu dự án")
-        btn_save_proj.setFixedHeight(32)
-        btn_save_proj.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_save_proj.setStyleSheet(
-            "QPushButton { background-color: #ffffff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 4px 12px; font-size: 11px; font-weight: 600; color: #0f172a; }"
-            "QPushButton:hover { background-color: #f1f5f9; border-color: #007aff; color: #007aff; }"
-        )
-        btn_save_proj.clicked.connect(self._save_project_file)
-
-        actions_lay.addWidget(btn_open_proj)
-        actions_lay.addWidget(btn_save_proj)
-        header_lay.addLayout(actions_lay)
-
-        # Stretch 1: Pushes switcher_frame to the exact center
-        header_lay.addStretch(1)
-
-        # Centered Mode Switcher Frame (Pills Tab)
-        switcher_frame = QFrame()
-        switcher_frame.setObjectName("modeSwitcherFrame")
-        switcher_frame.setStyleSheet(
-            "QFrame { background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 2px; }"
-        )
-        switcher_lay = QHBoxLayout(switcher_frame)
-        switcher_lay.setContentsMargins(3, 3, 3, 3)
-        switcher_lay.setSpacing(4)
-
-        self.btn_tab_sub = QPushButton("📝  Edit Subtitle")
-        self.btn_tab_sub.setCheckable(True)
-        self.btn_tab_sub.setChecked(True)
-        self.btn_tab_sub.setFixedHeight(32)
-        self.btn_tab_sub.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tab_sub.setStyleSheet(
-            "QPushButton { background: transparent; color: #64748b; font-weight: 600; border: none; padding: 5px 18px; border-radius: 6px; font-size: 12px; white-space: nowrap; }"
-            "QPushButton:hover { color: #0f172a; background: rgba(255, 255, 255, 0.5); }"
-            "QPushButton:checked { background: #ffffff; color: #007aff; font-weight: bold; border: 1px solid #cbd5e1; }"
-        )
-        self.btn_tab_sub.clicked.connect(self._on_mode_sub_clicked)
-
-        self.btn_tab_video = QPushButton("🎬 Edit Video Scale")
-        self.btn_tab_video.setCheckable(True)
-        self.btn_tab_video.setChecked(False)
-        self.btn_tab_video.setFixedHeight(32)
-        self.btn_tab_video.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_tab_video.setStyleSheet(
-            "QPushButton { background: transparent; color: #64748b; font-weight: 600; border: none; padding: 5px 18px; border-radius: 6px; font-size: 12px; white-space: nowrap; }"
-            "QPushButton:hover { color: #0f172a; background: rgba(255, 255, 255, 0.5); }"
-            "QPushButton:checked { background: #ffffff; color: #007aff; font-weight: bold; border: 1px solid #cbd5e1; }"
-        )
-        self.btn_tab_video.clicked.connect(self._on_mode_video_clicked)
-
-        switcher_lay.addWidget(self.btn_tab_sub)
-        switcher_lay.addWidget(self.btn_tab_video)
-        header_lay.addWidget(switcher_frame)
-
-        # Stretch 2: Balances right side so switcher_frame stays perfectly centered
-        header_lay.addStretch(1)
-
-        root_lay.addWidget(header_bar)
 
         # Instantiate style and layer controls first so panels can cross-reference them
         self.style_panel = SubtitleStyleEditor(self)
@@ -1395,8 +1473,12 @@ class MainWindow(QMainWindow):
         self._active_preset = None
 
     def _on_resolution_changed(self):
-        """Sync resolution changes to video_layout_preview and preview_widget."""
-        res_val = self.cmb_resolution.currentText().split(" ")[0]
+        """Sync resolution changes to video_layout_preview, preview_widget, and top Live Monitor label."""
+        full_text = self.cmb_resolution.currentText()
+        if hasattr(self, "lbl_viewport_res"):
+            self.lbl_viewport_res.setText(full_text)
+
+        res_val = full_text.split(" ")[0]
         if "x" in res_val:
             try:
                 w, h = map(int, res_val.split("x"))
@@ -2655,6 +2737,14 @@ class MainWindow(QMainWindow):
         self._save_settings()
 
         config = self._build_config()
+
+        # Clamp output to what the signed license token actually permits.
+        from core.entitlements import apply_to_render_config
+        _wanted_gpu = bool(getattr(config, "use_gpu", False))
+        ent = apply_to_render_config(config, getattr(self, "_license_info", None))
+        if _wanted_gpu and not ent.gpu:
+            self._on_log("[Bản quyền] Gói hiện tại không hỗ trợ tăng tốc GPU - đã chuyển về CPU encoder.")
+
         os.makedirs(config.output_folder, exist_ok=True)
         # Filter matching pairs based on active tab and checked rows
         matched_pairs = []

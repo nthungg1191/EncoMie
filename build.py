@@ -11,6 +11,19 @@ def main():
     root_dir = Path(__file__).resolve().parent
     os.chdir(root_dir)
     
+    # 0. Install runtime dependencies (PyQt6, requests, PyNaCl, ...)
+    print_step("Installing runtime dependencies (requirements.txt)...")
+    req_file = root_dir / "requirements.txt"
+    if req_file.exists():
+        try:
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", str(req_file)], check=True)
+            print("[INFO] Dependencies installed.")
+        except Exception as e:
+            print(f"[ERROR] Failed to install dependencies: {e}")
+            sys.exit(1)
+    else:
+        print("[WARNING] requirements.txt not found - skipping dependency install.")
+
     # 1. Check/Install PyInstaller
     print_step("Checking PyInstaller installation...")
     try:
@@ -50,6 +63,10 @@ def main():
         "--add-data=Asset;Asset",
         "--add-data=presets;presets",
         "--clean",
+        # License system runtime deps (PyNaCl / cffi + lazily-imported module)
+        "--hidden-import=_cffi_backend",
+        "--collect-submodules=nacl",
+        "--hidden-import=core.entitlements",
     ]
     
     if onefile:
