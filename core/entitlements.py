@@ -48,7 +48,9 @@ def apply_to_render_config(config, info) -> Entitlements:
         config.use_gpu = False
         codec = str(getattr(config, "codec", "") or "")
         if "nvenc" in codec:
-            config.codec = "libx265" if codec.startswith("hevc") or "265" in codec else "libx264"
+            # Forced onto CPU by the licence -> use x264 (much faster than CPU
+            # HEVC). An explicit libx265 pick is left untouched.
+            config.codec = "libx264"
 
     # Layer count gating ----------------------------------------------------
     layers = getattr(config, "layers", None)

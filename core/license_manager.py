@@ -148,14 +148,20 @@ class LicenseManager:
     # Helpers
     # ------------------------------------------------------------------ #
 
-    def _run_security_audit(self) -> Optional[LicenseInfo]:
+    def _run_security_audit(self, deep: bool = False) -> Optional[LicenseInfo]:
+        """
+        Fast anti-tamper check. `deep=True` also runs the ~150ms process scan
+        (`tasklist`); the periodic/render-path callers pass deep=False because
+        the UI's realtime watchdog already scans processes continuously.
+        """
         if is_debugger_present():
             return LicenseInfo(status=LicenseStatus.SECURITY_VIOLATION,
                                raw_data={"error": {"message": "Debugger detected. App execution restricted."}})
-        proc = scan_suspicious_processes()
-        if proc:
-            return LicenseInfo(status=LicenseStatus.SECURITY_VIOLATION,
-                               raw_data={"error": {"message": f"Suspicious process '{proc}' detected."}})
+        if deep:
+            proc = scan_suspicious_processes()
+            if proc:
+                return LicenseInfo(status=LicenseStatus.SECURITY_VIOLATION,
+                                   raw_data={"error": {"message": f"Suspicious process '{proc}' detected."}})
         return None
 
     def _signed_body(self, key: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -204,7 +210,7 @@ class LicenseManager:
     # ------------------------------------------------------------------ #
 
     def activate(self, key: str) -> LicenseInfo:
-        sec = self._run_security_audit()
+        sec = self._run_security_audit(deep=True)
         if sec:
             return sec
 

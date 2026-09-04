@@ -3,6 +3,8 @@ Qt Worker thread for running render jobs without blocking the UI.
 Supports concurrent rendering of multiple video pairs.
 """
 
+import time
+
 from PyQt6.QtCore import QThread, pyqtSignal, QMutex, QMutexLocker, QWaitCondition
 from core.video_processor import FilePair, RenderConfig, render_pair, build_pairs
 
@@ -78,6 +80,8 @@ class RenderWorker(QThread):
         self._job_progress = {}        # pair.index -> float (percent)
         self._job_messages = {}        # pair.index -> str (last status msg)
         self._completed_pairs = set()
+        self._license_mgr = None
+        self._last_license_check = 0.0
 
     def abort(self):
         self._abort = True
@@ -114,6 +118,7 @@ class RenderWorker(QThread):
         self._job_progress.clear()
         self._job_messages.clear()
         self._completed_pairs.clear()
+        self._last_license_check = 0.0
 
         # If empty queue, exit immediately
         if not self.pairs:
@@ -137,19 +142,30 @@ class RenderWorker(QThread):
             return
 
         max_concurrent = getattr(self.config, "max_concurrent_renders", 2)
-        while len(self._active_jobs) < max_concurrent and self._pending_pairs:
-            # Check license validity before starting next queued video item
+
+        # License gate: check once when the batch starts, then at most once a
+        # minute — not on every queued item (each check was a ~150ms process
+        # scan + a network round-trip between videos).
+        now = time.monotonic()
+        if now - self._last_license_check > 60:
+            self._last_license_check = now
             try:
                 from core.license_manager import LicenseManager, LicenseStatus
-                info = LicenseManager().check_license(force_refresh=False)
-                if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.INVALID, LicenseStatus.SECURITY_VIOLATION]:
+                if self._license_mgr is None:
+                    self._license_mgr = LicenseManager()
+                info = self._license_mgr.check_license(force_refresh=False)
+                if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED,
+                                   LicenseStatus.INVALID, LicenseStatus.SECURITY_VIOLATION]:
                     self._abort = True
-                    self.license_expired.emit("Thời hạn bản quyền đã kết thúc. Video đang chạy dở sẽ hoàn tất, nhưng các video còn lại trong hàng chờ đã bị ngắt.")
+                    self.license_expired.emit(
+                        "Thời hạn bản quyền đã kết thúc. Video đang chạy dở sẽ hoàn tất, "
+                        "nhưng các video còn lại trong hàng chờ đã bị ngắt.")
                     self.quit()
                     return
             except Exception:
                 pass
 
+        while len(self._active_jobs) < max_concurrent and self._pending_pairs:
             pair = self._pending_pairs.pop(0)
             
             # Batch index is sequence number starting from 1

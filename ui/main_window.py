@@ -530,6 +530,65 @@ class FrameExtractTask(QRunnable):
             self.signals.loaded.emit(self.video_path, img)
 
 
+_DEFAULT_SYS_INFO = {
+    "cpu_name": "—", "cpu_load_pct": 0,
+    "ram_total_gb": 0, "ram_free_gb": 0, "ram_used_pct": 0,
+    "gpu_name": "…", "gpu_available": False,
+    "vram_total_mb": 0, "vram_free_mb": 0, "gpu_power_w": "—",
+}
+
+
+class _BgProbeSignals(QObject):
+    sysinfo = pyqtSignal(dict)
+    suspicious_proc = pyqtSignal(str)
+    debugger = pyqtSignal()
+
+
+class _BgProbeTask(QRunnable):
+    """Off-thread system metrics + anti-tamper scan (kept off the UI thread)."""
+
+    def __init__(self, want_scan: bool):
+        super().__init__()
+        self.want_scan = want_scan
+        self.signals = _BgProbeSignals()
+
+    def run(self):
+        try:
+            self.signals.sysinfo.emit(detect_system_info())
+        except Exception:
+            pass
+        if not self.want_scan:
+            return
+        try:
+            if is_debugger_present():
+                self.signals.debugger.emit()
+                return
+            proc = scan_suspicious_processes()
+            if proc:
+                self.signals.suspicious_proc.emit(proc)
+        except Exception:
+            pass
+
+
+class _LicenseCheckSignals(QObject):
+    result = pyqtSignal(object)  # LicenseInfo
+
+
+class _LicenseCheckTask(QRunnable):
+    """Off-thread periodic licence verification (does a network round-trip)."""
+
+    def __init__(self):
+        super().__init__()
+        self.signals = _LicenseCheckSignals()
+
+    def run(self):
+        try:
+            from core.license_manager import LicenseManager
+            self.signals.result.emit(LicenseManager().check_license())
+        except Exception:
+            pass
+
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -547,7 +606,7 @@ class MainWindow(QMainWindow):
         self._settings = cfg.load()
         self._pairs: list[FilePair] = []
         self._worker: RenderWorker | None = None
-        self._sys_info = detect_system_info()
+        self._sys_info = dict(_DEFAULT_SYS_INFO)  # populated off-thread after show()
         self._presets: list[SubtitleStylePreset] = []
         self._active_preset: SubtitleStylePreset | None = None
         self._timing_undo: dict[str, list[SubtitleEntry]] = {}  # path → original entries
@@ -555,7 +614,12 @@ class MainWindow(QMainWindow):
         self.frame_pool = QThreadPool()
         self.frame_pool.setMaxThreadCount(2)
         self.running_extractions = set()
-        
+
+        # Dedicated pool for lightweight background probes (sysinfo, anti-tamper,
+        # licence heartbeat) so none of them ever run on the UI thread.
+        self._bg_pool = QThreadPool()
+        self._bg_pool.setMaxThreadCount(2)
+
         # Debounce settings saving to avoid disk write stuttering during drags/edits
         self._save_timer = QTimer(self)
         self._save_timer.setSingleShot(True)
@@ -563,58 +627,67 @@ class MainWindow(QMainWindow):
 
         self.license_manager = LicenseManager()
 
-        # Real-time Security Watchdog (Scans for debuggers and cracking tools every 3 seconds)
-        self._security_watchdog_timer = QTimer(self)
-        self._security_watchdog_timer.setInterval(3000)
-        self._security_watchdog_timer.timeout.connect(self._run_realtime_security_watchdog)
-        self._security_watchdog_timer.start()
+        # One background timer drives: system-metrics badges + anti-tamper scan.
+        # The debugger check itself is instant but runs off-thread with the scan.
+        self._bg_probe_timer = QTimer(self)
+        self._bg_probe_timer.setInterval(5000)
+        self._bg_probe_timer.timeout.connect(lambda: self._kick_bg_probe(scan=True))
+        self._bg_probe_timer.start()
 
-        # Background Periodic License Heartbeat (Verifies with Cloudflare Server every 2 minutes)
+        # Background periodic licence heartbeat (network round-trip) every 2 min.
         self._license_timer = QTimer(self)
         self._license_timer.setInterval(2 * 60 * 1000)
-        self._license_timer.timeout.connect(self._periodic_license_check)
+        self._license_timer.timeout.connect(self._kick_license_check)
         self._license_timer.start()
 
         self._build_ui()
         self._create_menu_bar()
         self._apply_saved_settings()
-        self._check_deps()
         self._log_debug("MainWindow initialized")
+        # Defer everything that shells out so the window paints immediately.
+        QTimer.singleShot(0, self._check_deps)
+        QTimer.singleShot(0, lambda: self._kick_bg_probe(scan=False))
         QTimer.singleShot(500, self._check_license_on_startup)
 
-    def _run_realtime_security_watchdog(self):
-        """Active real-time security watchdog running every 3 seconds."""
-        if is_debugger_present():
-            print("[Security Watchdog] Active debugger detected! Terminating app.")
-            self._security_watchdog_timer.stop()
-            QMessageBox.critical(
-                self,
-                "Cảnh Báo Bảo Mật",
-                "Phát hiện công cụ Debugger đính kèm vào tiến trình ứng dụng.\nỨng dụng sẽ ngắt ngay lập tức!"
-            )
-            sys.exit(0)
+    # ---- Background probes (never block the UI thread) ----
 
-        suspicious_proc = scan_suspicious_processes()
-        if suspicious_proc:
-            print(f"[Security Watchdog] Suspicious process detected: {suspicious_proc}")
-            self._security_watchdog_timer.stop()
-            QMessageBox.critical(
-                self,
-                "Cảnh Báo Bảo Mật",
-                f"Phát hiện công cụ can thiệp '{suspicious_proc}' đang hoạt động trên hệ thống.\nỨng dụng sẽ ngắt ngay lập tức!"
-            )
-            sys.exit(0)
+    def _kick_bg_probe(self, scan: bool):
+        task = _BgProbeTask(want_scan=scan)
+        task.signals.sysinfo.connect(self._apply_sys_info)
+        task.signals.debugger.connect(self._on_security_violation_debugger)
+        task.signals.suspicious_proc.connect(self._on_security_violation_proc)
+        self._bg_pool.start(task)
 
-    def _periodic_license_check(self):
-        """Periodic background check to detect license expiration while app is left open."""
-        info = self.license_manager.check_license()
+    def _kick_license_check(self):
+        task = _LicenseCheckTask()
+        task.signals.result.connect(self._on_periodic_license_result)
+        self._bg_pool.start(task)
+
+    def _apply_sys_info(self, si: dict):
+        self._sys_info = si
+        self._update_sysinfo()
+
+    def _on_security_violation_debugger(self):
+        self._bg_probe_timer.stop()
+        QMessageBox.critical(
+            self, "Cảnh Báo Bảo Mật",
+            "Phát hiện công cụ Debugger đính kèm vào tiến trình ứng dụng.\nỨng dụng sẽ ngắt ngay lập tức!")
+        sys.exit(0)
+
+    def _on_security_violation_proc(self, proc: str):
+        self._bg_probe_timer.stop()
+        QMessageBox.critical(
+            self, "Cảnh Báo Bảo Mật",
+            f"Phát hiện công cụ can thiệp '{proc}' đang hoạt động trên hệ thống.\nỨng dụng sẽ ngắt ngay lập tức!")
+        sys.exit(0)
+
+    def _on_periodic_license_result(self, info):
+        if info is None:
+            return
         if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.SECURITY_VIOLATION]:
-            print("[Security] Heartbeat: License is no longer valid or has expired.")
             QMessageBox.warning(
-                self,
-                "Bản Quyền Hết Hạn",
-                "Thời hạn bản quyền ứng dụng EncoMie của bạn đã kết thúc.\nVui lòng kích hoạt key mới để tiếp tục sử dụng."
-            )
+                self, "Bản Quyền Hết Hạn",
+                "Thời hạn bản quyền ứng dụng EncoMie của bạn đã kết thúc.\nVui lòng kích hoạt key mới để tiếp tục sử dụng.")
             self._show_license_window(mandatory=True)
 
     def _guard_license_active(self) -> bool:
@@ -1215,19 +1288,14 @@ class MainWindow(QMainWindow):
 
         lay.addStretch()
 
-        # Realtime refresh timer (every 3 s)
-        from PyQt6.QtCore import QTimer
-        self._sysinfo_timer = QTimer(self)
-        self._sysinfo_timer.timeout.connect(self._update_sysinfo)
-        self._sysinfo_timer.start(3000)
-
+        # Badges refresh from _bg_probe_timer (off-thread) — no timer here.
         return bar
 
     def _update_sysinfo(self):
-        """Refresh system-info badges in the title bar."""
+        """Refresh system-info badges from the already-fetched self._sys_info."""
         if not hasattr(self, "_cpu_load_lbl") or self._cpu_load_lbl is None:
             return
-        si = detect_system_info()
+        si = self._sys_info
         self._cpu_load_lbl.setText(f"CPU: {si['cpu_load_pct']}%")
         self._ram_pct_lbl.setText(f"RAM: {si['ram_used_pct']}%")
         if si["gpu_available"]:

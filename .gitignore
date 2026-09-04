@@ -11,7 +11,7 @@
 /build
 *.spec
 *.zip
-
+build.py
 # all pycache
 *__pycache__
 EncoMie.bat 

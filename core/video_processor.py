@@ -10,6 +10,7 @@ import os
 import re
 import json
 import random
+import logging
 import subprocess
 import shlex
 from pathlib import Path
@@ -18,6 +19,20 @@ from typing import Optional, List
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
+
+# Verbose render diagnostics. Off unless logging is configured for DEBUG (or
+# ENCOMIE_DEBUG is set). Keeps ~50 diagnostic lines per render out of the hot
+# path and avoids writing to a missing stdout in a no-console build.
+_dbg_log = logging.getLogger("encomie.video")
+if os.environ.get("ENCOMIE_DEBUG"):
+    logging.basicConfig(level=logging.DEBUG)
+
+
+def _dbg(msg: str = "") -> None:
+    if _dbg_log.isEnabledFor(logging.DEBUG):
+        _dbg_log.debug(msg)
+
+
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".aac"}
 
 import sys
@@ -695,7 +710,7 @@ def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1
         convert_srt_to_ass_simple(srt_path, ass_path, style)
         target = ass_path
     except Exception as exc:
-        print(f"[subtitle] SRT->ASS conversion failed ({exc}); using raw SRT")
+        _dbg(f"[subtitle] SRT->ASS conversion failed ({exc}); using raw SRT")
         target = srt_path
 
     safe = target.replace("\\", "/").replace(":", "\\:")
@@ -725,69 +740,69 @@ def build_ffmpeg_cmd(
     # ============================================================
     # DEBUG LOG: Layer Resolution
     # ============================================================
-    print(f"\n{'='*60}")
-    print(f"[DEBUG] build_ffmpeg_cmd() called")
-    print(f"  - bg_video: {bg_video}")
-    print(f"  - audio_path: {audio_path}")
-    print(f"  - srt_path: {srt_path}")
-    print(f"  - config.resolution: {config.resolution}")
-    print(f"  - config.use_gpu: {config.use_gpu}")
-    print(f"  - config.codec: {config.codec}")
-    print(f"  - is_edit_sub (has srt_folder): {bool(config.srt_folder)}")
-    print(f"{'='*60}")
+    _dbg(f"\n{'='*60}")
+    _dbg(f"[DEBUG] build_ffmpeg_cmd() called")
+    _dbg(f"  - bg_video: {bg_video}")
+    _dbg(f"  - audio_path: {audio_path}")
+    _dbg(f"  - srt_path: {srt_path}")
+    _dbg(f"  - config.resolution: {config.resolution}")
+    _dbg(f"  - config.use_gpu: {config.use_gpu}")
+    _dbg(f"  - config.codec: {config.codec}")
+    _dbg(f"  - is_edit_sub (has srt_folder): {bool(config.srt_folder)}")
+    _dbg(f"{'='*60}")
 
     # Resolve active layers (supporting up to 5 layers)
     active_layers = []
     if hasattr(config, "layers") and config.layers:
         for idx, layer in enumerate(config.layers):
-            print(f"\n[DEBUG] Layer {idx+1} config:")
-            print(f"  - enabled: {layer.enabled}")
-            print(f"  - path: '{layer.path}'")
-            print(f"  - position: {layer.position}")
-            print(f"  - size: {layer.size}")
-            print(f"  - opacity: {layer.opacity}")
-            print(f"  - margin_t/b/l/r: {layer.margin_t}/{layer.margin_b}/{layer.margin_l}/{layer.margin_r}")
+            _dbg(f"\n[DEBUG] Layer {idx+1} config:")
+            _dbg(f"  - enabled: {layer.enabled}")
+            _dbg(f"  - path: '{layer.path}'")
+            _dbg(f"  - position: {layer.position}")
+            _dbg(f"  - size: {layer.size}")
+            _dbg(f"  - opacity: {layer.opacity}")
+            _dbg(f"  - margin_t/b/l/r: {layer.margin_t}/{layer.margin_b}/{layer.margin_l}/{layer.margin_r}")
             
             if not layer.enabled:
-                print(f"  -> SKIPPED: Layer is disabled")
+                _dbg(f"  -> SKIPPED: Layer is disabled")
                 continue
                 
             if not layer.path:
-                print(f"  -> SKIPPED: Layer path is empty")
+                _dbg(f"  -> SKIPPED: Layer path is empty")
                 continue
                 
             # Resolve source type path dynamically
             if layer.path == "Video nền":
                 layer_resolved_path = bg_video
-                print(f"  -> Source: 'Video nền' -> resolved to bg_video")
+                _dbg(f"  -> Source: 'Video nền' -> resolved to bg_video")
             elif layer.path == "Theo danh sách chạy":
                 layer_resolved_path = audio_path
-                print(f"  -> Source: 'Theo danh sách chạy' -> resolved to audio_path")
+                _dbg(f"  -> Source: 'Theo danh sách chạy' -> resolved to audio_path")
             else:
                 layer_resolved_path = layer.path
-                print(f"  -> Source: 'File cố định' -> path = '{layer_resolved_path}'")
+                _dbg(f"  -> Source: 'File cố định' -> path = '{layer_resolved_path}'")
             
             # Check file exists
             exists = os.path.exists(layer_resolved_path)
-            print(f"  -> os.path.exists(): {exists}")
+            _dbg(f"  -> os.path.exists(): {exists}")
             if not exists:
-                print(f"  -> SKIPPED: Resolved path does not exist!")
+                _dbg(f"  -> SKIPPED: Resolved path does not exist!")
                 continue
                 
             # Check video stream
             has_video = has_video_stream(layer_resolved_path)
-            print(f"  -> has_video_stream(): {has_video}")
+            _dbg(f"  -> has_video_stream(): {has_video}")
             
             if has_video:
                 layer._resolved_path = layer_resolved_path
                 active_layers.append(layer)
-                print(f"  -> ACCEPTED: Layer added to active_layers")
+                _dbg(f"  -> ACCEPTED: Layer added to active_layers")
             else:
-                print(f"  -> SKIPPED: File has no video/image stream")
+                _dbg(f"  -> SKIPPED: File has no video/image stream")
     else:
-        print(f"\n[DEBUG] config.layers is None or empty!")
+        _dbg(f"\n[DEBUG] config.layers is None or empty!")
         
-    print(f"\n[DEBUG] Total active_layers: {len(active_layers)}")
+    _dbg(f"\n[DEBUG] Total active_layers: {len(active_layers)}")
                     
     # Fallback to legacy logo config if no active layers set
     if not active_layers and config.logo_path and os.path.exists(config.logo_path) and has_video_stream(config.logo_path):
@@ -811,24 +826,27 @@ def build_ffmpeg_cmd(
 
     fps_val = getattr(config, "fps", 30)
 
-    # Tính toán số luồng CPU động để chừa luồng cho hệ điều hành và kích hoạt E-cores
+    # Thread budget: leave 2 logical CPUs for the OS / foreground app so the
+    # BELOW_NORMAL priority actually keeps the machine responsive, then split
+    # what's left across concurrently rendering jobs. Used only for the CPU
+    # filter graph; the encoder is left on -threads 0 (auto) which x264/x265
+    # schedule better internally than a forced count.
     logical_cpus = os.cpu_count() or 4
-    max_concurrent = getattr(config, "max_concurrent_renders", 2)
-    # Nhân hệ số 1.2 để tổng số luồng vượt qua ngưỡng P-Cores, ép Windows chia sẻ bớt việc sang các nhân E-Cores (hiệu năng tăng thêm ~25%)
-    allocated_threads = min(12, max(2, int(logical_cpus * 1.2) // max_concurrent))
+    max_concurrent = max(1, getattr(config, "max_concurrent_renders", 2))
+    filter_threads = max(2, min(16, (logical_cpus - 2) // max_concurrent))
 
     if config.use_gpu:
         vcodec = config.codec
     else:
         vcodec = "libx265" if "hevc" in config.codec else "libx264"
 
+    # No per-input -threads: decoding is rarely the bottleneck and forcing it on
+    # every input over-subscribes the scheduler once several inputs / jobs stack.
     cmd.extend([
-        "-threads", str(allocated_threads),  # Đa luồng cho bộ giải mã video nền
-        "-thread_queue_size", "1024",  # Tối ưu hóa hàng đợi đọc dữ liệu đầu vào trên CPU
+        "-thread_queue_size", "1024",
         "-ss", f"{bg_start:.3f}",
         "-t", f"{bg_segment_duration:.3f}",
         "-i", bg_video,
-        "-threads", str(allocated_threads),  # Đa luồng cho bộ giải mã audio/video nguồn
         "-thread_queue_size", "1024",
         "-i", audio_path,
     ])
@@ -836,7 +854,6 @@ def build_ffmpeg_cmd(
         is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
         if is_video:
             cmd.extend([
-                "-threads", str(allocated_threads),  # Đa luồng cho bộ giải mã layer video phụ
                 "-thread_queue_size", "1024",
                 "-stream_loop", "-1",
                 "-i", layer._resolved_path
@@ -847,9 +864,15 @@ def build_ffmpeg_cmd(
                 "-i", layer._resolved_path
             ])
 
-    # Sử dụng preset p1 (Fastest) cho NVENC để đạt tốc độ mã hóa tối đa trên GPU RTX
-    quality_flags = ["-qp", "23"] if config.use_gpu else ["-crf", "23"]
-    preset_flags  = ["-preset", "p1"] if config.use_gpu else ["-preset", "fast"]
+    if config.use_gpu:
+        # p4 = good quality at practically the same GPU throughput as p1 on
+        # modern NVENC; p1 only helps on very old cards.
+        quality_flags = ["-qp", "23"]
+        preset_flags = ["-preset", "p4"]
+    else:
+        quality_flags = ["-crf", "23"]
+        # x264 handles veryfast well; x265 collapses in quality below ~fast.
+        preset_flags = ["-preset", "veryfast" if vcodec == "libx264" else "fast"]
 
     # Sử dụng filter graph CPU tối ưu (Bilinear scale và pad trên CPU)
     vf_parts = [
@@ -982,7 +1005,7 @@ def build_ffmpeg_cmd(
     filter_expr = ";".join(filter_parts)
 
     cmd += [
-        "-filter_threads", str(allocated_threads),  # Tự động hóa song song hóa bộ lọc trên CPU
+        "-filter_threads", str(filter_threads),  # song song hóa bộ lọc CPU (scale/overlay/subtitles)
         "-filter_complex",
         filter_expr,
         "-map", "[vout]",
@@ -999,21 +1022,21 @@ def build_ffmpeg_cmd(
         "-pix_fmt", "yuv420p",  # Định dạng pixel tối ưu nhất cho GPU NVENC và độ tương thích
         "-c:a", "aac",
         "-b:a", "192k",
-        "-threads", str(allocated_threads),
+        "-threads", "0",  # let the encoder pick its own thread count
         "-shortest",
         "-movflags", "+faststart",
         output_path
     ]
 
     # DEBUG: Log final command inputs
-    print(f"\n[DEBUG] FFmpeg input files:")
+    _dbg(f"\n[DEBUG] FFmpeg input files:")
     for i, part in enumerate(cmd):
         if part == "-i":
-            print(f"  Input #{cmd.index(part, i)}: {cmd[cmd.index(part, i)+1]}")
+            _dbg(f"  Input #{cmd.index(part, i)}: {cmd[cmd.index(part, i)+1]}")
     
-    print(f"[DEBUG] Filter complex preview:")
-    print(f"  {filter_expr[:500]}{'...' if len(filter_expr) > 500 else ''}")
-    print(f"{'='*60}\n")
+    _dbg(f"[DEBUG] Filter complex preview:")
+    _dbg(f"  {filter_expr[:500]}{'...' if len(filter_expr) > 500 else ''}")
+    _dbg(f"{'='*60}\n")
     
     return cmd
 
@@ -1032,26 +1055,26 @@ def render_pair(
     # ============================================================
     # DEBUG LOG: render_pair() entry
     # ============================================================
-    print(f"\n{'#'*70}")
-    print(f"[DEBUG] render_pair() STARTED for pair #{pair.index}")
-    print(f"  - audio_path: {pair.audio_path}")
-    print(f"  - srt_path: {pair.srt_path}")
-    print(f"  - matched: {pair.matched}")
-    print(f"")
-    print(f"  RenderConfig:")
-    print(f"    - bg_folder: '{config.bg_folder}'")
-    print(f"    - bg_videos: {config.bg_videos}")
-    print(f"    - srt_folder: '{config.srt_folder}'")
-    print(f"    - output_folder: '{config.output_folder}'")
-    print(f"    - use_gpu: {config.use_gpu}")
-    print(f"    - codec: {config.codec}")
-    print(f"    - subtitle_style.font_size: {config.subtitle_style.font_size if config.subtitle_style else 'None'}")
-    print(f"")
-    print(f"    Layers config ({len(config.layers) if config.layers else 0} layers):")
+    _dbg(f"\n{'#'*70}")
+    _dbg(f"[DEBUG] render_pair() STARTED for pair #{pair.index}")
+    _dbg(f"  - audio_path: {pair.audio_path}")
+    _dbg(f"  - srt_path: {pair.srt_path}")
+    _dbg(f"  - matched: {pair.matched}")
+    _dbg(f"")
+    _dbg(f"  RenderConfig:")
+    _dbg(f"    - bg_folder: '{config.bg_folder}'")
+    _dbg(f"    - bg_videos: {config.bg_videos}")
+    _dbg(f"    - srt_folder: '{config.srt_folder}'")
+    _dbg(f"    - output_folder: '{config.output_folder}'")
+    _dbg(f"    - use_gpu: {config.use_gpu}")
+    _dbg(f"    - codec: {config.codec}")
+    _dbg(f"    - subtitle_style.font_size: {config.subtitle_style.font_size if config.subtitle_style else 'None'}")
+    _dbg(f"")
+    _dbg(f"    Layers config ({len(config.layers) if config.layers else 0} layers):")
     if config.layers:
         for i, layer in enumerate(config.layers):
-            print(f"      Layer {i+1}: enabled={layer.enabled}, path='{layer.path}', position={layer.position}, size={layer.size}")
-    print(f"{'#'*70}")
+            _dbg(f"      Layer {i+1}: enabled={layer.enabled}, path='{layer.path}', position={layer.position}, size={layer.size}")
+    _dbg(f"{'#'*70}")
     
     if not pair.matched:
         raise ValueError(f"FilePair {pair.index} chưa được ghép đầy đủ: {pair.error}")
