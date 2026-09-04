@@ -116,7 +116,7 @@ class VideoLayoutPreview(QWidget):
             else:
                 lw, lh = 16, 9
 
-        if cfg.size <= 100:
+        if cfg.size <= 150:
             max_w = vw * (cfg.size / 100.0)
             max_h = vh * (cfg.size / 100.0)
             scale_factor = min(max_w / float(lw), max_h / float(lh))
@@ -593,13 +593,13 @@ class VideoLayoutPreview(QWidget):
             
             # Compute size adjustment based on 8 handles
             if self._resize_handle in ('se', 'ne', 'e'):
-                new_size = max(10, min(100, self._start_size + int(ws_dx * 0.5)))
+                new_size = max(10, min(150, self._start_size + int(ws_dx * 0.5)))
             elif self._resize_handle in ('sw', 'nw', 'w'):
-                new_size = max(10, min(100, self._start_size - int(ws_dx * 0.5)))
+                new_size = max(10, min(150, self._start_size - int(ws_dx * 0.5)))
             elif self._resize_handle == 's':
-                new_size = max(10, min(100, self._start_size + int(ws_dy * 0.5)))
+                new_size = max(10, min(150, self._start_size + int(ws_dy * 0.5)))
             else: # 'n'
-                new_size = max(10, min(100, self._start_size - int(ws_dy * 0.5)))
+                new_size = max(10, min(150, self._start_size - int(ws_dy * 0.5)))
                 
             cfg.size = new_size
             self.layerResized.emit(self._selected_index, new_size)

@@ -1334,7 +1334,7 @@ class LiveFramePreview(SubtitlePreviewWidget):
         else:
             lw, lh = 16, 9
             
-        if cfg.size <= 100:
+        if cfg.size <= 150:
             max_w = vw * (cfg.size / 100.0)
             max_h = vh * (cfg.size / 100.0)
             scale_factor = min(max_w / float(lw), max_h / float(lh)) if lw > 0 and lh > 0 else 1.0

@@ -123,7 +123,7 @@ class VideoLayerConfigWidget(QWidget):
         row3.addWidget(sz_lbl)
 
         self.spn_size = QSpinBox()
-        self.spn_size.setRange(10, 100)
+        self.spn_size.setRange(10, 150)
         self.spn_size.setValue(30 if self.index == 1 else 15)
         self.spn_size.setStyleSheet("font-size: 11px;")
         self.spn_size.valueChanged.connect(self._on_changed)

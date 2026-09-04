@@ -730,11 +730,11 @@ class MainWindow(QMainWindow):
 
         # 2. View Menu
         view_menu = menubar.addMenu("View")
-        mode_sub_act = view_menu.addAction("Chế Độ Subtitle + Logo")
+        mode_sub_act = view_menu.addAction("Subtitle")
         mode_sub_act.setShortcut(QKeySequence("Ctrl+1"))
         mode_sub_act.triggered.connect(self._on_mode_sub_clicked)
 
-        mode_vid_act = view_menu.addAction("Chế Độ Trộn Layer Video")
+        mode_vid_act = view_menu.addAction("Scale video")
         mode_vid_act.setShortcut(QKeySequence("Ctrl+2"))
         mode_vid_act.triggered.connect(self._on_mode_video_clicked)
 

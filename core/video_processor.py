@@ -587,86 +587,119 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
 
 
 # ---------------------------------------------------------------------------
-# Subtitle ASS style string for FFmpeg
+# Subtitle rendering — SRT -> ASS pinned to a fixed 1280x720 authoring space
 # ---------------------------------------------------------------------------
 
-def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1280, video_h: int = 720) -> str:
-    if not srt_path or not os.path.exists(srt_path):
-        return ""
-    
-    safe_srt = srt_path.replace("\\", "/").replace(":", "\\:")
-    if srt_path.lower().endswith(".ass"):
-        return f"subtitles='{safe_srt}'"
+# Every subtitle path — this converter, the rounded-box generator
+# convert_srt_to_ass(), and the Edit Sub preview widget — works in this same
+# 1280x720 reference space, so the on-screen preview and the rendered video
+# share one scale. libass then scales this reference to the real output size.
+SUB_REF_W, SUB_REF_H = 1280, 720
 
+
+def _ass_escape_text(text: str) -> str:
+    """Escape a plain subtitle line for use in an ASS Dialogue Text field."""
+    text = text.replace("\\", "").replace("{", r"\{").replace("}", r"\}")
+    return text.replace("\r\n", "\n").replace("\n", r"\N")
+
+
+def convert_srt_to_ass_simple(srt_path: str, ass_path: str, style: SubtitleStyle) -> None:
     """
-    Build FFmpeg subtitles filter with force_style and original_size reference resolution.
+    Wrap an SRT into an ASS whose PlayRes is the fixed 1280x720 authoring space,
+    with a single Default style derived from `style`. Used for every subtitle
+    style except rounded-corner backgrounds (those go through convert_srt_to_ass).
 
-    BorderStyle mapping:
-      1  = Outline + shadow only (no box)
-      3  = Opaque box (rectangle)
-      4  = Opaque box with rounded corners
-
-    We use 3 (rectangle) when background is enabled, 1 (outline only) otherwise.
-    Shadow: SSA supports only basic shadow (Shadow=1/2/3). We approximate with
-    shadow_distance and shadow_blur via BorderStyle=1 + drop-shadow via
-    libass natively when Shadow > 0.
+    Why this exists: handing a raw .srt straight to FFmpeg's `subtitles` filter
+    makes libass invent a ~384x288 script. FontSize / Outline / MarginV are then
+    interpreted in that tiny space and render ~2.5x larger than the preview.
     """
-    def _hex_to_ass(hex_color: str, alpha: float) -> str:
-        r = int(hex_color[1:3], 16)
-        g = int(hex_color[3:5], 16)
-        b = int(hex_color[5:7], 16)
-        a = int((1.0 - alpha) * 255)
-        return f"&H{a:02X}{b:02X}{g:02X}{r:02X}"
+    from core.srt_service import SrtService
 
-    safe_srt = srt_path.replace("\\", "/").replace(":", "\\:")
+    entries = SrtService.parse(srt_path)
 
-    font_color_ass = _hex_to_ass(style.font_color, 1.0)
+    primary = color_to_ass(style.font_color, 1.0)
+    outline_col = color_to_ass(style.stroke_color, 1.0)
+    outline_w = int(style.stroke_width) if style.stroke_enabled else 0
+    border_style = 3 if style.bg_enabled else 1  # 3 = opaque box, 1 = outline + shadow
 
-    # Stroke
-    stroke_color_ass = _hex_to_ass(style.stroke_color, 1.0)
-    outline_val = int(style.stroke_width) if style.stroke_enabled else 0
+    if style.bg_enabled:
+        # BorderStyle 3: BackColour is the box fill colour. libass would also draw
+        # a hard box-coloured drop shadow offset to the lower-right (the "tail"
+        # artefact the preview never shows), so Shadow stays 0 here. A proper
+        # directional box shadow needs the per-line generator (convert_srt_to_ass).
+        back_col = color_to_ass(style.bg_color, style.bg_opacity)
+        shadow_val = 0
+    else:
+        # BorderStyle 1: BackColour is the text drop-shadow colour.
+        back_col = color_to_ass(style.shadow_color, style.shadow_opacity)
+        shadow_val = 0
+        if style.shadow_enabled and style.shadow_distance > 0:
+            d = style.shadow_distance
+            shadow_val = 1 if d <= 2 else 2 if d <= 4 else 3
 
-    # Shadow — convert angle+distance to SSA shadow depth
-    # SSA Shadow=1/2/3 is a single-step shadow. Map our distance to nearest.
-    shadow_val = 0
-    if style.shadow_enabled:
-        d = style.shadow_distance
-        shadow_val = 1 if d <= 2 else 2 if d <= 4 else 3
+    # v4.00+ ASS uses numpad alignment (1-9) directly — the same convention as
+    # style.alignment, so there is no remap (the old keypad->SSA-legacy map was
+    # wrong for this context and broke top/middle alignment).
+    alignment = style.alignment if style.alignment in range(1, 10) else 2
 
-    # Background
-    bg_color_ass = _hex_to_ass(style.bg_color, style.bg_opacity)
-    # Use standard ASS BorderStyle=3 (opaque box) when background is enabled, otherwise 1 (outline + shadow)
-    border_style = 3 if style.bg_enabled else 1
-
-    # Padding — translate to MarginL/R which extend the background box
     margin_l = style.margin_l + style.bg_padding_x
     margin_r = style.margin_r + style.bg_padding_x
     margin_v = style.margin_v + style.bg_padding_y
 
-    # Map keypad alignment (1-9) to ASS/SSA legacy style alignment codes (1-3 bottom, 5-7 top, 9-11 middle)
-    keypad_to_legacy = {
-        1: 1, 2: 2, 3: 3,   # Bottom
-        4: 9, 5: 10, 6: 11, # Middle
-        7: 5, 8: 6, 9: 7    # Top
-    }
-    ass_alignment = keypad_to_legacy.get(style.alignment, style.alignment)
+    lines = [
+        "[Script Info]",
+        "ScriptType: v4.00+",
+        f"PlayResX: {SUB_REF_W}",
+        f"PlayResY: {SUB_REF_H}",
+        "WrapStyle: 0",
+        "ScaledBorderAndShadow: yes",
+        "",
+        "[V4+ Styles]",
+        "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, "
+        "Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
+        "Alignment, MarginL, MarginR, MarginV, Encoding",
+        f"Style: Default,{style.font_name},{style.font_size},{primary},&H000000FF,{outline_col},{back_col},"
+        f"0,0,0,0,100,100,0,0,{border_style},{outline_w},{shadow_val},{alignment},"
+        f"{margin_l},{margin_r},{margin_v},1",
+        "",
+        "[Events]",
+        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+    ]
 
-    force_style = (
-        f"FontName={style.font_name},"
-        f"FontSize={style.font_size},"
-        f"PrimaryColour={font_color_ass},"
-        f"BackColour={bg_color_ass},"
-        f"OutlineColour={stroke_color_ass},"
-        f"Outline={outline_val},"
-        f"Shadow={shadow_val},"
-        f"Alignment={ass_alignment},"
-        f"BorderStyle={border_style},"
-        f"MarginV={margin_v},"
-        f"MarginL={margin_l},"
-        f"MarginR={margin_r}"
-    )
+    for e in entries:
+        text = _ass_escape_text(e.text)
+        if not text:
+            continue
+        lines.append(
+            f"Dialogue: 0,{srt_time_to_ass(e.start_time)},{srt_time_to_ass(e.end_time)},Default,,0,0,0,,{text}"
+        )
 
-    return f"subtitles='{safe_srt}':original_size={video_w}x{video_h}:force_style='{force_style}'"
+    with open(ass_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+
+def _build_subtitle_filter(srt_path: str, style: SubtitleStyle, video_w: int = 1280, video_h: int = 720) -> str:
+    # video_w/video_h are kept for call-site compatibility but no longer used:
+    # subtitles are always authored in the fixed SUB_REF_W x SUB_REF_H space.
+    if not srt_path or not os.path.exists(srt_path):
+        return ""
+
+    if srt_path.lower().endswith(".ass"):
+        safe = srt_path.replace("\\", "/").replace(":", "\\:")
+        return f"subtitles='{safe}'"
+
+    # Convert the SRT to an ASS pinned to 1280x720 so the rendered subtitle
+    # matches the Edit Sub preview instead of coming out ~2.5x too large.
+    ass_path = os.path.splitext(srt_path)[0] + ".auto.ass"
+    try:
+        convert_srt_to_ass_simple(srt_path, ass_path, style)
+        target = ass_path
+    except Exception as exc:
+        print(f"[subtitle] SRT->ASS conversion failed ({exc}); using raw SRT")
+        target = srt_path
+
+    safe = target.replace("\\", "/").replace(":", "\\:")
+    return f"subtitles='{safe}'"
 
 
 # ---------------------------------------------------------------------------
@@ -874,7 +907,7 @@ def build_ffmpeg_cmd(
         crop_r = getattr(layer, "crop_r", 0)
 
         # Compute virtual uncropped layer size
-        if layer.size <= 100:
+        if layer.size <= 150:
             max_w_virt = ws_w_virt * (layer.size / 100.0)
             max_h_virt = ws_h_virt * (layer.size / 100.0)
             scale_factor_virt = min(max_w_virt / float(lw_orig), max_h_virt / float(lh_orig)) if lw_orig > 0 and lh_orig > 0 else 1.0
