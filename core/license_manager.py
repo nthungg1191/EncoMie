@@ -64,6 +64,20 @@ class LicenseInfo:
 class LicenseManager:
     DEFAULT_API_URL = "https://encomie-server.19novemberrr.workers.dev"
 
+    # Running several EncoMie processes at once on the same machine is a
+    # supported workflow (e.g. parallel batches), not something to lock out.
+    # But each instance's own periodic heartbeat (main window: every ~12 min;
+    # worker: every >=60s while rendering) hits the network independently, so
+    # N instances meant N times the /verify traffic for the exact same
+    # key+machine. All instances share the same license.json, and a token
+    # carries the server's issue time (`iat`), so a non-forced check can just
+    # trust a cache another process (or this one) refreshed within this window
+    # instead of repeating the round-trip. The trade-off is detection latency:
+    # a revocation is noticed up to this long late during active use, which for
+    # a desktop tool is fine. force_refresh=True (pre-render, dialog open)
+    # always bypasses this.
+    HEARTBEAT_COALESCE_MS = 600_000
+
     def __init__(self, api_url: Optional[str] = None):
         raw_url = api_url or os.environ.get("LICENSE_API_URL", self.DEFAULT_API_URL)
         self.API_BASE_URL = raw_url.rstrip("/")
@@ -99,12 +113,8 @@ class LicenseManager:
     # ------------------------------------------------------------------ #
 
     def _get_cache_filepath(self) -> Path:
-        if sys.platform.startswith("win"):
-            base_dir = Path(os.environ.get("APPDATA", Path.home())) / "EncoMie"
-        else:
-            base_dir = Path.home() / ".config" / "encomie"
-        base_dir.mkdir(parents=True, exist_ok=True)
-        return base_dir / "license.json"
+        from core.app_paths import app_data_dir
+        return app_data_dir() / "license.json"
 
     def _save_cache(self, key: str, token: str):
         try:
@@ -267,6 +277,13 @@ class LicenseManager:
             if bad.status in (LicenseStatus.REVOKED, LicenseStatus.INVALID):
                 self._clear_cache()
             return bad
+
+        # Coalesce: skip the round-trip if the shared cache was refreshed very
+        # recently — by this process's own last check, or another instance's.
+        if not force_refresh:
+            age_ms = int(time.time() * 1000) - int(claims.get("iat", 0))
+            if 0 <= age_ms < self.HEARTBEAT_COALESCE_MS:
+                return self._info_from_token(cached_key, claims, offline=False)
 
         # ---- Try online verification (refreshes the token / TTL) ----
         try:

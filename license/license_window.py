@@ -200,7 +200,7 @@ class LicenseInfoDialog(QDialog):
 
     def _init_ui(self):
         self.setWindowTitle("Thông Tin Bản Quyền - EncoMie Pro")
-        self.setFixedSize(480, 400)
+        self.setFixedSize(480, 430)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0f172a;
@@ -322,8 +322,31 @@ class LicenseInfoDialog(QDialog):
         machine_id_val = getattr(self.info, 'machine_id', '') or ''
         machine_preview = f"{machine_id_val[:8]}...{machine_id_val[-4:]}" if len(machine_id_val) > 12 else (machine_id_val or "Chưa bind")
 
+        # Plan / gói bản quyền (từ features trong token đã ký, không phải từ is_valid)
+        plan_val = (getattr(self.info, 'plan', '') or '').lower()
+        plan_icon, plan_display, plan_color = {
+            'pro': ("💎", "Pro", "#3b82f6"),
+        }.get(plan_val, ("🆓", "Free", "#94a3b8"))
+        features = getattr(self.info, 'features', None) or {}
+        feature_bits = []
+        if features.get("gpu"):
+            feature_bits.append("Tăng tốc GPU")
+        max_layers = features.get("max_layers")
+        if max_layers:
+            feature_bits.append(f"{max_layers} layer")
+        max_videos = features.get("max_videos")
+        if max_videos is not None and max_videos >= 0:
+            try:
+                from core.render_quota import today_count
+                _k = getattr(self.info, "key", "") or ""
+                feature_bits.append(f"{today_count(_k)}/{max_videos} video hôm nay")
+            except Exception:
+                feature_bits.append(f"{max_videos} video/ngày")
+        plan_suffix = f" &nbsp;<font color='#64748b' style='font-size: 11px;'>({', '.join(feature_bits)})</font>" if feature_bits else ""
+
         f_lay.addWidget(QLabel(f"<b>🔑 Mã License Key:</b> &nbsp;<font color='#38bdf8' style='font-family: monospace; font-size: 14px;'>{key_val}</font>"))
         f_lay.addWidget(QLabel(f"<b>{status_icon} Trạng thái:</b> &nbsp;<font color='{status_color}'><b>{status_display}</b></font>"))
+        f_lay.addWidget(QLabel(f"<b>{plan_icon} Gói:</b> &nbsp;<font color='{plan_color}'><b>{plan_display}</b></font>{plan_suffix}"))
         f_lay.addWidget(QLabel(f"<b>📅 Ngày bắt đầu:</b> &nbsp;<font color='#f1f5f9'>{created_val}</font>"))
         f_lay.addWidget(QLabel(f"<b>⏳ Ngày hết hạn:</b> &nbsp;<font color='#f59e0b'><b>{expires_val}</b></font>"))
         f_lay.addWidget(QLabel(f"<b>🖥️ Số thiết bị tối đa:</b> &nbsp;<font color='#f1f5f9'>{max_devices_val} Máy</font>"))

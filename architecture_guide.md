@@ -46,7 +46,8 @@ graph TD
 | `core/worker.py` | `RenderWorker` (QThread) chạy event loop nền, spawn tối đa `max_concurrent_renders` `SingleRenderJob` song song, tổng hợp tiến độ, cổng kiểm tra bản quyền. `PairingWorker` quét thư mục nền. |
 | `core/license_manager.py` | Sinh HWID (SHA-256 của MachineGuid + hostname + CPU + MAC), cache `%APPDATA%\EncoMie\license.json`, gọi API `activate`/`verify`/`deactivate` (ký HMAC), xác thực offline bằng `exp` của token. |
 | `core/security.py` | Ký request (HMAC-SHA256, nonce, timestamp), **verify license token bằng Ed25519 public key nhúng sẵn**, anti-debugger / quét tiến trình khả nghi, HMAC toàn vẹn cache. |
-| `core/entitlements.py` | Đọc `features` từ token đã ký, kẹp (clamp) `RenderConfig` xuống đúng gói: tắt NVENC / giới hạn số layer / bật watermark nếu không có token hợp lệ. |
+| `core/entitlements.py` | Đọc `features` từ token đã ký, kẹp (clamp) `RenderConfig` xuống đúng gói (`free`/`pro`): tắt NVENC / giới hạn số layer nếu không có token hợp lệ. |
+| `core/render_quota.py` | Đếm số video render thành công trong ngày (cục bộ), enforce trần 50 video/ngày của gói Free. |
 | `core/srt_service.py`, `core/subtitle_model.py` | Parse/ghi/dời/tách/gộp SRT. |
 | `ui/main_window.py` | Trạng thái UI, bảng file, signal/slot, log FFmpeg, **các probe nền** (sysinfo, anti-tamper, heartbeat), gọi entitlements trước khi render. |
 | `ui/video_layer_config.py`, `ui/video_layout_preview.py` | Cấu hình 5 layer đè + canvas kéo–thả–resize 8 hướng (tab Edit Video, hệ ảo 400×225). |
@@ -196,10 +197,25 @@ cache: %APPDATA%\EncoMie\license.json  (token + HMAC checksum)
 ```
 
 - **Không còn** cơ chế "grace period = now − saved_at" hay heuristic xoay đồng hồ.
+- **2 gói: `free` / `pro`. Không có Enterprise, không watermark ở gói nào.**
+  Nguồn định nghĩa: `D:\Cursor\Server\src\utils\plans.ts`.
+
+  | | Free | Pro |
+  |---|---|---|
+  | GPU (NVENC) | ✗ | ✓ |
+  | Layer đè tối đa | 2 | 5 |
+  | Render / ngày | **50** (`max_videos`, reset theo ngày) | không giới hạn |
+
 - `core.entitlements.apply_to_render_config(config, info)` chạy **trước mỗi render**
   ở `_start_render`: token không hợp lệ ⇒ coi như `free` ⇒ tắt NVENC (→ `libx264`),
-  kẹp số layer về `max_layers`, đặt `watermark_enabled=True`. Patch `is_valid=True`
-  không đủ để mở khóa Pro vì `features` rỗng.
+  kẹp số layer về `max_layers`. Patch `is_valid=True` không đủ để mở khóa Pro vì
+  `features` rỗng.
+- **`core/render_quota.py` (mới)**: đếm số video render thành công **cục bộ**
+  (`%APPDATA%\EncoMie\render_quota.json`, theo ngày dương lịch máy). `RenderWorker`
+  kiểm tra trước khi lấy job kế tiếp trong hàng đợi (không đợi chu kỳ check license
+  60s) — hết quota ⇒ phát `quota_exceeded`, dừng phần còn lại của batch. Đây là
+  giới hạn phía client, cùng mức độ bảo vệ với kẹp layer/GPU — không chống được
+  người sửa/xóa file đếm.
 
 ### Server (`D:\Cursor\Server` — riêng)
 Cloudflare Worker + D1 + KV. Request bắt buộc ký (HMAC + nonce một lần + timestamp

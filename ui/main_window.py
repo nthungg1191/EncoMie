@@ -8,6 +8,7 @@ Layout (3-panel horizontal):
 
 import json
 import os
+import random
 import sys
 from pathlib import Path
 
@@ -634,9 +635,16 @@ class MainWindow(QMainWindow):
         self._bg_probe_timer.timeout.connect(lambda: self._kick_bg_probe(scan=True))
         self._bg_probe_timer.start()
 
-        # Background periodic licence heartbeat (network round-trip) every 2 min.
+        # Background periodic licence heartbeat (network round-trip), ~12 min.
+        # This only needs to catch a mid-session revocation/expiry reasonably
+        # promptly; the signed token's own exp + offline grace cover everything
+        # between beats. A short interval (it was 2 min) multiplied by every
+        # running instance was burning the server's KV write budget.
+        # Randomized +/-90s so several EncoMie instances on one machine don't
+        # stay phase-locked; check_license() also coalesces near-simultaneous
+        # beats across instances (see LicenseManager.HEARTBEAT_COALESCE_MS).
         self._license_timer = QTimer(self)
-        self._license_timer.setInterval(2 * 60 * 1000)
+        self._license_timer.setInterval(12 * 60 * 1000 + random.randint(-90000, 90000))
         self._license_timer.timeout.connect(self._kick_license_check)
         self._license_timer.start()
 
@@ -684,6 +692,8 @@ class MainWindow(QMainWindow):
     def _on_periodic_license_result(self, info):
         if info is None:
             return
+        self._license_info = info
+        self._apply_entitlements_to_ui(info)
         if info.status in [LicenseStatus.EXPIRED, LicenseStatus.REVOKED, LicenseStatus.SECURITY_VIOLATION]:
             QMessageBox.warning(
                 self, "Bản Quyền Hết Hạn",
@@ -694,6 +704,7 @@ class MainWindow(QMainWindow):
         """Pre-action security guard before running batch render or core tasks."""
         info = self.license_manager.check_license(force_refresh=True)
         self._license_info = info
+        self._apply_entitlements_to_ui(info)
         if not info.is_valid:
             QMessageBox.warning(
                 self,
@@ -706,6 +717,8 @@ class MainWindow(QMainWindow):
 
     def _check_license_on_startup(self):
         info = self.license_manager.check_license()
+        self._license_info = info
+        self._apply_entitlements_to_ui(info)
         if info.status == LicenseStatus.SECURITY_VIOLATION:
             err_msg = info.raw_data.get("error", {}).get("message", "Cảnh báo bảo mật: Phát hiện công cụ can thiệp hoặc gian lận hệ thống.")
             QMessageBox.critical(
@@ -1564,6 +1577,16 @@ class MainWindow(QMainWindow):
     def _on_logo_settings_changed(self):
         self._update_logo_preview_frames()
 
+    def _apply_entitlements_to_ui(self, info):
+        try:
+            from core.entitlements import Entitlements
+            locked = not Entitlements.from_license(info).color_grade
+            for ctrl in list(getattr(self, "logo_layers", [])) + list(getattr(self, "video_layer_widgets", [])):
+                if hasattr(ctrl, "set_color_locked"):
+                    ctrl.set_color_locked(locked)
+        except Exception:
+            pass
+
     def _update_logo_preview_frames(self):
         if not hasattr(self, "preview_widget") or not hasattr(self, "logo_layers") or not self.logo_layers:
             return
@@ -1598,7 +1621,8 @@ class MainWindow(QMainWindow):
             
             if layer_img:
                 self.preview_widget._logo_images[cfg_obj.path] = layer_img
-                
+            ctrl.set_curve_histogram(layer_img)
+
         self.preview_widget.set_logo_layers(configs)
         self._save_timer.start(1000)
 
@@ -1822,12 +1846,14 @@ class MainWindow(QMainWindow):
         r_lay.addWidget(fps_lbl)
 
         self.cmb_fps = QComboBox(grp_render)
-        self.cmb_fps.addItem("60 FPS", 60)
-        self.cmb_fps.addItem("50 FPS", 50)
-        self.cmb_fps.addItem("30 FPS", 30)
-        self.cmb_fps.addItem("25 FPS", 25)
-        self.cmb_fps.addItem("24 FPS", 24)
-        self.cmb_fps.addItem("23.976 FPS", 23)
+        # Data is the exact ffmpeg -r argument (string). 23.976 must be the
+        # rational 24000/1001, not 23 -- the old int mapping rendered it wrong.
+        self.cmb_fps.addItem("60 FPS", "60")
+        self.cmb_fps.addItem("50 FPS", "50")
+        self.cmb_fps.addItem("30 FPS", "30")
+        self.cmb_fps.addItem("25 FPS", "25")
+        self.cmb_fps.addItem("24 FPS", "24")
+        self.cmb_fps.addItem("23.976 FPS", "24000/1001")
         self.cmb_fps.setCurrentIndex(2) # Default to 30 FPS
         self.cmb_fps.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.cmb_fps)
@@ -2138,12 +2164,14 @@ class MainWindow(QMainWindow):
         self.spn_slow_min.setValue(s.get("slow_min", 35.0))
         self.spn_slow_max.setValue(s.get("slow_max", 45.0))
 
-        fps_val = s.get("fps", 30)
-        idx = self.cmb_fps.findData(fps_val)
-        if idx >= 0:
-            self.cmb_fps.setCurrentIndex(idx)
-        else:
-            self.cmb_fps.setCurrentIndex(2)
+        # Tolerate legacy int-saved fps values (30) and the old "23" for 23.976.
+        _fps_saved = str(s.get("fps", "30"))
+        idx = self.cmb_fps.findData(_fps_saved)
+        if idx < 0 and _fps_saved in ("23", "23.976"):
+            idx = self.cmb_fps.findData("24000/1001")
+        if idx < 0:
+            idx = self.cmb_fps.findData(str(int(float(_fps_saved)))) if _fps_saved.replace(".", "").isdigit() else -1
+        self.cmb_fps.setCurrentIndex(idx if idx >= 0 else 2)
 
         codec_val = s.get("codec", "hevc_nvenc")
         for i, (_, val) in enumerate(CODECS):
@@ -2179,6 +2207,7 @@ class MainWindow(QMainWindow):
             ctrl.spn_crop_b.setValue(s.get(f"logo_crop_b_{layer_num}", 0))
             ctrl.spn_crop_l.setValue(s.get(f"logo_crop_l_{layer_num}", 0))
             ctrl.spn_crop_r.setValue(s.get(f"logo_crop_r_{layer_num}", 0))
+            ctrl.set_crop_mode_checked(s.get(f"logo_crop_mode_{layer_num}", False))
             ctrl.spn_speed.setValue(s.get(f"logo_speed_{layer_num}", 100))
             
             ctrl.chk_chroma_enabled.setChecked(s.get(f"logo_chroma_enabled_{layer_num}", False))
@@ -2187,7 +2216,8 @@ class MainWindow(QMainWindow):
             ctrl.set_chroma_color(s.get(f"logo_chroma_color_{layer_num}", "#00FF00"))
             ctrl.spn_chroma_spill.setValue(s.get(f"logo_chroma_spill_{layer_num}", 0.0))
             ctrl.chroma_params_frame.setVisible(ctrl.chk_chroma_enabled.isChecked())
-            
+            ctrl.color_panel.set_config(s.get(f"logo_color_grade_{layer_num}"))
+
             ctrl._update_speed_visibility()
             
         self._on_logo_settings_changed()
@@ -2216,6 +2246,7 @@ class MainWindow(QMainWindow):
             widget.spn_crop_b.setValue(s.get(f"vlayer_crop_b_{layer_num}", 0))
             widget.spn_crop_l.setValue(s.get(f"vlayer_crop_l_{layer_num}", 0))
             widget.spn_crop_r.setValue(s.get(f"vlayer_crop_r_{layer_num}", 0))
+            widget.set_crop_mode_checked(s.get(f"vlayer_crop_mode_{layer_num}", False))
             widget.spn_speed.setValue(s.get(f"vlayer_speed_{layer_num}", 100))
             
             widget.chk_chroma_enabled.setChecked(s.get(f"vlayer_chroma_enabled_{layer_num}", False))
@@ -2224,7 +2255,8 @@ class MainWindow(QMainWindow):
             widget.set_chroma_color(s.get(f"vlayer_chroma_color_{layer_num}", "#00FF00"))
             widget.spn_chroma_spill.setValue(s.get(f"vlayer_chroma_spill_{layer_num}", 0.0))
             widget.chroma_params_frame.setVisible(widget.chk_chroma_enabled.isChecked())
-            
+            widget.color_panel.set_config(s.get(f"vlayer_color_grade_{layer_num}"))
+
             widget._update_speed_visibility()
 
         self._on_video_layer_changed()
@@ -2249,6 +2281,17 @@ class MainWindow(QMainWindow):
             self.video_tab_widget.setCurrentIndex(s.get("active_video_tab", 0))
         if hasattr(self, "inspector_tab_widget"):
             self.inspector_tab_widget.setCurrentIndex(s.get("active_inspector_tab", 0))
+
+        # setCurrentIndex is a no-op when the index is unchanged, so sync each
+        # preview's crop-edit state to the active layer's restored toggle here.
+        if hasattr(self, "video_layout_preview") and self.video_layer_widgets:
+            _vi = self.video_tab_widget.currentIndex()
+            if 0 <= _vi < len(self.video_layer_widgets):
+                self.video_layout_preview.set_crop_mode(self.video_layer_widgets[_vi].btn_crop_mode.isChecked())
+        if hasattr(self, "preview_widget") and self.logo_layers:
+            _li = self.layer_tab_widget.currentIndex()
+            if 0 <= _li < len(self.logo_layers) and hasattr(self.preview_widget, "set_crop_mode"):
+                self.preview_widget.set_crop_mode(self.logo_layers[_li].btn_crop_mode.isChecked())
 
         # Auto-scan if files already set
         if self.pick_audio.selected_files() and self.pick_srt.selected_files():
@@ -2362,12 +2405,14 @@ class MainWindow(QMainWindow):
             settings_dict[f"logo_crop_b_{layer_num}"] = cfg_obj.crop_b
             settings_dict[f"logo_crop_l_{layer_num}"] = cfg_obj.crop_l
             settings_dict[f"logo_crop_r_{layer_num}"] = cfg_obj.crop_r
+            settings_dict[f"logo_crop_mode_{layer_num}"] = ctrl.btn_crop_mode.isChecked()
             settings_dict[f"logo_speed_{layer_num}"] = ctrl.spn_speed.value()
             settings_dict[f"logo_chroma_enabled_{layer_num}"] = ctrl.chk_chroma_enabled.isChecked()
             settings_dict[f"logo_chroma_sim_{layer_num}"] = ctrl.spn_chroma_sim.value()
             settings_dict[f"logo_chroma_blend_{layer_num}"] = ctrl.spn_chroma_blend.value()
             settings_dict[f"logo_chroma_color_{layer_num}"] = ctrl.chroma_key_color
             settings_dict[f"logo_chroma_spill_{layer_num}"] = ctrl.spn_chroma_spill.value()
+            settings_dict[f"logo_color_grade_{layer_num}"] = ctrl.color_panel.get_config().to_dict()
 
         # Save Edit Video layers (5 layers)
         for idx, widget in enumerate(self.video_layer_widgets):
@@ -2387,12 +2432,14 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_crop_b_{layer_num}"] = cfg_obj.crop_b
             settings_dict[f"vlayer_crop_l_{layer_num}"] = cfg_obj.crop_l
             settings_dict[f"vlayer_crop_r_{layer_num}"] = cfg_obj.crop_r
+            settings_dict[f"vlayer_crop_mode_{layer_num}"] = widget.btn_crop_mode.isChecked()
             settings_dict[f"vlayer_speed_{layer_num}"] = widget.spn_speed.value()
             settings_dict[f"vlayer_chroma_enabled_{layer_num}"] = widget.chk_chroma_enabled.isChecked()
             settings_dict[f"vlayer_chroma_sim_{layer_num}"] = widget.spn_chroma_sim.value()
             settings_dict[f"vlayer_chroma_blend_{layer_num}"] = widget.spn_chroma_blend.value()
             settings_dict[f"vlayer_chroma_color_{layer_num}"] = widget.chroma_key_color
             settings_dict[f"vlayer_chroma_spill_{layer_num}"] = widget.spn_chroma_spill.value()
+            settings_dict[f"vlayer_color_grade_{layer_num}"] = widget.color_panel.get_config().to_dict()
 
         # Collect unchecked audio files from pair_table
         unchecked_audio_files = []
@@ -2709,7 +2756,7 @@ class MainWindow(QMainWindow):
     def _build_config(self) -> RenderConfig:
         codec_val = CODECS[self.cmb_codec.currentIndex()][1]
         res_val = self.cmb_resolution.currentText().split(" ")[0]
-        fps_val = self.cmb_fps.currentData() or 30
+        fps_val = str(self.cmb_fps.currentData() or "30")
         
         if self.btn_tab_video.isChecked():
             # Edit Video mode configurations
@@ -2732,7 +2779,7 @@ class MainWindow(QMainWindow):
                 layers=configs,
                 resolution=res_val,
                 fps=fps_val,
-                max_concurrent_renders=self.spn_concurrent.value()
+                max_concurrent_renders=self.spn_concurrent.value(),
             )
         else:
             preset = self.style_panel.get_style()
@@ -2762,7 +2809,7 @@ class MainWindow(QMainWindow):
                 layers=configs,
                 resolution=res_val,
                 fps=fps_val,
-                max_concurrent_renders=self.spn_concurrent.value()
+                max_concurrent_renders=self.spn_concurrent.value(),
             )
 
     def _validate(self) -> bool:
@@ -2836,6 +2883,7 @@ class MainWindow(QMainWindow):
         self._worker.pair_error.connect(self._on_pair_error)
         self._worker.all_done.connect(self._on_all_done)
         self._worker.license_expired.connect(self._on_render_license_expired)
+        self._worker.quota_exceeded.connect(self._on_render_quota_exceeded)
         self._worker.stopped.connect(self._on_stopped)
         self._worker.paused.connect(self._on_paused)
         self._worker.resumed.connect(self._on_resumed)
@@ -2934,6 +2982,16 @@ class MainWindow(QMainWindow):
             f"{msg}\nVui lòng kích hoạt key mới để tiếp tục render các video còn lại."
         )
         self._show_license_window(mandatory=True)
+
+    def _on_render_quota_exceeded(self, msg: str):
+        self.btn_render.setEnabled(True)
+        self.btn_pause.setEnabled(False)
+        self.btn_pause.setText("⏸  Tạm dừng")
+        self.btn_stop.setEnabled(False)
+        self.lbl_status.setText("Tạm dừng render do đạt giới hạn gói Free")
+        self._log("=" * 60)
+        self._log(f"⚠️ {msg}")
+        QMessageBox.information(self, "Đã Đạt Giới Hạn Gói Free", msg)
 
     def _on_refresh_preview_frame(self):
         """Extract a frame from the first selected video and set it as preview background."""
@@ -3253,16 +3311,20 @@ class MainWindow(QMainWindow):
                         layer_img = get_cached_frame(static_path)
             
             self.video_layout_preview.set_layer_image(layer_num, layer_img)
+            widget.set_curve_histogram(layer_img)
+
+    _FRAME_CACHE_MAX = 16
+    _FRAME_CACHE_DIM = (960, 540)  # preview only; ~2 MB/frame vs ~3.7 MB at 720p
 
     def _add_frame_to_cache(self, path: str, img: QImage):
         if not img or img.isNull():
             return
-        if img.width() > 1280 or img.height() > 720:
-            img = img.scaled(1280, 720, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        mw, mh = self._FRAME_CACHE_DIM
+        if img.width() > mw or img.height() > mh:
+            img = img.scaled(mw, mh, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
         self._video_frame_cache[path] = img
-        if len(self._video_frame_cache) > 50:
-            first_key = next(iter(self._video_frame_cache))
-            self._video_frame_cache.pop(first_key, None)
+        while len(self._video_frame_cache) > self._FRAME_CACHE_MAX:
+            self._video_frame_cache.pop(next(iter(self._video_frame_cache)), None)
 
     def _on_frame_loaded(self, path: str, image: QImage):
         if path in self.running_extractions:

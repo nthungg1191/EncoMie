@@ -29,7 +29,7 @@ from pathlib import Path
 
 APP_NAME = "EncoMie"
 ENTRY = "main.py"
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 
 
 def step(msg: str) -> None:
@@ -80,6 +80,13 @@ def run_nuitka(build_dir: Path, onefile: bool) -> Path:
         "--include-package=nacl",
         "--include-module=_cffi_backend",
         "--include-module=core.entitlements",
+        "--include-module=core.render_quota",
+        "--include-module=core.render_coord",
+        "--include-module=core.app_paths",
+        "--include-module=core.color_preview",
+        "--include-module=core.curves",
+        "--include-module=ui.color_grade_panel",
+        "--include-module=ui.curve_editor",
         "--python-flag=no_asserts",
         "--python-flag=no_docstrings",
         f"--company-name={APP_NAME}",

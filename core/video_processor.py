@@ -130,6 +130,7 @@ class ImageLayerConfig:
     crop_b: int = 0
     crop_l: int = 0
     crop_r: int = 0
+    crop_mode: bool = False   # UI-only: crop-edit tool active for this layer
     radius: int = 0
     speed: int = 100
     chroma_key_enabled: bool = False
@@ -137,6 +138,68 @@ class ImageLayerConfig:
     chroma_key_blend: float = 0.08
     chroma_key_color: str = "#00FF00"
     chroma_key_spill: float = 0.0
+    blur: float = 0.0
+    color_grade: "Optional[ColorGrade]" = None
+
+
+def _identity_curve():
+    return [[0.0, 0.0], [1.0, 1.0]]
+
+
+@dataclass
+class ColorGrade:
+    """Per-layer Curves adjustment (ffmpeg `curves`). Each channel is a list of
+    [x, y] control points in 0..1 with a fixed endpoint at x=0 and x=1; an
+    unchanged channel stays [[0,0],[1,1]] (identity)."""
+    enabled: bool = False
+    curve_m: list = field(default_factory=_identity_curve)  # master (all channels)
+    curve_r: list = field(default_factory=_identity_curve)
+    curve_g: list = field(default_factory=_identity_curve)
+    curve_b: list = field(default_factory=_identity_curve)
+
+    def _channels(self):
+        return (("m", self.curve_m), ("r", self.curve_r), ("g", self.curve_g), ("b", self.curve_b))
+
+    def is_active(self) -> bool:
+        if not self.enabled:
+            return False
+        from core.curves import is_identity
+        return any(not is_identity(pts) for _, pts in self._channels())
+
+    def to_dict(self) -> dict:
+        return {
+            "enabled": self.enabled,
+            "curve_m": [list(p) for p in self.curve_m],
+            "curve_r": [list(p) for p in self.curve_r],
+            "curve_g": [list(p) for p in self.curve_g],
+            "curve_b": [list(p) for p in self.curve_b],
+        }
+
+    @classmethod
+    def from_dict(cls, d: Optional[dict]) -> "ColorGrade":
+        d = d or {}
+
+        def _pts(key):
+            raw = d.get(key)
+            if not isinstance(raw, list) or len(raw) < 2:
+                return _identity_curve()
+            return [[float(p[0]), float(p[1])] for p in raw]
+
+        return cls(
+            enabled=bool(d.get("enabled", False)),
+            curve_m=_pts("curve_m"), curve_r=_pts("curve_r"),
+            curve_g=_pts("curve_g"), curve_b=_pts("curve_b"),
+        )
+
+
+def _build_color_filter(cg: Optional["ColorGrade"]) -> str:
+    """Translate a ColorGrade into an ffmpeg `curves` fragment (no in/out pads)."""
+    if not cg or not cg.is_active():
+        return ""
+    from core.curves import is_identity, format_points, bake_points
+    parts = [f"{ch}='{format_points(bake_points(pts))}'"
+             for ch, pts in cg._channels() if not is_identity(pts)]
+    return ("curves=" + ":".join(parts)) if parts else ""
 
 
 @dataclass
@@ -157,10 +220,8 @@ class RenderConfig:
     logo_size: int = 100     # Legacy field
     logo_opacity: float = 0.8 # Legacy field
     layers: list[ImageLayerConfig] = field(default_factory=lambda: [ImageLayerConfig() for _ in range(5)])
-    fps: int = 30
+    fps: str = "30"   # exact ffmpeg -r arg, e.g. "30" or "24000/1001"
     max_concurrent_renders: int = 2
-    # Set by core.entitlements.apply_to_render_config from the signed license token.
-    watermark_enabled: bool = False
 
     def __post_init__(self):
         if self.subtitle_style is None:
@@ -571,8 +632,13 @@ def convert_srt_to_ass(srt_path: str, ass_path: str, style: SubtitleStyle):
             dx = int(style.shadow_distance * math.cos(rad))
             dy = int(style.shadow_distance * math.sin(rad))
             path = draw_rounded_rect_path(box_w, box_h, bg_radius)
+            # \blur applies libass's gaussian blur to this vector shape, matching
+            # the soft/feathered shadow the Edit Sub preview already draws
+            # (_draw_shadow in subtitle_preview_widget.py) — previously this shape
+            # was always hard-edged and shadow_blur had no effect on the render.
+            blur_tag = f"\\blur{style.shadow_blur:.2f}" if style.shadow_blur > 0 else ""
             lines_out.append(
-                f"Dialogue: 0,{start_ass},{end_ass},SubShadow,,0,0,0,,{{\\pos({bx + dx},{by + dy})\\p1}}{path}"
+                f"Dialogue: 0,{start_ass},{end_ass},SubShadow,,0,0,0,,{{\\pos({bx + dx},{by + dy}){blur_tag}\\p1}}{path}"
             )
 
         # 2. Background Box
@@ -618,6 +684,38 @@ def _ass_escape_text(text: str) -> str:
     return text.replace("\r\n", "\n").replace("\n", r"\N")
 
 
+_SHADOW_LEFT_ALIGN = {1, 4, 7}
+_SHADOW_RIGHT_ALIGN = {3, 6, 9}
+_SHADOW_BOTTOM_ALIGN = {1, 2, 3}
+_SHADOW_TOP_ALIGN = {7, 8, 9}
+
+
+def _shadow_layer_margins(alignment: int, margin_l: int, margin_r: int, margin_v: int,
+                           dx: float, dy: float) -> tuple[int, int, int]:
+    """
+    Margins for a *second* style that shares the same Alignment as the main
+    text but should render offset by (dx, dy) screen pixels (dx>0=right,
+    dy>0=down) without using \\pos — so libass still auto-wraps/positions it
+    identically to the main line (same font/width => same wrap points), and
+    the shadow layer just lands shifted by the shadow angle/distance.
+    Vertical offset is skipped for middle-anchored alignments (4/5/6): MarginV
+    has no reliable effect on vertical centering in libass.
+    """
+    l, r, v = margin_l, margin_r, margin_v
+    if alignment in _SHADOW_LEFT_ALIGN:
+        l = max(0, int(margin_l + dx))
+    elif alignment in _SHADOW_RIGHT_ALIGN:
+        r = max(0, int(margin_r - dx))
+    else:
+        l = max(0, int(margin_l + dx))
+        r = max(0, int(margin_r - dx))
+    if alignment in _SHADOW_BOTTOM_ALIGN:
+        v = max(0, int(margin_v - dy))
+    elif alignment in _SHADOW_TOP_ALIGN:
+        v = max(0, int(margin_v + dy))
+    return l, r, v
+
+
 def convert_srt_to_ass_simple(srt_path: str, ass_path: str, style: SubtitleStyle) -> None:
     """
     Wrap an SRT into an ASS whose PlayRes is the fixed 1280x720 authoring space,
@@ -627,7 +725,15 @@ def convert_srt_to_ass_simple(srt_path: str, ass_path: str, style: SubtitleStyle
     Why this exists: handing a raw .srt straight to FFmpeg's `subtitles` filter
     makes libass invent a ~384x288 script. FontSize / Outline / MarginV are then
     interpreted in that tiny space and render ~2.5x larger than the preview.
+
+    Text drop-shadow (shadow_enabled, no background box) is rendered as a
+    *separate* styled dialogue line underneath the main text, offset via
+    margins and blurred with libass's \\blur tag — matching the soft, angled
+    shadow the Edit Sub preview already draws (_draw_shadow). The old
+    approach (ASS's built-in Shadow=1/2/3 style field) was always a hard,
+    fixed-diagonal copy with no blur and no angle control.
     """
+    import math
     from core.srt_service import SrtService
 
     entries = SrtService.parse(srt_path)
@@ -635,22 +741,19 @@ def convert_srt_to_ass_simple(srt_path: str, ass_path: str, style: SubtitleStyle
     primary = color_to_ass(style.font_color, 1.0)
     outline_col = color_to_ass(style.stroke_color, 1.0)
     outline_w = int(style.stroke_width) if style.stroke_enabled else 0
-    border_style = 3 if style.bg_enabled else 1  # 3 = opaque box, 1 = outline + shadow
+    border_style = 3 if style.bg_enabled else 1  # 3 = opaque box, 1 = outline only
+
+    # Real shadow (this function's scope) only applies to plain text, matching
+    # what the preview does: a background box gets its own shadow treatment in
+    # convert_srt_to_ass instead (square boxes here stay shadow-less, as before,
+    # to avoid the hard box-coloured "tail" artefact fixed earlier).
+    use_shadow_layer = style.shadow_enabled and not style.bg_enabled and style.shadow_distance >= 0
 
     if style.bg_enabled:
-        # BorderStyle 3: BackColour is the box fill colour. libass would also draw
-        # a hard box-coloured drop shadow offset to the lower-right (the "tail"
-        # artefact the preview never shows), so Shadow stays 0 here. A proper
-        # directional box shadow needs the per-line generator (convert_srt_to_ass).
         back_col = color_to_ass(style.bg_color, style.bg_opacity)
-        shadow_val = 0
     else:
-        # BorderStyle 1: BackColour is the text drop-shadow colour.
-        back_col = color_to_ass(style.shadow_color, style.shadow_opacity)
-        shadow_val = 0
-        if style.shadow_enabled and style.shadow_distance > 0:
-            d = style.shadow_distance
-            shadow_val = 1 if d <= 2 else 2 if d <= 4 else 3
+        back_col = "&H00000000"
+    shadow_val = 0  # the real shadow, if any, is the separate ShadowFX layer below
 
     # v4.00+ ASS uses numpad alignment (1-9) directly — the same convention as
     # style.alignment, so there is no remap (the old keypad->SSA-legacy map was
@@ -676,18 +779,35 @@ def convert_srt_to_ass_simple(srt_path: str, ass_path: str, style: SubtitleStyle
         f"Style: Default,{style.font_name},{style.font_size},{primary},&H000000FF,{outline_col},{back_col},"
         f"0,0,0,0,100,100,0,0,{border_style},{outline_w},{shadow_val},{alignment},"
         f"{margin_l},{margin_r},{margin_v},1",
-        "",
-        "[Events]",
-        "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
+
+    blur_tag = ""
+    if use_shadow_layer:
+        shadow_col = color_to_ass(style.shadow_color, style.shadow_opacity)
+        rad = math.radians(style.shadow_angle)
+        dx = style.shadow_distance * math.cos(rad)
+        dy = style.shadow_distance * math.sin(rad)
+        sh_l, sh_r, sh_v = _shadow_layer_margins(alignment, margin_l, margin_r, margin_v, dx, dy)
+        lines.append(
+            f"Style: ShadowFX,{style.font_name},{style.font_size},{shadow_col},&H000000FF,&H00000000,&H00000000,"
+            f"0,0,0,0,100,100,0,0,1,0,0,{alignment},{sh_l},{sh_r},{sh_v},1"
+        )
+        if style.shadow_blur > 0:
+            blur_tag = f"{{\\blur{style.shadow_blur:.2f}}}"
+
+    lines += ["", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
 
     for e in entries:
         text = _ass_escape_text(e.text)
         if not text:
             continue
-        lines.append(
-            f"Dialogue: 0,{srt_time_to_ass(e.start_time)},{srt_time_to_ass(e.end_time)},Default,,0,0,0,,{text}"
-        )
+        start_ass, end_ass = srt_time_to_ass(e.start_time), srt_time_to_ass(e.end_time)
+        if use_shadow_layer:
+            # Layer 0 draws first (underneath); Default below is bumped to Layer 1.
+            lines.append(f"Dialogue: 0,{start_ass},{end_ass},ShadowFX,,0,0,0,,{blur_tag}{text}")
+            lines.append(f"Dialogue: 1,{start_ass},{end_ass},Default,,0,0,0,,{text}")
+        else:
+            lines.append(f"Dialogue: 0,{start_ass},{end_ass},Default,,0,0,0,,{text}")
 
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -729,7 +849,8 @@ def build_ffmpeg_cmd(
     audio_path: str,
     srt_path: str,
     output_path: str,
-    config: RenderConfig
+    config: RenderConfig,
+    cpu: Optional[dict] = None,
 ) -> list[str]:
     speed_factor = slow_pct / 100.0
     pts_expr = f"PTS/{speed_factor:.4f}"
@@ -826,14 +947,14 @@ def build_ffmpeg_cmd(
 
     fps_val = getattr(config, "fps", 30)
 
-    # Thread budget: leave 2 logical CPUs for the OS / foreground app so the
-    # BELOW_NORMAL priority actually keeps the machine responsive, then split
-    # what's left across concurrently rendering jobs. Used only for the CPU
-    # filter graph; the encoder is left on -threads 0 (auto) which x264/x265
-    # schedule better internally than a forced count.
-    logical_cpus = os.cpu_count() or 4
-    max_concurrent = max(1, getattr(config, "max_concurrent_renders", 2))
-    filter_threads = max(2, min(16, (logical_cpus - 2) // max_concurrent))
+    # Thread budget: render_coord.cpu_plan is the single source of truth (it
+    # keeps total render CPU near ~50% across every EncoMie instance). Derive
+    # one here if the caller didn't pass it.
+    if cpu is None:
+        from core.render_coord import cpu_plan
+        cpu = cpu_plan(getattr(config, "max_concurrent_renders", 2))
+    filter_threads = cpu["filter_threads"]
+    encoder_threads = cpu["encoder_threads"]
 
     if config.use_gpu:
         vcodec = config.codec
@@ -842,32 +963,43 @@ def build_ffmpeg_cmd(
 
     # No per-input -threads: decoding is rarely the bottleneck and forcing it on
     # every input over-subscribes the scheduler once several inputs / jobs stack.
+    # thread_queue_size is jitter-absorption between the decode thread and the
+    # filter graph, not a throughput knob: for local files the decoder is faster
+    # than the CPU filter graph so the queue sits near-full anyway. 384 (down
+    # from 1024) cuts the per-input packet buffer to ~a third -- a real RAM
+    # saving with N inputs x 2 concurrent renders -- and tested clean with no
+    # wall-clock cost. Raise it back if the ffmpeg log ever shows
+    # "Thread message queue blocking".
+    TQ = "384"
     cmd.extend([
-        "-thread_queue_size", "1024",
+        "-thread_queue_size", TQ,
         "-ss", f"{bg_start:.3f}",
         "-t", f"{bg_segment_duration:.3f}",
         "-i", bg_video,
-        "-thread_queue_size", "1024",
+        "-thread_queue_size", TQ,
         "-i", audio_path,
     ])
     for layer in active_layers:
         is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
         if is_video:
             cmd.extend([
-                "-thread_queue_size", "1024",
+                "-thread_queue_size", TQ,
                 "-stream_loop", "-1",
                 "-i", layer._resolved_path
             ])
         else:
             cmd.extend([
-                "-thread_queue_size", "1024",
+                "-thread_queue_size", TQ,
                 "-i", layer._resolved_path
             ])
 
     if config.use_gpu:
         # p4 = good quality at practically the same GPU throughput as p1 on
         # modern NVENC; p1 only helps on very old cards.
-        quality_flags = ["-qp", "23"]
+        # -surfaces 8: cap the NVENC surface pool (auto can allocate 20-40
+        # frames of VRAM+host memory); 8 is enough to keep a single-pass
+        # encode pipelined and saves ~30-50 MB per concurrent render.
+        quality_flags = ["-qp", "23", "-surfaces", "8"]
         preset_flags = ["-preset", "p4"]
     else:
         quality_flags = ["-crf", "23"]
@@ -920,8 +1052,18 @@ def build_ffmpeg_cmd(
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)
         
-        ws_w_virt = 1280.0 if is_edit_sub else 400.0
-        ws_h_virt = 720.0 if is_edit_sub else 225.0
+        # Virtual workspace the layer positions/sizes were authored in, kept in
+        # lock-step with the on-screen preview so a layer renders where the user
+        # dragged it at ANY output resolution (not just 16:9 720p):
+        #   - Edit-Video preview (video_layout_preview): 400px wide, aspect height
+        #   - Subtitle-mode preview (LiveFramePreview): the full target w x h
+        _tw, _th = int(w), int(h)
+        if is_edit_sub:
+            ws_w_virt = float(_tw)
+            ws_h_virt = float(_th)
+        else:
+            ws_w_virt = 400.0
+            ws_h_virt = (400.0 * _th / _tw) if _tw else 225.0
 
         # Crop values
         crop_t = getattr(layer, "crop_t", 0)
@@ -957,10 +1099,26 @@ def build_ffmpeg_cmd(
         # Ensure even width for FFmpeg compatibility
         pixel_w = max(4, (pixel_w // 2) * 2)
 
-        # Build filter for scaling, crop, format conversion (Đặt format=rgba trước scale để giữ kênh alpha/độ trong suốt của ảnh, tránh bị nền trắng/đen)
+        # gblur blurs all planes present in the pixel format, alpha included since
+        # we're already in rgba here -- softens cutout edges the same way the
+        # chroma-key/despill step does, rather than leaving them hard after blur.
+        blur_sigma = getattr(layer, "blur", 0.0)
+        blur_filter = f"gblur=sigma={blur_sigma:.2f}:steps=2," if blur_sigma > 0.001 else ""
+
+        # Per-layer colour grade (Pro), applied after keying/despill so the key
+        # colour isn't shifted before it's matched.
+        _cg = _build_color_filter(getattr(layer, "color_grade", None))
+        grade_filter = f"{_cg}," if _cg else ""
+
+        # Working pixel format: rgba is 4 bytes/px and drives peak filter-graph
+        # RAM. colorkey/despill genuinely need it; without chroma-key, yuva420p
+        # (1.5 bytes/px, alpha kept for opacity/blur/overlay) halves the
+        # decode->scale->blur buffers. ffmpeg auto-converts for the RGB-only
+        # tail filters (curves / colorchannelmixer).
+        layer_fmt = "rgba" if chroma_filter else "yuva420p"
         filter_parts.append(
-            f"[{input_index}:v]{crop_filter}{pts_filter}format=rgba,scale={pixel_w}:-2:flags=bilinear,"
-            f"{chroma_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
+            f"[{input_index}:v]{crop_filter}{pts_filter}format={layer_fmt},scale={pixel_w}:-2:flags=bilinear,"
+            f"{chroma_filter}{blur_filter}{grade_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
         )
         
         # Position calculations with scaled margins
@@ -1022,7 +1180,9 @@ def build_ffmpeg_cmd(
         "-pix_fmt", "yuv420p",  # Định dạng pixel tối ưu nhất cho GPU NVENC và độ tương thích
         "-c:a", "aac",
         "-b:a", "192k",
-        "-threads", "0",  # let the encoder pick its own thread count
+        # 0 = auto (best for a lone job); a positive cap when the machine is
+        # shared by several renders so N encoders don't each grab every core.
+        "-threads", str(encoder_threads),
         "-shortest",
         "-movflags", "+faststart",
         output_path
@@ -1145,20 +1305,29 @@ def render_pair(
     try:
         _progress(12, f"[{pair.index}] Bắt đầu render với FFmpeg...")
 
-        cmd = build_ffmpeg_cmd(
-            bg_video=bg_video,
-            bg_start=bg_start,
-            bg_segment_duration=bg_seg_dur,
-            slow_pct=slow_pct,
-            audio_path=pair.audio_path,
-            srt_path=temp_srt_path,
-            output_path=output_path,
-            config=config
-        )
+        from core.render_coord import RenderSlot, cpu_plan, active_render_count
 
-        _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+        with RenderSlot() as _slot:
+            plan = cpu_plan(getattr(config, "max_concurrent_renders", 2))
+            _log(f"[sched] {active_render_count()} render(s) machine-wide -> "
+                 f"{plan['filter_threads']} filter / {plan['encoder_threads']} encoder threads each")
 
-        _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort)
+            cmd = build_ffmpeg_cmd(
+                bg_video=bg_video,
+                bg_start=bg_start,
+                bg_segment_duration=bg_seg_dur,
+                slow_pct=slow_pct,
+                audio_path=pair.audio_path,
+                srt_path=temp_srt_path,
+                output_path=output_path,
+                config=config,
+                cpu=plan,
+            )
+
+            _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+
+            _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort,
+                        slot=_slot)
     finally:
         try:
             if os.path.exists(temp_srt_path):
@@ -1174,12 +1343,15 @@ def render_pair(
 
 
 def _run_ffmpeg(cmd: list[str], total_duration: float,
-                progress_cb, log_cb, label: str, should_abort=None):
+                progress_cb, log_cb, label: str, should_abort=None, slot=None):
     time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
 
     import sys
     creationflags = 0
     if sys.platform == "win32":
+        # BELOW_NORMAL keeps the reserved CPU headroom genuinely available to
+        # the OS / foreground apps; the thread budget (render_coord.cpu_plan)
+        # is what actually holds total render CPU near ~50%.
         creationflags = 0x00004000 | 0x08000000  # BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
 
     process = subprocess.Popen(
@@ -1193,6 +1365,8 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
     )
 
     for line in process.stdout:
+        if slot is not None:
+            slot.touch()
         if should_abort and should_abort():
             process.terminate()
             process.wait(timeout=5)

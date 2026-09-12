@@ -58,6 +58,7 @@ class RenderWorker(QThread):
     pair_error = pyqtSignal(str, str)       # index, error_message
     all_done = pyqtSignal(int, int)         # success_count, error_count
     license_expired = pyqtSignal(str)       # license expired during batch queue
+    quota_exceeded = pyqtSignal(str)        # daily Free-plan render quota reached
     stopped = pyqtSignal()
     paused = pyqtSignal()
     resumed = pyqtSignal()
@@ -82,6 +83,8 @@ class RenderWorker(QThread):
         self._completed_pairs = set()
         self._license_mgr = None
         self._last_license_check = 0.0
+        self._entitlements = None      # core.entitlements.Entitlements, refreshed with the license check
+        self._license_key = ""         # active key, for scoping the render quota
 
     def abort(self):
         self._abort = True
@@ -119,6 +122,8 @@ class RenderWorker(QThread):
         self._job_messages.clear()
         self._completed_pairs.clear()
         self._last_license_check = 0.0
+        self._entitlements = None
+        self._license_key = ""
 
         # If empty queue, exit immediately
         if not self.pairs:
@@ -144,13 +149,16 @@ class RenderWorker(QThread):
         max_concurrent = getattr(self.config, "max_concurrent_renders", 2)
 
         # License gate: check once when the batch starts, then at most once a
-        # minute — not on every queued item (each check was a ~150ms process
-        # scan + a network round-trip between videos).
+        # minute — not on every queued item (the local part is a ~150ms process
+        # scan). The network round-trip is usually skipped: check_license()
+        # coalesces onto a cache refreshed within HEARTBEAT_COALESCE_MS, so a
+        # long batch only really re-verifies every ~10 min.
         now = time.monotonic()
         if now - self._last_license_check > 60:
             self._last_license_check = now
             try:
                 from core.license_manager import LicenseManager, LicenseStatus
+                from core.entitlements import Entitlements
                 if self._license_mgr is None:
                     self._license_mgr = LicenseManager()
                 info = self._license_mgr.check_license(force_refresh=False)
@@ -162,8 +170,24 @@ class RenderWorker(QThread):
                         "nhưng các video còn lại trong hàng chờ đã bị ngắt.")
                     self.quit()
                     return
+                self._entitlements = Entitlements.from_license(info)
+                self._license_key = getattr(info, "key", "") or ""
             except Exception:
                 pass
+
+        # Free-plan daily render quota: checked before popping each item (not
+        # throttled like the license check above) since a big batch can cross
+        # the cap well within the 60s license-check window. Scoped to the active
+        # key so renders done on another key (e.g. a Pro key) don't count.
+        if self._entitlements is not None and self._pending_pairs:
+            from core.render_quota import remaining_today
+            if remaining_today(self._entitlements.max_videos, self._license_key) == 0:
+                self._abort = True
+                self.quota_exceeded.emit(
+                    "Đã đạt giới hạn render trong ngày của gói Free. Video đang chạy dở sẽ hoàn tất, "
+                    "nhưng các video còn lại trong hàng chờ đã bị ngắt. Nâng cấp Pro để render không giới hạn.")
+                self.quit()
+                return
 
         while len(self._active_jobs) < max_concurrent and self._pending_pairs:
             pair = self._pending_pairs.pop(0)
@@ -196,7 +220,13 @@ class RenderWorker(QThread):
         self._completed_pairs.add(idx)
         self._job_progress[idx] = 100.0
         self._success += 1
-        
+
+        try:
+            from core.render_quota import record_render
+            record_render(getattr(self, "_license_key", ""))
+        except Exception:
+            pass
+
         # Clean up job reference
         if idx in self._active_jobs:
             self._active_jobs[idx].wait()

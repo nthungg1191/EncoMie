@@ -2,9 +2,9 @@
 Interactive Video Layout Preview widget using QPainter.
 Supports dragging, resizing, selecting, and cropping 5 layers.
 """
-from PyQt6.QtWidgets import QWidget
-from PyQt6.QtCore import Qt, QRect, QPoint, pyqtSignal, QSize
-from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QImage
+from PyQt6.QtWidgets import QWidget, QGraphicsScene, QGraphicsPixmapItem, QGraphicsBlurEffect
+from PyQt6.QtCore import Qt, QRect, QRectF, QPoint, pyqtSignal, QSize
+from PyQt6.QtGui import QPainter, QColor, QPen, QBrush, QFont, QImage, QPixmap
 
 class VideoLayoutPreview(QWidget):
     # Signals to communicate updates back to Main Window
@@ -267,6 +267,8 @@ class VideoLayoutPreview(QWidget):
             layer_opacity = getattr(cfg, "opacity", 1.0)
             if layer_img and not layer_img.isNull():
                 layer_img = self._get_keyed_image(i, layer_img, cfg)
+                layer_img = self._get_blurred_image(i, layer_img, cfg)
+                layer_img = self._get_color_graded_image(i, layer_img, cfg)
                 p.save()
                 p.setOpacity(layer_opacity)
                 
@@ -685,6 +687,65 @@ class VideoLayoutPreview(QWidget):
                 return
 
         self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def _get_color_graded_image(self, index: int, img: QImage, cfg) -> QImage:
+        """Approximate this layer's colour grade for the preview (LUT excluded)."""
+        cg = getattr(cfg, "color_grade", None)
+        if cg is None or not getattr(cg, "is_active", lambda: False)() or img.isNull():
+            return img
+        if not hasattr(self, "_graded_images_cache"):
+            self._graded_images_cache = {}
+        sig = (img.cacheKey(), repr(cg.curve_m), repr(cg.curve_r), repr(cg.curve_g), repr(cg.curve_b))
+        cached = self._graded_images_cache.get(index)
+        if cached and cached[0] == sig:
+            return cached[1]
+        try:
+            from core.color_preview import grade_qimage
+            out = grade_qimage(img, cg)
+        except Exception:
+            out = img
+        self._graded_images_cache[index] = (sig, out)
+        return out
+
+    def _get_blurred_image(self, index: int, img: QImage, cfg) -> QImage:
+        """Approximate the render's gblur (sigma) on the preview via Qt's own
+        QGraphicsBlurEffect, so the on-screen layer matches the exported video."""
+        if not hasattr(self, "_blurred_images_cache"):
+            self._blurred_images_cache = {}
+
+        sigma = getattr(cfg, "blur", 0.0)
+        if sigma <= 0.001 or img.isNull():
+            return img
+
+        cache_key = img.cacheKey()
+        cached = self._blurred_images_cache.get(index)
+        if cached and cached[0] == cache_key and cached[1] == sigma:
+            return cached[2]
+
+        blurred = self._apply_blur(img, sigma)
+        self._blurred_images_cache[index] = (cache_key, sigma, blurred)
+        return blurred
+
+    @staticmethod
+    def _apply_blur(img: QImage, sigma: float) -> QImage:
+        # Keep the output the exact same size as the input: FFmpeg's gblur does not
+        # enlarge the frame (blur is edge-clamped), and the paint code stretches
+        # whatever image it gets into the layer rect -- a padded image would make
+        # the visible content appear to shrink after enabling blur.
+        scene = QGraphicsScene()
+        item = QGraphicsPixmapItem(QPixmap.fromImage(img))
+        effect = QGraphicsBlurEffect()
+        effect.setBlurRadius(sigma * 2.0)
+        effect.setBlurHints(QGraphicsBlurEffect.BlurHint.QualityHint)
+        item.setGraphicsEffect(effect)
+        scene.addItem(item)
+        target = QImage(img.width(), img.height(), QImage.Format.Format_ARGB32)
+        target.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(target)
+        scene.render(painter, QRectF(0, 0, img.width(), img.height()),
+                     QRectF(0, 0, img.width(), img.height()))
+        painter.end()
+        return target
 
     def _get_keyed_image(self, index: int, img: QImage, cfg) -> QImage:
         if not hasattr(self, "_keyed_images_cache"):

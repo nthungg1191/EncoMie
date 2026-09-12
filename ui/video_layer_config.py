@@ -4,7 +4,7 @@ Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QPushButton,
-    QGroupBox, QFrame, QLineEdit, QScrollArea
+    QGroupBox, QFrame, QLineEdit, QScrollArea, QSizePolicy
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from pathlib import Path
@@ -34,13 +34,18 @@ class VideoLayerConfigWidget(QWidget):
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # AsNeeded (not AlwaysOff): if the panel gets narrower than the content can
+        # reasonably shrink, show a scrollbar instead of silently clipping widgets.
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
 
         # Inner content widget
         content = QWidget()
+        # Floor width: below this the scroll area shows a horizontal scrollbar
+        # instead of squashing/clipping the group-box rows.
+        content.setMinimumWidth(320)
         content_lay = QVBoxLayout(content)
         content_lay.setContentsMargins(10, 10, 10, 10)
         content_lay.setSpacing(8)
@@ -62,8 +67,11 @@ class VideoLayerConfigWidget(QWidget):
             "File cố định (Static file...)"
         ])
         self.cmb_source_type.setStyleSheet("font-size: 11px;")
+        self.cmb_source_type.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_source_type.setMinimumContentsLength(8)
+        self.cmb_source_type.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.cmb_source_type.currentIndexChanged.connect(self._on_source_type_changed)
-        row1.addWidget(self.cmb_source_type)
+        row1.addWidget(self.cmb_source_type, 1)
         content_lay.addLayout(row1)
 
         # Static file selector row (visible only if Static file is selected)
@@ -110,28 +118,31 @@ class VideoLayerConfigWidget(QWidget):
             "Góc trên - Trái (Top-Left)"
         ])
         self.cmb_pos.setStyleSheet("font-size: 11px;")
+        self.cmb_pos.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon)
+        self.cmb_pos.setMinimumContentsLength(8)
+        self.cmb_pos.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.cmb_pos.currentIndexChanged.connect(self._on_pos_changed)
         row2.addWidget(self.cmb_pos, 1)
         content_lay.addLayout(row2)
 
-        # Row 3: Cỡ (Scale %) & Bo góc (Radius px)
-        row3 = QHBoxLayout()
+        # Row 3: Cỡ (Scale %) & Độ mờ (Opacity %) - 2 cột responsive như Margin/Crop group
+        row3 = QGridLayout()
         row3.setSpacing(10)
 
         sz_lbl = QLabel("Cỡ (%):")
         sz_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(sz_lbl)
+        row3.addWidget(sz_lbl, 0, 0)
 
         self.spn_size = QSpinBox()
         self.spn_size.setRange(10, 150)
         self.spn_size.setValue(30 if self.index == 1 else 15)
         self.spn_size.setStyleSheet("font-size: 11px;")
         self.spn_size.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_size, 1)
+        row3.addWidget(self.spn_size, 0, 1)
 
         op_lbl = QLabel("Độ mờ (%):")
         op_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(op_lbl)
+        row3.addWidget(op_lbl, 0, 2)
 
         self.spn_opacity = QSpinBox()
         self.spn_opacity.setRange(10, 100)
@@ -139,18 +150,28 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_opacity.setSingleStep(5)
         self.spn_opacity.setStyleSheet("font-size: 11px;")
         self.spn_opacity.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_opacity, 1)
+        row3.addWidget(self.spn_opacity, 0, 3)
+
+        row3.setColumnStretch(1, 1)
+        row3.setColumnStretch(3, 1)
         content_lay.addLayout(row3)
 
-        # Row 3.5: Speed configuration (only for video layers)
-        self.row_speed_widget = QWidget()
-        row_speed_lay = QHBoxLayout(self.row_speed_widget)
-        row_speed_lay.setContentsMargins(0, 0, 0, 0)
-        row_speed_lay.setSpacing(10)
+        # Row 3.5: Tốc độ chạy layer (chỉ video, có thể ẩn) & Độ nhòe (Blur, luôn hiện
+        # kể cả layer ảnh tĩnh) - cùng 1 hàng, 2 cột responsive.
+        row_speed_grid = QGridLayout()
+        row_speed_grid.setContentsMargins(0, 0, 0, 0)
+        row_speed_grid.setSpacing(10)
 
-        speed_lbl = QLabel("Tốc độ chạy layer (%):")
+        # Tốc độ chỉ áp dụng cho video nên gói riêng trong 1 widget để ẩn/hiện
+        # mà không kéo theo ô Blur (áp dụng được cho cả layer ảnh tĩnh).
+        self.row_speed_widget = QWidget()
+        speed_pair_lay = QHBoxLayout(self.row_speed_widget)
+        speed_pair_lay.setContentsMargins(0, 0, 0, 0)
+        speed_pair_lay.setSpacing(10)
+
+        speed_lbl = QLabel("Tốc độ layer (%):")
         speed_lbl.setStyleSheet("font-size: 11px;")
-        row_speed_lay.addWidget(speed_lbl)
+        speed_pair_lay.addWidget(speed_lbl)
 
         self.spn_speed = QSpinBox()
         self.spn_speed.setRange(10, 300)
@@ -158,9 +179,26 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_speed.setSuffix("%")
         self.spn_speed.setStyleSheet("font-size: 11px;")
         self.spn_speed.valueChanged.connect(self._on_changed)
-        row_speed_lay.addWidget(self.spn_speed, 1)
+        speed_pair_lay.addWidget(self.spn_speed, 1)
 
-        content_lay.addWidget(self.row_speed_widget)
+        row_speed_grid.addWidget(self.row_speed_widget, 0, 0, 1, 2)
+
+        blur_lbl = QLabel("Độ nhòe (Blur):")
+        blur_lbl.setStyleSheet("font-size: 11px;")
+        row_speed_grid.addWidget(blur_lbl, 0, 2)
+
+        self.spn_blur = QDoubleSpinBox()
+        self.spn_blur.setRange(0.0, 20.0)
+        self.spn_blur.setSingleStep(0.5)
+        self.spn_blur.setValue(0.0)
+        self.spn_blur.setStyleSheet("font-size: 11px;")
+        self.spn_blur.valueChanged.connect(self._on_changed)
+        row_speed_grid.addWidget(self.spn_blur, 0, 3)
+
+        row_speed_grid.setColumnStretch(1, 1)
+        row_speed_grid.setColumnStretch(3, 1)
+
+        content_lay.addLayout(row_speed_grid)
 
         # Row 4: Margins Group
         margin_grp = QGroupBox("Căn chỉnh khoảng lề (Margin - px)")
@@ -319,8 +357,28 @@ class VideoLayerConfigWidget(QWidget):
         self.chroma_params_frame.setVisible(False)
 
         content_lay.addWidget(self.chroma_grp)
+
+        # Row 7: Curves (Pro) for this layer's clip
+        self.color_grp = QGroupBox("🎨  Curves")
+        self.color_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
+        color_lay = QVBoxLayout(self.color_grp)
+        color_lay.setContentsMargins(6, 6, 6, 6)
+        from ui.color_grade_panel import ColorGradePanel
+        self.color_panel = ColorGradePanel(self.color_grp)
+        self.color_panel.changed.connect(self._on_changed)
+        self.color_panel.set_locked(True)  # unlocked when a Pro licence is confirmed
+        color_lay.addWidget(self.color_panel)
+        content_lay.addWidget(self.color_grp)
+
         content_lay.addStretch(1)
-        
+
+        # Keep every number field compact so the 2-column grid rows fit a narrow
+        # panel without forcing a horizontal scrollbar.
+        for _sb in content.findChildren((QSpinBox, QDoubleSpinBox)):
+            _sb.setMinimumWidth(0)
+            _sb.setMaximumWidth(90)
+            _sb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
         # Set scroll area widget
         scroll.setWidget(content)
         outer.addWidget(scroll)
@@ -363,6 +421,15 @@ class VideoLayerConfigWidget(QWidget):
         else:
             self.btn_crop_mode.setText("✂  Bật Crop Mode")
         self.cropModeToggled.emit(checked)
+
+    def set_crop_mode_checked(self, checked: bool):
+        """Restore the crop-mode toggle without re-emitting cropModeToggled
+        (preview sync is done by the tab-change handler on load)."""
+        checked = bool(checked)
+        self.btn_crop_mode.blockSignals(True)
+        self.btn_crop_mode.setChecked(checked)
+        self.btn_crop_mode.setText("✓  Đang Crop (Tắt)" if checked else "✂  Bật Crop Mode")
+        self.btn_crop_mode.blockSignals(False)
 
     def _on_chroma_enabled_changed(self, state: int):
         # In PyQt6, check state can be an int or CheckState
@@ -421,8 +488,17 @@ class VideoLayerConfigWidget(QWidget):
         cfg_obj.chroma_key_blend = self.spn_chroma_blend.value()
         cfg_obj.chroma_key_color = self.chroma_key_color
         cfg_obj.chroma_key_spill = self.spn_chroma_spill.value()
+        cfg_obj.blur = self.spn_blur.value()
+        cfg_obj.color_grade = self.color_panel.get_config()
+        cfg_obj.crop_mode = self.btn_crop_mode.isChecked()
         cfg_obj.source_type = idx # Save index
         return cfg_obj
+
+    def set_color_locked(self, locked: bool):
+        self.color_panel.set_locked(locked)
+
+    def set_curve_histogram(self, img):
+        self.color_panel.set_histogram_image(img)
 
     def set_config(self, cfg_obj: ImageLayerConfig):
         """Populates the widget values from a config object."""
@@ -451,6 +527,7 @@ class VideoLayerConfigWidget(QWidget):
 
         self.spn_size.setValue(cfg_obj.size)
         self.spn_opacity.setValue(int(getattr(cfg_obj, "opacity", 1.0) * 100))
+        self.spn_blur.setValue(getattr(cfg_obj, "blur", 0.0))
         self.spn_margin_t.setValue(cfg_obj.margin_t)
         self.spn_margin_b.setValue(cfg_obj.margin_b)
         self.spn_margin_l.setValue(cfg_obj.margin_l)
@@ -460,6 +537,7 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_b.setValue(getattr(cfg_obj, "crop_b", 0))
         self.spn_crop_l.setValue(getattr(cfg_obj, "crop_l", 0))
         self.spn_crop_r.setValue(getattr(cfg_obj, "crop_r", 0))
+        self.set_crop_mode_checked(getattr(cfg_obj, "crop_mode", False))
         self.spn_speed.setValue(getattr(cfg_obj, "speed", 100))
         
         self.chk_chroma_enabled.setChecked(getattr(cfg_obj, "chroma_key_enabled", False))
@@ -468,6 +546,8 @@ class VideoLayerConfigWidget(QWidget):
         self.set_chroma_color(getattr(cfg_obj, "chroma_key_color", "#00FF00"))
         self.spn_chroma_spill.setValue(getattr(cfg_obj, "chroma_key_spill", 0.0))
         self.chroma_params_frame.setVisible(self.chk_chroma_enabled.isChecked())
+
+        self.color_panel.set_config(getattr(cfg_obj, "color_grade", None))
         
         self._update_speed_visibility()
 

@@ -1,3 +1,13 @@
+"""
+Plan entitlements enforcement (Phase 2 / P2).
+
+Two plans: free and pro. No watermark is ever applied to rendered output on
+either plan. Feature limits come from the *signed* license token
+(``LicenseInfo.features``), not from a single "is licensed" boolean. This means
+patching ``is_valid`` to True is not enough to unlock Pro output: with no valid
+token the features dict is empty, the app is treated as ``free`` and GPU /
+extra layers are withheld, and the daily render quota applies.
+"""
 
 from dataclasses import dataclass
 from typing import Any, Dict
@@ -5,21 +15,19 @@ from typing import Any, Dict
 # Fallback used when there is no valid token (e.g. a patched client).
 _FREE_FEATURES: Dict[str, Any] = {
     "gpu": False,
-    "watermark": True,
-    "max_videos": 5,
+    "max_videos": 50,   # per day
     "max_layers": 2,
+    "color_grade": False,
     "priority_support": False,
-    "custom_branding": False,
 }
 
 
 @dataclass
 class Entitlements:
     gpu: bool = False
-    watermark: bool = True
-    max_videos: int = 5
+    max_videos: int = 50  # -1 = unlimited; otherwise a per-day quota
     max_layers: int = 2
-    custom_branding: bool = False
+    color_grade: bool = False
 
     @classmethod
     def from_license(cls, info) -> "Entitlements":
@@ -29,10 +37,9 @@ class Entitlements:
         merged = {**_FREE_FEATURES, **feats}
         return cls(
             gpu=bool(merged.get("gpu", False)),
-            watermark=bool(merged.get("watermark", True)),
-            max_videos=int(merged.get("max_videos", 5)),
+            max_videos=int(merged.get("max_videos", 50)),
             max_layers=int(merged.get("max_layers", 2)),
-            custom_branding=bool(merged.get("custom_branding", False)),
+            color_grade=bool(merged.get("color_grade", False)),
         )
 
 
@@ -52,6 +59,13 @@ def apply_to_render_config(config, info) -> Entitlements:
             # HEVC). An explicit libx265 pick is left untouched.
             config.codec = "libx264"
 
+    # Per-layer colour grade gating -------------------------------------
+    if not ent.color_grade:
+        for layer in (getattr(config, "layers", None) or []):
+            cg = getattr(layer, "color_grade", None)
+            if cg is not None:
+                cg.enabled = False
+
     # Layer count gating ----------------------------------------------------
     layers = getattr(config, "layers", None)
     if layers and ent.max_layers >= 0:
@@ -61,11 +75,5 @@ def apply_to_render_config(config, info) -> Entitlements:
                 enabled_seen += 1
                 if enabled_seen > ent.max_layers:
                     layer.enabled = False
-
-    # Watermark flag (consumed by the render pipeline) --------------------
-    try:
-        config.watermark_enabled = ent.watermark
-    except Exception:
-        pass
 
     return ent
