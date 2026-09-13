@@ -2216,6 +2216,12 @@ class MainWindow(QMainWindow):
             ctrl.set_chroma_color(s.get(f"logo_chroma_color_{layer_num}", "#00FF00"))
             ctrl.spn_chroma_spill.setValue(s.get(f"logo_chroma_spill_{layer_num}", 0.0))
             ctrl.chroma_params_frame.setVisible(ctrl.chk_chroma_enabled.isChecked())
+
+            ctrl.chk_luma_enabled.setChecked(s.get(f"logo_luma_enabled_{layer_num}", False))
+            ctrl.spn_luma_threshold.setValue(s.get(f"logo_luma_threshold_{layer_num}", 0.10))
+            ctrl.spn_luma_tolerance.setValue(s.get(f"logo_luma_tolerance_{layer_num}", 0.05))
+            ctrl.spn_luma_softness.setValue(s.get(f"logo_luma_softness_{layer_num}", 0.05))
+            ctrl.luma_params_frame.setVisible(ctrl.chk_luma_enabled.isChecked())
             ctrl.color_panel.set_config(s.get(f"logo_color_grade_{layer_num}"))
 
             ctrl._update_speed_visibility()
@@ -2255,6 +2261,12 @@ class MainWindow(QMainWindow):
             widget.set_chroma_color(s.get(f"vlayer_chroma_color_{layer_num}", "#00FF00"))
             widget.spn_chroma_spill.setValue(s.get(f"vlayer_chroma_spill_{layer_num}", 0.0))
             widget.chroma_params_frame.setVisible(widget.chk_chroma_enabled.isChecked())
+
+            widget.chk_luma_enabled.setChecked(s.get(f"vlayer_luma_enabled_{layer_num}", False))
+            widget.spn_luma_threshold.setValue(s.get(f"vlayer_luma_threshold_{layer_num}", 0.10))
+            widget.spn_luma_tolerance.setValue(s.get(f"vlayer_luma_tolerance_{layer_num}", 0.05))
+            widget.spn_luma_softness.setValue(s.get(f"vlayer_luma_softness_{layer_num}", 0.05))
+            widget.luma_params_frame.setVisible(widget.chk_luma_enabled.isChecked())
             widget.color_panel.set_config(s.get(f"vlayer_color_grade_{layer_num}"))
 
             widget._update_speed_visibility()
@@ -2412,6 +2424,10 @@ class MainWindow(QMainWindow):
             settings_dict[f"logo_chroma_blend_{layer_num}"] = ctrl.spn_chroma_blend.value()
             settings_dict[f"logo_chroma_color_{layer_num}"] = ctrl.chroma_key_color
             settings_dict[f"logo_chroma_spill_{layer_num}"] = ctrl.spn_chroma_spill.value()
+            settings_dict[f"logo_luma_enabled_{layer_num}"] = ctrl.chk_luma_enabled.isChecked()
+            settings_dict[f"logo_luma_threshold_{layer_num}"] = ctrl.spn_luma_threshold.value()
+            settings_dict[f"logo_luma_tolerance_{layer_num}"] = ctrl.spn_luma_tolerance.value()
+            settings_dict[f"logo_luma_softness_{layer_num}"] = ctrl.spn_luma_softness.value()
             settings_dict[f"logo_color_grade_{layer_num}"] = ctrl.color_panel.get_config().to_dict()
 
         # Save Edit Video layers (5 layers)
@@ -2439,6 +2455,10 @@ class MainWindow(QMainWindow):
             settings_dict[f"vlayer_chroma_blend_{layer_num}"] = widget.spn_chroma_blend.value()
             settings_dict[f"vlayer_chroma_color_{layer_num}"] = widget.chroma_key_color
             settings_dict[f"vlayer_chroma_spill_{layer_num}"] = widget.spn_chroma_spill.value()
+            settings_dict[f"vlayer_luma_enabled_{layer_num}"] = widget.chk_luma_enabled.isChecked()
+            settings_dict[f"vlayer_luma_threshold_{layer_num}"] = widget.spn_luma_threshold.value()
+            settings_dict[f"vlayer_luma_tolerance_{layer_num}"] = widget.spn_luma_tolerance.value()
+            settings_dict[f"vlayer_luma_softness_{layer_num}"] = widget.spn_luma_softness.value()
             settings_dict[f"vlayer_color_grade_{layer_num}"] = widget.color_panel.get_config().to_dict()
 
         # Collect unchecked audio files from pair_table

@@ -750,26 +750,81 @@ class VideoLayoutPreview(QWidget):
     def _get_keyed_image(self, index: int, img: QImage, cfg) -> QImage:
         if not hasattr(self, "_keyed_images_cache"):
             self._keyed_images_cache = {}
-            
+
         chroma_enabled = getattr(cfg, "chroma_key_enabled", False)
         sim = getattr(cfg, "chroma_key_similarity", 0.38)
         blend = getattr(cfg, "chroma_key_blend", 0.08)
         color = getattr(cfg, "chroma_key_color", "#00FF00")
         spill = getattr(cfg, "chroma_key_spill", 0.0)
-        
-        if not chroma_enabled:
+
+        if chroma_enabled:
+            cache_key = img.cacheKey()
+            cached = self._keyed_images_cache.get(index)
+            if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend and cached[4] == color and cached[5] == spill:
+                return cached[6]
+            keyed_img = self._apply_chroma_key(img, sim, blend, color, spill)
+            self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, color, spill, keyed_img)
+            return keyed_img
+
+        # Chroma and luma key are mutually exclusive (see video_layer_config.py's
+        # toggle handlers), so only try luma when chroma is off.
+        return self._get_luma_keyed_image(index, img, cfg)
+
+    def _get_luma_keyed_image(self, index: int, img: QImage, cfg) -> QImage:
+        if not hasattr(self, "_luma_keyed_images_cache"):
+            self._luma_keyed_images_cache = {}
+
+        luma_enabled = getattr(cfg, "luma_key_enabled", False)
+        threshold = getattr(cfg, "luma_key_threshold", 0.10)
+        tolerance = getattr(cfg, "luma_key_tolerance", 0.05)
+        softness = getattr(cfg, "luma_key_softness", 0.05)
+
+        if not luma_enabled:
             return img
-            
-        # Check cache
+
         cache_key = img.cacheKey()
-        cached = self._keyed_images_cache.get(index)
-        if cached and cached[0] == cache_key and cached[1] == chroma_enabled and cached[2] == sim and cached[3] == blend and cached[4] == color and cached[5] == spill:
-            return cached[6]
-            
-        # Process and cache
-        keyed_img = self._apply_chroma_key(img, sim, blend, color, spill)
-        self._keyed_images_cache[index] = (cache_key, chroma_enabled, sim, blend, color, spill, keyed_img)
+        cached = self._luma_keyed_images_cache.get(index)
+        if cached and cached[0] == cache_key and cached[1] == threshold and cached[2] == tolerance and cached[3] == softness:
+            return cached[4]
+
+        keyed_img = self._apply_luma_key(img, threshold, tolerance, softness)
+        self._luma_keyed_images_cache[index] = (cache_key, threshold, tolerance, softness, keyed_img)
         return keyed_img
+
+    @staticmethod
+    def _apply_luma_key(img: QImage, threshold: float, tolerance: float, softness: float) -> QImage:
+        """Approximate ffmpeg's lumakey filter for the preview: pixels whose
+        luma falls within threshold +/- tolerance go fully transparent, with a
+        soft alpha ramp of width `softness` beyond that band."""
+        if img.isNull():
+            return img
+
+        scaled_img = img.scaled(QSize(400, 400), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.FastTransformation)
+        scaled_img = scaled_img.convertToFormat(QImage.Format.Format_ARGB32)
+
+        w, h = scaled_img.width(), scaled_img.height()
+        bpl = scaled_img.bytesPerLine()
+        try:
+            ptr = scaled_img.bits()
+            ptr.setsize(scaled_img.sizeInBytes())
+            buf = memoryview(ptr)
+        except Exception:
+            return scaled_img
+
+        soft = max(1e-4, softness)
+
+        for y in range(h):
+            row = y * bpl
+            for x in range(w):
+                i = row + (x << 2)
+                b, g, r, a = buf[i], buf[i + 1], buf[i + 2], buf[i + 3]
+                luma = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+                dist = abs(luma - threshold)
+                if dist <= tolerance:
+                    buf[i + 3] = 0
+                elif dist <= tolerance + soft:
+                    buf[i + 3] = int(a * (dist - tolerance) / soft)
+        return scaled_img
 
     def _apply_chroma_key(self, img: QImage, similarity: float, blend: float, color: str, spill: float = 0.0) -> QImage:
         if img.isNull():

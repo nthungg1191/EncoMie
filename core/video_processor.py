@@ -8,6 +8,7 @@ Handles:
 
 import os
 import re
+import sys
 import json
 import random
 import logging
@@ -20,11 +21,17 @@ from typing import Optional, List
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
 
-# Verbose render diagnostics. Off unless logging is configured for DEBUG (or
-# ENCOMIE_DEBUG is set). Keeps ~50 diagnostic lines per render out of the hot
-# path and avoids writing to a missing stdout in a no-console build.
+# Full internal render detail (the exact FFmpeg command: filter-graph formulas,
+# thread tuning, etc.) is only useful to us during development. Showing it in
+# the user-facing render log on every single render hands anyone running the
+# packaged app the whole pipeline recipe for free, no reverse-engineering
+# needed. So it's only emitted when running from source (an IDE, sys.frozen is
+# unset) or when a support session explicitly opts in with ENCOMIE_DEBUG=1;
+# the packaged app's default log stays to status/progress/error detail only.
+_DEV_MODE = bool(os.environ.get("ENCOMIE_DEBUG")) or not getattr(sys, "frozen", False)
+
 _dbg_log = logging.getLogger("encomie.video")
-if os.environ.get("ENCOMIE_DEBUG"):
+if _DEV_MODE:
     logging.basicConfig(level=logging.DEBUG)
 
 
@@ -34,8 +41,6 @@ def _dbg(msg: str = "") -> None:
 
 
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".aac"}
-
-import sys
 
 LOCAL_BIN_DIR = Path(__file__).parent.parent / "bin"
 if getattr(sys, 'frozen', False):
@@ -138,6 +143,13 @@ class ImageLayerConfig:
     chroma_key_blend: float = 0.08
     chroma_key_color: str = "#00FF00"
     chroma_key_spill: float = 0.0
+    # Luma Key: keys out a brightness band instead of a colour (Premiere-style
+    # companion to chroma key above). Mutually exclusive with it in the UI;
+    # threshold alone covers both ends (near 0 = key black, near 1 = key white).
+    luma_key_enabled: bool = False
+    luma_key_threshold: float = 0.10
+    luma_key_tolerance: float = 0.05
+    luma_key_softness: float = 0.05
     blur: float = 0.0
     color_grade: "Optional[ColorGrade]" = None
 
@@ -943,6 +955,11 @@ def build_ffmpeg_cmd(
 
     cmd = [
         FFMPEG_PATH, "-y",
+        # Keep ffmpeg's own stderr down to warnings/errors + the periodic
+        # progress line (-stats forces that even at a quiet loglevel) instead
+        # of its default banner/build-config/stream-mapping dump, which is
+        # just noise for the user-facing render log.
+        "-hide_banner", "-loglevel", "warning", "-stats",
     ]
 
     fps_val = getattr(config, "fps", 30)
@@ -1048,7 +1065,16 @@ def build_ffmpeg_cmd(
                     r_val, g_val, b_val = 0, 255, 0
                 spill_type = "green" if g_val >= b_val and g_val >= r_val else ("blue" if b_val >= r_val else "green")
                 chroma_filter += f"despill=type={spill_type}:mix={spill:.2f},"
-        
+
+        # Luma Key: only when chroma-key is off (mutually exclusive in the UI;
+        # this is the defensive fallback if a config somehow has both set).
+        luma_filter = ""
+        if not chroma_filter and getattr(layer, "luma_key_enabled", False):
+            lt = max(0.0, min(1.0, getattr(layer, "luma_key_threshold", 0.10)))
+            lo = max(0.0, min(1.0, getattr(layer, "luma_key_tolerance", 0.05)))
+            ls = max(0.0, min(1.0, getattr(layer, "luma_key_softness", 0.05)))
+            luma_filter = f"lumakey=threshold={lt:.3f}:tolerance={lo:.3f}:softness={ls:.3f},"
+
         # 1. Probe original resolution of the layer clip
         lw_orig, lh_orig = probe_resolution(layer._resolved_path)
         
@@ -1111,16 +1137,16 @@ def build_ffmpeg_cmd(
         grade_filter = f"{_cg}," if _cg else ""
 
         # Working pixel format: rgba is 4 bytes/px and drives peak filter-graph
-        # RAM. colorkey/despill genuinely need it; without chroma-key, yuva420p
-        # (1.5 bytes/px, alpha kept for opacity/blur/overlay) halves the
-        # decode->scale->blur buffers. ffmpeg auto-converts for the RGB-only
-        # tail filters (curves / colorchannelmixer).
+        # RAM. colorkey/despill work in RGB; without it, yuva420p (1.5 bytes/px,
+        # alpha kept for opacity/blur/overlay) halves the decode->scale->blur
+        # buffers. ffmpeg auto-converts for the RGB-only tail filters
+        # (curves / colorchannelmixer).
         layer_fmt = "rgba" if chroma_filter else "yuva420p"
         filter_parts.append(
             f"[{input_index}:v]{crop_filter}{pts_filter}format={layer_fmt},scale={pixel_w}:-2:flags=bilinear,"
-            f"{chroma_filter}{blur_filter}{grade_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
+            f"{chroma_filter}{luma_filter}{blur_filter}{grade_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
         )
-        
+
         # Position calculations with scaled margins
         scale_x = int(w) / ws_w_virt
         scale_y = int(h) / ws_h_virt
@@ -1324,7 +1350,11 @@ def render_pair(
                 cpu=plan,
             )
 
-            _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+            if _DEV_MODE:
+                _log("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
+            else:
+                _log(f"[{pair.index}] Đang render — {config.resolution}, {config.codec}")
+            _dbg("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
 
             _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort,
                         slot=_slot)
@@ -1346,7 +1376,6 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
                 progress_cb, log_cb, label: str, should_abort=None, slot=None):
     time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
 
-    import sys
     creationflags = 0
     if sys.platform == "win32":
         # BELOW_NORMAL keeps the reserved CPU headroom genuinely available to

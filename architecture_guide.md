@@ -253,7 +253,11 @@ Dependency runtime: `PyQt6`, `requests`, `PyNaCl` (+ `cffi`/`_sodium`).
 
 ### Debug render
 - Đặt biến môi trường `ENCOMIE_DEBUG=1` để bật ~50 dòng chẩn đoán của
-  `build_ffmpeg_cmd`/`render_pair` (logger `encomie.video`, mặc định tắt).
+  `build_ffmpeg_cmd`/`render_pair` (logger `encomie.video`, mặc định tắt) — bản
+  đóng gói mặc định chỉ hiện trạng thái/lỗi gọn cho người dùng, không lộ nguyên
+  văn lệnh FFmpeg (`_DEV_MODE` trong `core/video_processor.py`).
+- Tra cứu ý nghĩa mọi mã/thông báo lỗi (render, license client, API server):
+  [`docs/error_codes.md`](docs/error_codes.md).
 
 ### Vì sao KHÔNG có đường GPU đầy đủ (`scale_cuda`/`overlay_cuda`)
 

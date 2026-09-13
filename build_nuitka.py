@@ -31,6 +31,10 @@ APP_NAME = "EncoMie"
 ENTRY = "main.py"
 VERSION = "1.6.0"
 
+# Final .exe/dist/zip land here, outside the project folder entirely (so the
+# IDE/AV/git don't see or scan the build output, and it survives a `git clean`).
+OUTPUT_DIR = Path("D:/EncoMie_App")
+
 
 def step(msg: str) -> None:
     print(f"\n{'=' * 60}\n[STEP] {msg}\n{'=' * 60}", flush=True)
@@ -87,6 +91,7 @@ def run_nuitka(build_dir: Path, onefile: bool) -> Path:
         "--include-module=core.curves",
         "--include-module=ui.color_grade_panel",
         "--include-module=ui.curve_editor",
+        "--include-module=ui.collapsible_section",
         "--python-flag=no_asserts",
         "--python-flag=no_docstrings",
         f"--company-name={APP_NAME}",
@@ -150,14 +155,15 @@ def main() -> None:
     step("Cleaning previous output")
     kill_stale_builders()
     robust_rmtree(build_dir)
-    robust_rmtree(root / "dist")
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    robust_rmtree(OUTPUT_DIR / "dist")
     build_dir.mkdir(parents=True, exist_ok=True)
 
     step("Compiling with Nuitka (this takes a while)")
     produced = run_nuitka(build_dir, onefile)
 
-    step("Assembling ./dist + FFmpeg")
-    dist_root = root / "dist" / APP_NAME
+    step(f"Assembling {OUTPUT_DIR / 'dist'} + FFmpeg")
+    dist_root = OUTPUT_DIR / "dist" / APP_NAME
     dist_root.mkdir(parents=True, exist_ok=True)
 
     if onefile:
@@ -178,10 +184,10 @@ def main() -> None:
         print("[WARNING] bin/ not found — place ffmpeg.exe / ffprobe.exe manually.")
 
     step("Creating distribution ZIP")
-    zip_base = root / f"{APP_NAME}_Windows_nuitka"
+    zip_base = OUTPUT_DIR / f"{APP_NAME}_Windows_nuitka"
     if zip_base.with_suffix(".zip").exists():
         zip_base.with_suffix(".zip").unlink()
-    shutil.make_archive(str(zip_base), "zip", root / "dist", APP_NAME)
+    shutil.make_archive(str(zip_base), "zip", OUTPUT_DIR / "dist", APP_NAME)
 
     step("Cleaning temp build dir")
     robust_rmtree(build_dir)

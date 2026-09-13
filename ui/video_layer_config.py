@@ -4,13 +4,14 @@ Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QPushButton,
-    QGroupBox, QFrame, QLineEdit, QScrollArea, QSizePolicy
+    QFrame, QLineEdit, QScrollArea, QSizePolicy
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from pathlib import Path
 import os
 
 from core.video_processor import ImageLayerConfig
+from ui.collapsible_section import CollapsibleSection
 
 class VideoLayerConfigWidget(QWidget):
     MAX_HEIGHT = 380  # Fixed max height with scrollbar
@@ -101,7 +102,19 @@ class VideoLayerConfigWidget(QWidget):
         content_lay.addWidget(self.static_file_frame)
         self.static_file_frame.setVisible(False) # Default is Batch file
 
-        # Row 2: Vị trí neo (Alignment)
+        # ------------------------------------------------------------------
+        # Below: collapsible sections (accordion). Several can be open at once
+        # (click a header to toggle just that one) instead of 7 always-expanded
+        # group boxes, so the common case - checking what a layer does without
+        # scrolling past everything - fits in one glance. See "So Sánh Bảng
+        # Layer" design demo for the reasoning behind this layout.
+        # ------------------------------------------------------------------
+
+        # Section 1: Vị trí & Kích thước - open by default, the most frequently
+        # touched controls for any layer.
+        self.sec_transform = CollapsibleSection("Vị trí & Kích thước", open_=True)
+        t_lay = self.sec_transform.body_layout
+
         row2 = QHBoxLayout()
         row2.setSpacing(6)
         pos_lbl = QLabel("Vị trí đè:")
@@ -123,9 +136,8 @@ class VideoLayerConfigWidget(QWidget):
         self.cmb_pos.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self.cmb_pos.currentIndexChanged.connect(self._on_pos_changed)
         row2.addWidget(self.cmb_pos, 1)
-        content_lay.addLayout(row2)
+        t_lay.addLayout(row2)
 
-        # Row 3: Cỡ (Scale %) & Độ mờ (Opacity %) - 2 cột responsive như Margin/Crop group
         row3 = QGridLayout()
         row3.setSpacing(10)
 
@@ -154,9 +166,9 @@ class VideoLayerConfigWidget(QWidget):
 
         row3.setColumnStretch(1, 1)
         row3.setColumnStretch(3, 1)
-        content_lay.addLayout(row3)
+        t_lay.addLayout(row3)
 
-        # Row 3.5: Tốc độ chạy layer (chỉ video, có thể ẩn) & Độ nhòe (Blur, luôn hiện
+        # Tốc độ chạy layer (chỉ video, có thể ẩn) & Độ nhòe (Blur, luôn hiện
         # kể cả layer ảnh tĩnh) - cùng 1 hàng, 2 cột responsive.
         row_speed_grid = QGridLayout()
         row_speed_grid.setContentsMargins(0, 0, 0, 0)
@@ -198,16 +210,15 @@ class VideoLayerConfigWidget(QWidget):
         row_speed_grid.setColumnStretch(1, 1)
         row_speed_grid.setColumnStretch(3, 1)
 
-        content_lay.addLayout(row_speed_grid)
+        t_lay.addLayout(row_speed_grid)
+        content_lay.addWidget(self.sec_transform)
 
-        # Row 4: Margins Group
-        margin_grp = QGroupBox("Căn chỉnh khoảng lề (Margin - px)")
-        margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        margin_lay = QGridLayout(margin_grp)
-        margin_lay.setContentsMargins(6, 6, 6, 6)
+        # Section 2: Khoảng lề (Margin) - open by default, baseline positioning.
+        self.sec_margin = CollapsibleSection("Khoảng lề (Margin - px)", open_=True)
+        margin_lay = QGridLayout()
+        margin_lay.setContentsMargins(0, 0, 0, 0)
         margin_lay.setSpacing(6)
 
-        # Top
         margin_lay.addWidget(QLabel("Trên:"), 0, 0)
         self.spn_margin_t = QSpinBox()
         self.spn_margin_t.setRange(0, 1000)
@@ -215,7 +226,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_t.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_t, 0, 1)
 
-        # Bottom
         margin_lay.addWidget(QLabel("Dưới:"), 0, 2)
         self.spn_margin_b = QSpinBox()
         self.spn_margin_b.setRange(0, 1000)
@@ -223,7 +233,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_b.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_b, 0, 3)
 
-        # Left
         margin_lay.addWidget(QLabel("Trái:"), 1, 0)
         self.spn_margin_l = QSpinBox()
         self.spn_margin_l.setRange(0, 1000)
@@ -231,7 +240,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_l.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_l, 1, 1)
 
-        # Right
         margin_lay.addWidget(QLabel("Phải:"), 1, 2)
         self.spn_margin_r = QSpinBox()
         self.spn_margin_r.setRange(0, 1000)
@@ -239,16 +247,15 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_margin_r.valueChanged.connect(self._on_changed)
         margin_lay.addWidget(self.spn_margin_r, 1, 3)
 
-        content_lay.addWidget(margin_grp)
+        self.sec_margin.body_layout.addLayout(margin_lay)
+        content_lay.addWidget(self.sec_margin)
 
-        # Row 5: Crop Group
-        crop_grp = QGroupBox("Cắt cúp khung hình (Crop - px)")
-        crop_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        crop_lay = QGridLayout(crop_grp)
-        crop_lay.setContentsMargins(6, 6, 6, 6)
+        # Section 3: Cắt cúp (Crop) - collapsed by default.
+        self.sec_crop = CollapsibleSection("Cắt cúp (Crop)")
+        crop_lay = QGridLayout()
+        crop_lay.setContentsMargins(0, 0, 0, 0)
         crop_lay.setSpacing(6)
 
-        # Crop Mode Button (moved from main window player controls to each individual layer widget)
         self.btn_crop_mode = QPushButton("✂  Bật Crop Mode")
         self.btn_crop_mode.setCheckable(True)
         self.btn_crop_mode.setStyleSheet(
@@ -259,7 +266,6 @@ class VideoLayerConfigWidget(QWidget):
         self.btn_crop_mode.toggled.connect(self._on_crop_mode_toggled)
         crop_lay.addWidget(self.btn_crop_mode, 0, 0, 1, 4)
 
-        # Crop Top
         crop_lay.addWidget(QLabel("Cắt Trên:"), 1, 0)
         self.spn_crop_t = QSpinBox()
         self.spn_crop_t.setRange(0, 500)
@@ -267,7 +273,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_t.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_t, 1, 1)
 
-        # Crop Bottom
         crop_lay.addWidget(QLabel("Cắt Dưới:"), 1, 2)
         self.spn_crop_b = QSpinBox()
         self.spn_crop_b.setRange(0, 500)
@@ -275,7 +280,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_b.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_b, 1, 3)
 
-        # Crop Left
         crop_lay.addWidget(QLabel("Cắt Trái:"), 2, 0)
         self.spn_crop_l = QSpinBox()
         self.spn_crop_l.setRange(0, 500)
@@ -283,7 +287,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_l.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_l, 2, 1)
 
-        # Crop Right
         crop_lay.addWidget(QLabel("Cắt Phải:"), 2, 2)
         self.spn_crop_r = QSpinBox()
         self.spn_crop_r.setRange(0, 500)
@@ -291,26 +294,22 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_crop_r.valueChanged.connect(self._on_changed)
         crop_lay.addWidget(self.spn_crop_r, 2, 3)
 
-        content_lay.addWidget(crop_grp)
+        self.sec_crop.body_layout.addLayout(crop_lay)
+        content_lay.addWidget(self.sec_crop)
 
-        # Row 6: Chroma Key (Green Screen) Group
-        self.chroma_grp = QGroupBox("Xóa nền xanh (Chroma Key)")
-        self.chroma_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        chroma_lay = QVBoxLayout(self.chroma_grp)
-        chroma_lay.setContentsMargins(6, 6, 6, 6)
-        chroma_lay.setSpacing(6)
+        # Section 4: Chroma Key - collapsed by default.
+        self.sec_chroma = CollapsibleSection("Chroma Key")
 
         self.chk_chroma_enabled = QCheckBox("Kích hoạt khử nền xanh")
         self.chk_chroma_enabled.setStyleSheet("font-size: 11px;")
         self.chk_chroma_enabled.stateChanged.connect(self._on_chroma_enabled_changed)
-        chroma_lay.addWidget(self.chk_chroma_enabled)
+        self.sec_chroma.body_layout.addWidget(self.chk_chroma_enabled)
 
         self.chroma_params_frame = QWidget()
         chroma_params_lay = QGridLayout(self.chroma_params_frame)
         chroma_params_lay.setContentsMargins(0, 0, 0, 0)
         chroma_params_lay.setSpacing(6)
 
-        # Similarity
         chroma_params_lay.addWidget(QLabel("Độ nhạy:"), 0, 0)
         self.spn_chroma_sim = QDoubleSpinBox()
         self.spn_chroma_sim.setRange(0.01, 1.00)
@@ -320,7 +319,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_sim.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_sim, 0, 1)
 
-        # Blend
         chroma_params_lay.addWidget(QLabel("Độ mềm:"), 0, 2)
         self.spn_chroma_blend = QDoubleSpinBox()
         self.spn_chroma_blend.setRange(0.00, 1.00)
@@ -330,7 +328,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_blend.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_blend, 0, 3)
 
-        # Chroma Color Selector Row
         chroma_params_lay.addWidget(QLabel("Màu khử:"), 1, 0)
         self.btn_chroma_color = QPushButton()
         self.btn_chroma_color.setFixedSize(24, 24)
@@ -343,7 +340,6 @@ class VideoLayerConfigWidget(QWidget):
         self.btn_eyedropper.clicked.connect(self._on_eyedropper_clicked)
         chroma_params_lay.addWidget(self.btn_eyedropper, 1, 2, 1, 2)
 
-        # Spill Reduction Row
         chroma_params_lay.addWidget(QLabel("Khử tràn màu:"), 2, 0)
         self.spn_chroma_spill = QDoubleSpinBox()
         self.spn_chroma_spill.setRange(0.00, 1.00)
@@ -353,22 +349,71 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_spill.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_spill, 2, 1)
 
-        chroma_lay.addWidget(self.chroma_params_frame)
+        self.sec_chroma.body_layout.addWidget(self.chroma_params_frame)
         self.chroma_params_frame.setVisible(False)
+        content_lay.addWidget(self.sec_chroma)
 
-        content_lay.addWidget(self.chroma_grp)
+        # Section 5: Luma Key (remove background by brightness, not colour) -
+        # the Premiere-style companion to Chroma Key above; only plain numeric
+        # controls since there's no colour to pick. Mutually exclusive with
+        # Chroma Key (see the toggle handlers). Collapsed by default.
+        self.sec_luma = CollapsibleSection("Luma Key")
 
-        # Row 7: Curves (Pro) for this layer's clip
-        self.color_grp = QGroupBox("🎨  Curves")
-        self.color_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        color_lay = QVBoxLayout(self.color_grp)
-        color_lay.setContentsMargins(6, 6, 6, 6)
+        self.chk_luma_enabled = QCheckBox("Kích hoạt Luma Key")
+        self.chk_luma_enabled.setStyleSheet("font-size: 11px;")
+        self.chk_luma_enabled.stateChanged.connect(self._on_luma_enabled_changed)
+        self.sec_luma.body_layout.addWidget(self.chk_luma_enabled)
+
+        self.luma_params_frame = QWidget()
+        luma_params_lay = QGridLayout(self.luma_params_frame)
+        luma_params_lay.setContentsMargins(0, 0, 0, 0)
+        luma_params_lay.setSpacing(6)
+
+        # Threshold: where on the black<->white range keying happens. Low =
+        # remove dark/black backgrounds (most common), high = remove white.
+        # Tolerance: width of the band around threshold that's keyed out.
+        # Softness: width of the soft alpha ramp beyond that band's edge.
+        luma_params_lay.addWidget(QLabel("Ngưỡng:"), 0, 0)
+        self.spn_luma_threshold = QDoubleSpinBox()
+        self.spn_luma_threshold.setRange(0.00, 1.00)
+        self.spn_luma_threshold.setSingleStep(0.01)
+        self.spn_luma_threshold.setValue(0.10)
+        self.spn_luma_threshold.setToolTip("0 = xóa nền tối/đen  ·  1 = xóa nền sáng/trắng")
+        self.spn_luma_threshold.setStyleSheet("font-size: 11px;")
+        self.spn_luma_threshold.valueChanged.connect(self._on_changed)
+        luma_params_lay.addWidget(self.spn_luma_threshold, 0, 1)
+
+        luma_params_lay.addWidget(QLabel("Dung sai:"), 0, 2)
+        self.spn_luma_tolerance = QDoubleSpinBox()
+        self.spn_luma_tolerance.setRange(0.00, 1.00)
+        self.spn_luma_tolerance.setSingleStep(0.01)
+        self.spn_luma_tolerance.setValue(0.05)
+        self.spn_luma_tolerance.setToolTip("Vùng độ sáng quanh Ngưỡng cũng bị xóa")
+        self.spn_luma_tolerance.setStyleSheet("font-size: 11px;")
+        self.spn_luma_tolerance.valueChanged.connect(self._on_changed)
+        luma_params_lay.addWidget(self.spn_luma_tolerance, 0, 3)
+
+        luma_params_lay.addWidget(QLabel("Độ mềm viền:"), 1, 0)
+        self.spn_luma_softness = QDoubleSpinBox()
+        self.spn_luma_softness.setRange(0.00, 1.00)
+        self.spn_luma_softness.setSingleStep(0.01)
+        self.spn_luma_softness.setValue(0.05)
+        self.spn_luma_softness.setStyleSheet("font-size: 11px;")
+        self.spn_luma_softness.valueChanged.connect(self._on_changed)
+        luma_params_lay.addWidget(self.spn_luma_softness, 1, 1)
+
+        self.sec_luma.body_layout.addWidget(self.luma_params_frame)
+        self.luma_params_frame.setVisible(False)
+        content_lay.addWidget(self.sec_luma)
+
+        # Section 6: Curves (Pro) - collapsed by default.
+        self.sec_curves = CollapsibleSection("🎨  Curves")
         from ui.color_grade_panel import ColorGradePanel
-        self.color_panel = ColorGradePanel(self.color_grp)
+        self.color_panel = ColorGradePanel()
         self.color_panel.changed.connect(self._on_changed)
         self.color_panel.set_locked(True)  # unlocked when a Pro licence is confirmed
-        color_lay.addWidget(self.color_panel)
-        content_lay.addWidget(self.color_grp)
+        self.sec_curves.body_layout.addWidget(self.color_panel)
+        content_lay.addWidget(self.sec_curves)
 
         content_lay.addStretch(1)
 
@@ -396,6 +441,7 @@ class VideoLayerConfigWidget(QWidget):
             self.cmb_pos.setCurrentIndex(1) # Bottom-Right
 
         self._update_speed_visibility()
+        self._refresh_section_badges()
 
     def _on_source_type_changed(self, idx: int):
         self.static_file_frame.setVisible(idx == 2)
@@ -421,6 +467,7 @@ class VideoLayerConfigWidget(QWidget):
         else:
             self.btn_crop_mode.setText("✂  Bật Crop Mode")
         self.cropModeToggled.emit(checked)
+        self._refresh_section_badges()
 
     def set_crop_mode_checked(self, checked: bool):
         """Restore the crop-mode toggle without re-emitting cropModeToggled
@@ -435,6 +482,21 @@ class VideoLayerConfigWidget(QWidget):
         # In PyQt6, check state can be an int or CheckState
         enabled = (state == 2) or (state == Qt.CheckState.Checked.value) or (hasattr(Qt.CheckState, "Checked") and state == Qt.CheckState.Checked)
         self.chroma_params_frame.setVisible(enabled)
+        # Chroma and Luma key both answer "what makes this layer transparent?" -
+        # having both on at once is ambiguous, so picking one turns the other off.
+        if enabled and self.chk_luma_enabled.isChecked():
+            self.chk_luma_enabled.setChecked(False)
+        if enabled:
+            self.sec_chroma.set_open(True)
+        self._on_changed()
+
+    def _on_luma_enabled_changed(self, state: int):
+        enabled = (state == 2) or (state == Qt.CheckState.Checked.value) or (hasattr(Qt.CheckState, "Checked") and state == Qt.CheckState.Checked)
+        self.luma_params_frame.setVisible(enabled)
+        if enabled and self.chk_chroma_enabled.isChecked():
+            self.chk_chroma_enabled.setChecked(False)
+        if enabled:
+            self.sec_luma.set_open(True)
         self._on_changed()
 
     def _update_speed_visibility(self):
@@ -447,7 +509,42 @@ class VideoLayerConfigWidget(QWidget):
             self.row_speed_widget.setVisible(is_video)
 
     def _on_changed(self):
+        self._refresh_section_badges()
         self.changed.emit()
+
+    def _refresh_section_badges(self):
+        """Keep each collapsed section's header readable at a glance: a status
+        badge for on/off toggles, a value summary for the always-on ones."""
+        if not hasattr(self, "sec_curves"):
+            return  # called mid-construction, before every section exists yet
+
+        self.sec_transform.set_subtitle(f"{self.spn_size.value()}% · {self.spn_opacity.value()}%")
+        self.sec_margin.set_subtitle(
+            f"{self.spn_margin_t.value()}·{self.spn_margin_b.value()}·"
+            f"{self.spn_margin_l.value()}·{self.spn_margin_r.value()}"
+        )
+
+        crop_active = any(v.value() > 0 for v in
+                          (self.spn_crop_t, self.spn_crop_b, self.spn_crop_l, self.spn_crop_r))
+        if self.btn_crop_mode.isChecked():
+            self.sec_crop.set_badge("ĐANG CHỈNH", "warn")
+        elif crop_active:
+            self.sec_crop.set_badge("BẬT", "on")
+        else:
+            self.sec_crop.set_badge("TẮT", "off")
+
+        chroma_on = self.chk_chroma_enabled.isChecked()
+        self.sec_chroma.set_badge("BẬT" if chroma_on else "TẮT", "on" if chroma_on else "off")
+
+        luma_on = self.chk_luma_enabled.isChecked()
+        self.sec_luma.set_badge("BẬT" if luma_on else "TẮT", "on" if luma_on else "off")
+
+        if self.color_panel.is_locked():
+            self.sec_curves.set_badge("PRO", "pro")
+        else:
+            cg = self.color_panel.get_config()
+            active = cg.enabled and cg.is_active()
+            self.sec_curves.set_badge("BẬT" if active else "TẮT", "on" if active else "off")
 
     def get_config(self) -> ImageLayerConfig:
         """Returns the configuration parsed from widgets."""
@@ -488,6 +585,10 @@ class VideoLayerConfigWidget(QWidget):
         cfg_obj.chroma_key_blend = self.spn_chroma_blend.value()
         cfg_obj.chroma_key_color = self.chroma_key_color
         cfg_obj.chroma_key_spill = self.spn_chroma_spill.value()
+        cfg_obj.luma_key_enabled = self.chk_luma_enabled.isChecked()
+        cfg_obj.luma_key_threshold = self.spn_luma_threshold.value()
+        cfg_obj.luma_key_tolerance = self.spn_luma_tolerance.value()
+        cfg_obj.luma_key_softness = self.spn_luma_softness.value()
         cfg_obj.blur = self.spn_blur.value()
         cfg_obj.color_grade = self.color_panel.get_config()
         cfg_obj.crop_mode = self.btn_crop_mode.isChecked()
@@ -496,6 +597,7 @@ class VideoLayerConfigWidget(QWidget):
 
     def set_color_locked(self, locked: bool):
         self.color_panel.set_locked(locked)
+        self._refresh_section_badges()
 
     def set_curve_histogram(self, img):
         self.color_panel.set_histogram_image(img)
@@ -547,9 +649,16 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_spill.setValue(getattr(cfg_obj, "chroma_key_spill", 0.0))
         self.chroma_params_frame.setVisible(self.chk_chroma_enabled.isChecked())
 
+        self.chk_luma_enabled.setChecked(getattr(cfg_obj, "luma_key_enabled", False))
+        self.spn_luma_threshold.setValue(getattr(cfg_obj, "luma_key_threshold", 0.10))
+        self.spn_luma_tolerance.setValue(getattr(cfg_obj, "luma_key_tolerance", 0.05))
+        self.spn_luma_softness.setValue(getattr(cfg_obj, "luma_key_softness", 0.05))
+        self.luma_params_frame.setVisible(self.chk_luma_enabled.isChecked())
+
         self.color_panel.set_config(getattr(cfg_obj, "color_grade", None))
-        
+
         self._update_speed_visibility()
+        self._refresh_section_badges()
 
     def set_chroma_color(self, color_hex: str):
         self.chroma_key_color = color_hex

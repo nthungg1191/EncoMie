@@ -96,6 +96,9 @@ class ColorGradePanel(QWidget):
         self._editor.reset_channel()
 
     # -- public API --------------------------------------------------
+    def is_locked(self) -> bool:
+        return self._locked
+
     def set_histogram_image(self, img):
         self._editor.set_histogram_image(img)
 
