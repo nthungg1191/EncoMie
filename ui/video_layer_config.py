@@ -141,18 +141,17 @@ class VideoLayerConfigWidget(QWidget):
         row3 = QGridLayout()
         row3.setSpacing(10)
 
-        sz_lbl = QLabel("Cỡ (%):")
+        sz_lbl = QLabel("Size:")
         sz_lbl.setStyleSheet("font-size: 11px;")
         row3.addWidget(sz_lbl, 0, 0)
 
         self.spn_size = QSpinBox()
         self.spn_size.setRange(10, 150)
         self.spn_size.setValue(30 if self.index == 1 else 15)
-        self.spn_size.setStyleSheet("font-size: 11px;")
         self.spn_size.valueChanged.connect(self._on_changed)
         row3.addWidget(self.spn_size, 0, 1)
 
-        op_lbl = QLabel("Độ mờ (%):")
+        op_lbl = QLabel("Opacity:")
         op_lbl.setStyleSheet("font-size: 11px;")
         row3.addWidget(op_lbl, 0, 2)
 
@@ -160,7 +159,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_opacity.setRange(10, 100)
         self.spn_opacity.setValue(100)
         self.spn_opacity.setSingleStep(5)
-        self.spn_opacity.setStyleSheet("font-size: 11px;")
         self.spn_opacity.valueChanged.connect(self._on_changed)
         row3.addWidget(self.spn_opacity, 0, 3)
 
@@ -181,7 +179,7 @@ class VideoLayerConfigWidget(QWidget):
         speed_pair_lay.setContentsMargins(0, 0, 0, 0)
         speed_pair_lay.setSpacing(10)
 
-        speed_lbl = QLabel("Tốc độ layer (%):")
+        speed_lbl = QLabel("Speed:")
         speed_lbl.setStyleSheet("font-size: 11px;")
         speed_pair_lay.addWidget(speed_lbl)
 
@@ -189,13 +187,12 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_speed.setRange(10, 300)
         self.spn_speed.setValue(100)
         self.spn_speed.setSuffix("%")
-        self.spn_speed.setStyleSheet("font-size: 11px;")
         self.spn_speed.valueChanged.connect(self._on_changed)
         speed_pair_lay.addWidget(self.spn_speed, 1)
 
         row_speed_grid.addWidget(self.row_speed_widget, 0, 0, 1, 2)
 
-        blur_lbl = QLabel("Độ nhòe (Blur):")
+        blur_lbl = QLabel("Blur:")
         blur_lbl.setStyleSheet("font-size: 11px;")
         row_speed_grid.addWidget(blur_lbl, 0, 2)
 
@@ -203,7 +200,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_blur.setRange(0.0, 20.0)
         self.spn_blur.setSingleStep(0.5)
         self.spn_blur.setValue(0.0)
-        self.spn_blur.setStyleSheet("font-size: 11px;")
         self.spn_blur.valueChanged.connect(self._on_changed)
         row_speed_grid.addWidget(self.spn_blur, 0, 3)
 
@@ -315,7 +311,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_sim.setRange(0.01, 1.00)
         self.spn_chroma_sim.setSingleStep(0.01)
         self.spn_chroma_sim.setValue(0.38)
-        self.spn_chroma_sim.setStyleSheet("font-size: 11px;")
         self.spn_chroma_sim.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_sim, 0, 1)
 
@@ -324,7 +319,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_blend.setRange(0.00, 1.00)
         self.spn_chroma_blend.setSingleStep(0.01)
         self.spn_chroma_blend.setValue(0.08)
-        self.spn_chroma_blend.setStyleSheet("font-size: 11px;")
         self.spn_chroma_blend.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_blend, 0, 3)
 
@@ -345,7 +339,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_chroma_spill.setRange(0.00, 1.00)
         self.spn_chroma_spill.setSingleStep(0.05)
         self.spn_chroma_spill.setValue(0.00)
-        self.spn_chroma_spill.setStyleSheet("font-size: 11px;")
         self.spn_chroma_spill.valueChanged.connect(self._on_changed)
         chroma_params_lay.addWidget(self.spn_chroma_spill, 2, 1)
 
@@ -379,7 +372,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_luma_threshold.setSingleStep(0.01)
         self.spn_luma_threshold.setValue(0.10)
         self.spn_luma_threshold.setToolTip("0 = xóa nền tối/đen  ·  1 = xóa nền sáng/trắng")
-        self.spn_luma_threshold.setStyleSheet("font-size: 11px;")
         self.spn_luma_threshold.valueChanged.connect(self._on_changed)
         luma_params_lay.addWidget(self.spn_luma_threshold, 0, 1)
 
@@ -389,7 +381,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_luma_tolerance.setSingleStep(0.01)
         self.spn_luma_tolerance.setValue(0.05)
         self.spn_luma_tolerance.setToolTip("Vùng độ sáng quanh Ngưỡng cũng bị xóa")
-        self.spn_luma_tolerance.setStyleSheet("font-size: 11px;")
         self.spn_luma_tolerance.valueChanged.connect(self._on_changed)
         luma_params_lay.addWidget(self.spn_luma_tolerance, 0, 3)
 
@@ -398,7 +389,6 @@ class VideoLayerConfigWidget(QWidget):
         self.spn_luma_softness.setRange(0.00, 1.00)
         self.spn_luma_softness.setSingleStep(0.01)
         self.spn_luma_softness.setValue(0.05)
-        self.spn_luma_softness.setStyleSheet("font-size: 11px;")
         self.spn_luma_softness.valueChanged.connect(self._on_changed)
         luma_params_lay.addWidget(self.spn_luma_softness, 1, 1)
 

@@ -14,6 +14,7 @@ using an accordion (collapsible-section) layout.
 from __future__ import annotations
 import sys as _sys
 from pathlib import Path as _Path
+import os 
 
 _root = str(_Path(__file__).parent.parent)
 if _root not in _sys.path:
@@ -160,11 +161,26 @@ class ColorPickerPopup(QDialog):
                 border-radius: 4px;
                 color: {C_TEXT};
                 font-size: 12px;
-                padding: 2px 4px;
+                padding: 2px 20px 2px 4px;
             }}
             QSpinBox:focus {{ border-color: {C_ACCENT}; }}
-            QSpinBox::up-button, QSpinBox::down-button {{
-                background: {C_ELEVATED_BG}; width: 14px;
+            QSpinBox::up-button {{
+                subcontrol-origin: border; subcontrol-position: top right;
+                background: {C_ELEVATED_BG}; width: 15px; height: 11px;
+                border-left: 1px solid {C_BORDER}; border-bottom: 0.5px solid {C_BORDER};
+                border-top-right-radius: 4px; margin-top: 1px; margin-right: 1px;
+            }}
+            QSpinBox::down-button {{
+                subcontrol-origin: border; subcontrol-position: bottom right;
+                background: {C_ELEVATED_BG}; width: 15px; height: 11px;
+                border-left: 1px solid {C_BORDER};
+                border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px;
+            }}
+            QSpinBox::up-arrow {{
+                image: url("{_root}/assets/spin_up.svg"); width: 8px; height: 5px;
+            }}
+            QSpinBox::down-arrow {{
+                image: url("{_root}/assets/spin_down.svg"); width: 8px; height: 5px;
             }}
             QSlider::groove:horizontal {{
                 border-radius: 3px; height: 6px;
@@ -2465,13 +2481,22 @@ class SubtitleStyleEditor(QWidget):
         s.setSuffix(suffix)
         s.setFixedWidth(width)
         s.setFixedHeight(26)
+        up_p = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "spin_up.svg")).replace("\\", "/")
+        down_p = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "spin_down.svg")).replace("\\", "/")
         s.setStyleSheet(
             f"QSpinBox, QDoubleSpinBox {{ background: {C_ELEVATED_BG}; color: {C_TEXT}; "
             f"border: 1px solid {C_BORDER}; border-radius: 4px; "
-            f"padding: 0px 4px; font-size: 11px; }}"
-            f"QSpinBox::up-button, QSpinBox::down-button, "
-            f"QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ "
-            f"background: {C_HOVER}; width: 14px; }}"
+            f"padding: 0px 20px 0px 4px; font-size: 11px; }}"
+            f"QSpinBox::up-button, QDoubleSpinBox::up-button {{ "
+            f"subcontrol-origin: border; subcontrol-position: top right; "
+            f"background: {C_HOVER}; width: 15px; height: 11px; border-left: 1px solid {C_BORDER}; border-bottom: 0.5px solid {C_BORDER}; border-top-right-radius: 4px; margin-top: 1px; margin-right: 1px; }}"
+            f"QSpinBox::down-button, QDoubleSpinBox::down-button {{ "
+            f"subcontrol-origin: border; subcontrol-position: bottom right; "
+            f"background: {C_HOVER}; width: 15px; height: 11px; border-left: 1px solid {C_BORDER}; border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px; }}"
+            f"QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ "
+            f"image: url(\"{up_p}\"); width: 8px; height: 5px; }}"
+            f"QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{ "
+            f"image: url(\"{down_p}\"); width: 8px; height: 5px; }}"
         )
         return s
 

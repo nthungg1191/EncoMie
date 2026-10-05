@@ -40,6 +40,7 @@ from core.subtitle_model import SubtitleEntry
 from ui.subtitle_preview_widget import SubtitlePreviewWidget, SubtitleStyleEditor, LiveFramePreview
 from ui.video_layer_config import VideoLayerConfigWidget
 from ui.video_layout_preview import VideoLayoutPreview
+from ui.collapsible_section import CollapsibleSection
 from utils import settings as cfg
 from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
 from core.license_manager import LicenseManager, LicenseStatus
@@ -956,6 +957,15 @@ class MainWindow(QMainWindow):
         return media_files
 
     def _apply_theme(self):
+        try:
+            import PyQt6.QtSvg  # noqa: F401
+        except ImportError:
+            pass
+
+        assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets")).replace("\\", "/")
+        up_icon = f"{assets_dir}/spin_up.svg"
+        down_icon = f"{assets_dir}/spin_down.svg"
+
         qss = """
         /* Global Reset & Typography */
         QWidget {
@@ -974,8 +984,8 @@ class MainWindow(QMainWindow):
             background-color: #f8fafc;
             border: 1px solid #e2e8f0;
             border-radius: 8px;
-            margin-top: 14px;
-            padding: 12px 10px 10px 10px;
+            margin-top: 8px;
+            padding: 8px 8px 6px 8px;
             font-weight: 700;
             font-size: 11px;
             color: #475569;
@@ -985,7 +995,7 @@ class MainWindow(QMainWindow):
             subcontrol-origin: margin;
             subcontrol-position: top left;
             left: 10px;
-            padding: 0 6px;
+            padding: 0 4px;
             background-color: #f8fafc;
             color: #475569;
             text-transform: uppercase;
@@ -993,19 +1003,71 @@ class MainWindow(QMainWindow):
         }
 
         /* Form Controls */
-        QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+        QLineEdit, QComboBox {
             background-color: #ffffff;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
-            padding: 4px 8px;
+            padding: 2px 6px;
             color: #0f172a;
             font-size: 11px;
-            min-height: 24px;
+            min-height: 22px;
+        }
+
+        QSpinBox, QDoubleSpinBox {
+            background-color: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            padding: 1px 18px 1px 4px;
+            color: #0f172a;
+            font-size: 11px;
+            min-height: 22px;
         }
 
         QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
             border: 1.5px solid #007aff;
             background-color: #ffffff;
+        }
+
+        QSpinBox::up-button, QDoubleSpinBox::up-button {
+            subcontrol-origin: border;
+            subcontrol-position: top right;
+            width: 16px;
+            height: 11px;
+            border-left: 1px solid #cbd5e1;
+            border-bottom: 0.5px solid #e2e8f0;
+            border-top-right-radius: 5px;
+            background-color: #f8fafc;
+            margin-top: 1px;
+            margin-right: 1px;
+        }
+
+        QSpinBox::down-button, QDoubleSpinBox::down-button {
+            subcontrol-origin: border;
+            subcontrol-position: bottom right;
+            width: 16px;
+            height: 11px;
+            border-left: 1px solid #cbd5e1;
+            border-bottom-right-radius: 5px;
+            background-color: #f8fafc;
+            margin-bottom: 1px;
+            margin-right: 1px;
+        }
+
+        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+            background-color: #e2e8f0;
+        }
+
+        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+            image: url("__UP_ICON__");
+            width: 8px;
+            height: 5px;
+        }
+
+        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+            image: url("__DOWN_ICON__");
+            width: 8px;
+            height: 5px;
         }
 
         QComboBox::drop-down {
@@ -1133,7 +1195,7 @@ class MainWindow(QMainWindow):
             border-bottom: 2px solid #007aff;
             font-weight: 700;
         }
-        """
+        """.replace("__UP_ICON__", up_icon).replace("__DOWN_ICON__", down_icon)
         self.setStyleSheet(qss)
 
     def _build_ui(self):
@@ -1797,14 +1859,14 @@ class MainWindow(QMainWindow):
 
         tab_export = QWidget()
         tab_export_lay = QVBoxLayout(tab_export)
-        tab_export_lay.setContentsMargins(0, 4, 0, 0)
-        tab_export_lay.setSpacing(10)
+        tab_export_lay.setContentsMargins(4, 4, 4, 4)
+        tab_export_lay.setSpacing(6)
 
         # 1. Thư mục xuất video
         grp_output = QGroupBox("📤  Thư mục xuất video", tab_export)
         grp_output.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         out_lay = QVBoxLayout(grp_output)
-        out_lay.setContentsMargins(8, 8, 8, 8)
+        out_lay.setContentsMargins(6, 6, 6, 6)
         self.pick_output = FolderPicker("📤 Xuất:", "Chọn thư mục xuất video", parent=grp_output)
         self.pick_output.btn.setText("Chọn")
         out_lay.addWidget(self.pick_output)
@@ -1814,8 +1876,8 @@ class MainWindow(QMainWindow):
         grp_render = QGroupBox("⚙️  Thông số Render", tab_export)
         grp_render.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         r_lay = QVBoxLayout(grp_render)
-        r_lay.setSpacing(8)
-        r_lay.setContentsMargins(10, 10, 10, 10)
+        r_lay.setSpacing(4)
+        r_lay.setContentsMargins(6, 6, 6, 6)
 
         # Target Resolution Dropdown
         res_lbl = QLabel("Độ phân giải:", grp_render)
@@ -1827,7 +1889,6 @@ class MainWindow(QMainWindow):
         self.cmb_resolution.addItem("1920x1080 (FullHD - 16:9)")
         self.cmb_resolution.addItem("720x1280 (Dọc - TikTok)")
         self.cmb_resolution.addItem("1080x1920 (Dọc FullHD)")
-        self.cmb_resolution.setStyleSheet("font-size: 11px;")
         self.cmb_resolution.currentIndexChanged.connect(self._on_resolution_changed)
         r_lay.addWidget(self.cmb_resolution)
 
@@ -1838,7 +1899,6 @@ class MainWindow(QMainWindow):
         self.cmb_codec = QComboBox(grp_render)
         for label, _ in CODECS:
             self.cmb_codec.addItem(label)
-        self.cmb_codec.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.cmb_codec)
 
         fps_lbl = QLabel("Tốc độ khung hình (FPS):", grp_render)
@@ -1855,7 +1915,6 @@ class MainWindow(QMainWindow):
         self.cmb_fps.addItem("24 FPS", "24")
         self.cmb_fps.addItem("23.976 FPS", "24000/1001")
         self.cmb_fps.setCurrentIndex(2) # Default to 30 FPS
-        self.cmb_fps.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.cmb_fps)
 
         concurrent_lbl = QLabel("Render song song đồng thời:", grp_render)
@@ -1865,7 +1924,6 @@ class MainWindow(QMainWindow):
         self.spn_concurrent = QSpinBox(grp_render)
         self.spn_concurrent.setRange(1, 8)
         self.spn_concurrent.setValue(2)
-        self.spn_concurrent.setStyleSheet("font-size: 11px;")
         r_lay.addWidget(self.spn_concurrent)
 
         speed_lbl = QLabel("Tốc độ chậm của video nền:", grp_render)
@@ -1883,7 +1941,6 @@ class MainWindow(QMainWindow):
         self.spn_slow_min.setRange(10, 80)
         self.spn_slow_min.setValue(35.0)
         self.spn_slow_min.setSingleStep(1.0)
-        self.spn_slow_min.setStyleSheet("font-size: 11px;")
         speed_row.addWidget(self.spn_slow_min, 1)
 
         max_lbl = QLabel("Max:", grp_render)
@@ -1894,7 +1951,6 @@ class MainWindow(QMainWindow):
         self.spn_slow_max.setRange(10, 80)
         self.spn_slow_max.setValue(45.0)
         self.spn_slow_max.setSingleStep(1.0)
-        self.spn_slow_max.setStyleSheet("font-size: 11px;")
         speed_row.addWidget(self.spn_slow_max, 1)
 
         r_lay.addLayout(speed_row)
@@ -1909,13 +1965,13 @@ class MainWindow(QMainWindow):
         grp_ctrl = QGroupBox("Tiến trình", tab_export)
         grp_ctrl.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         ctrl_lay = QVBoxLayout(grp_ctrl)
-        ctrl_lay.setSpacing(6)
-        ctrl_lay.setContentsMargins(8, 8, 8, 8)
+        ctrl_lay.setSpacing(4)
+        ctrl_lay.setContentsMargins(6, 6, 6, 6)
 
         self.progress_bar = QProgressBar(grp_ctrl)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(18)
+        self.progress_bar.setFixedHeight(16)
         self.progress_bar.setStyleSheet(
             "QProgressBar { border: 1px solid #d1d1d6; border-radius: 4px; "
             "background: #e5e5ea; text-align: center; font-size: 10px; color: #1c1c1e; }"
@@ -1928,10 +1984,10 @@ class MainWindow(QMainWindow):
         ctrl_lay.addWidget(self.lbl_status)
 
         self.btn_render = QPushButton("🚀 Bắt đầu Render", grp_ctrl)
-        self.btn_render.setFixedHeight(34)
+        self.btn_render.setFixedHeight(30)
         self.btn_render.setStyleSheet(
-            "QPushButton { background: #007aff; color: white; font-size: 12px; "
-            "font-weight: bold; border-radius: 6px; border: none; }"
+            "QPushButton { background: #007aff; color: white; font-size: 11px; "
+            "font-weight: bold; border-radius: 5px; border: none; }"
             "QPushButton:hover { background: #0062cc; }"
             "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
         )
@@ -1942,10 +1998,10 @@ class MainWindow(QMainWindow):
         btn_row.setSpacing(4)
 
         self.btn_pause = QPushButton("⏸ Tạm dừng", grp_ctrl)
-        self.btn_pause.setFixedHeight(26)
+        self.btn_pause.setFixedHeight(24)
         self.btn_pause.setEnabled(False)
         self.btn_pause.setStyleSheet(
-            "QPushButton { background: #fef3c7; color: #d97706; font-size: 11px; "
+            "QPushButton { background: #fef3c7; color: #d97706; font-size: 10.5px; "
             "font-weight: bold; border-radius: 4px; border: 1px solid #fde68a; }"
             "QPushButton:hover { background: #fde68a; }"
             "QPushButton:disabled { background: #f8fafc; color: #cbd5e1; border-color: #e2e8f0; }"
@@ -1954,10 +2010,10 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(self.btn_pause, 1)
 
         self.btn_stop = QPushButton("⏹ Dừng hẳn", grp_ctrl)
-        self.btn_stop.setFixedHeight(26)
+        self.btn_stop.setFixedHeight(24)
         self.btn_stop.setEnabled(False)
         self.btn_stop.setStyleSheet(
-            "QPushButton { background: #fee2e2; color: #dc2626; font-size: 11px; "
+            "QPushButton { background: #fee2e2; color: #dc2626; font-size: 10.5px; "
             "font-weight: bold; border-radius: 4px; border: 1px solid #fca5a5; }"
             "QPushButton:hover { background: #fca5a5; }"
             "QPushButton:disabled { background: #f8fafc; color: #cbd5e1; border-color: #e2e8f0; }"
@@ -1966,9 +2022,9 @@ class MainWindow(QMainWindow):
         btn_row.addWidget(self.btn_stop, 1)
 
         self.btn_export = QPushButton("📤 Xuất JSON", grp_ctrl)
-        self.btn_export.setFixedHeight(26)
+        self.btn_export.setFixedHeight(24)
         self.btn_export.setStyleSheet(
-            "QPushButton { background: #dcfce7; color: #166534; font-size: 11px; "
+            "QPushButton { background: #dcfce7; color: #166534; font-size: 10.5px; "
             "font-weight: bold; border-radius: 4px; border: 1px solid #86efac; }"
             "QPushButton:hover { background: #bbf7d0; }"
         )
@@ -1979,24 +2035,25 @@ class MainWindow(QMainWindow):
         tab_export_lay.addWidget(grp_ctrl)
 
         # 4. FFmpeg log
-        grp_log = QGroupBox("📝  Log FFmpeg", tab_export)
-        grp_log.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
-        log_lay = QVBoxLayout(grp_log)
-        log_lay.setContentsMargins(6, 6, 6, 6)
+        grp_log = CollapsibleSection("📝  Log FFmpeg")
+        log_lay = QVBoxLayout()
+        log_lay.setContentsMargins(4, 4, 4, 4)
         
-        self.log_text = QPlainTextEdit(grp_log)
+        self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumBlockCount(100)
-        self.log_text.setFixedHeight(80)
+        self.log_text.setFixedHeight(60)
         self.log_text.setStyleSheet(
             "background: #f8fafc; color: #166534; font-family: monospace; font-size: 10px; border-radius: 4px; border: 1px solid #e2e8f0;"
         )
         log_lay.addWidget(self.log_text)
         
-        self.btn_clear_log = QPushButton("Xóa log", grp_log)
-        self.btn_clear_log.setFixedSize(60, 20)
+        self.btn_clear_log = QPushButton("Xóa log")
+        self.btn_clear_log.setFixedSize(60, 18)
         self.btn_clear_log.setStyleSheet("font-size: 10px; padding: 0;")
         self.btn_clear_log.clicked.connect(self.log_text.clear)
+        log_lay.addWidget(self.btn_clear_log)
+        grp_log.body_layout.addLayout(log_lay)
         tab_export_lay.addWidget(grp_log)
 
         tab_export_scroll.setWidget(tab_export)
