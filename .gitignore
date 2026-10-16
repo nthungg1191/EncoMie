@@ -16,6 +16,7 @@ build.py
 *__pycache__
 EncoMie.bat 
 html.html
+/tests
 
 ui_mockup.html
 wireframe_box_b.html
