@@ -418,17 +418,11 @@ class VideoLayerConfigWidget(QWidget):
         scroll.setWidget(content)
         outer.addWidget(scroll)
 
-        # Default states: Layer 1 and 2 are active on wireframe demo
-        if self.index in (1, 2):
-            self.chk_enabled.setChecked(True)
-        else:
-            self.chk_enabled.setChecked(False)
+        # Default state: Only Layer 1 is active by default
+        self.chk_enabled.setChecked(self.index == 1)
 
-        # Initialize mock values for Layer 2
-        if self.index == 2:
-            self.cmb_source_type.setCurrentIndex(1) # Static file
-            self.edit_path.setText("logo.png")
-            self.cmb_pos.setCurrentIndex(1) # Bottom-Right
+        # Clean initial path
+        self.edit_path.setText("")
 
         self._update_speed_visibility()
         self._refresh_section_badges()

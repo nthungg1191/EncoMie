@@ -10,6 +10,15 @@ import subprocess
 
 
 if sys.platform.startswith("win"):
+    import ctypes
+    # Đặt Explicit App User Model ID để Windows Taskbar gắn đúng icon của ứng dụng
+    # thay vì icon mặc định của python.exe hoặc icon trong suốt
+    try:
+        myappid = "encomie.auto_video_editor.app.v1"
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     _original_popen = subprocess.Popen
 
     def _hidden_popen(*args, **kwargs):
@@ -27,11 +36,24 @@ if sys.platform.startswith("win"):
     subprocess.Popen = _hidden_popen
 
 def main():
+    # Every instance and its child processes share the same half of the CPUs.
+    from core.render_coord import apply_cpu_limit
+    if not apply_cpu_limit():
+        raise RuntimeError("Không thể áp dụng giới hạn CPU 50% cho EncoMie")
+
     app = QApplication(sys.argv)
     app.setApplicationName("EncoMie")
     app.setOrganizationName("EncoMie")
 
+    # Thiết lập Icon cho toàn bộ tiến trình ứng dụng
+    from core.app_paths import get_app_icon
+    app_icon = get_app_icon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
+
     window = MainWindow()
+    if not app_icon.isNull():
+        window.setWindowIcon(app_icon)
     window.show()
     sys.exit(app.exec())
 

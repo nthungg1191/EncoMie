@@ -21,6 +21,11 @@ from core.security import (
     verify_license_token,
     generate_nonce,
 )
+from core.hardware_id import (
+    get_stable_machine_id,
+    get_legacy_machine_id,
+    get_smbios_uuid,
+)
 
 
 class LicenseStatus(Enum):
@@ -82,6 +87,7 @@ class LicenseManager:
         raw_url = api_url or os.environ.get("LICENSE_API_URL", self.DEFAULT_API_URL)
         self.API_BASE_URL = raw_url.rstrip("/")
         self._machine_id = self.get_machine_id()
+        self._legacy_machine_id = self.get_legacy_machine_id()
         self._cache_file = self._get_cache_filepath()
 
     # ------------------------------------------------------------------ #
@@ -90,23 +96,26 @@ class LicenseManager:
 
     @staticmethod
     def _hw_components() -> Dict[str, str]:
-        return {
+        comps = {
             "machine_guid": get_windows_machine_guid(),
             "node": platform.node(),
             "arch": platform.machine(),
             "cpu": platform.processor(),
             "mac": str(uuid.getnode()),
+            "smbios_uuid": get_smbios_uuid() or "",
+            "hwid_v2": get_stable_machine_id(),
         }
+        return comps
 
     @classmethod
     def get_machine_id(cls) -> str:
-        """Stable 32-char HWID derived from hardware attributes + Registry GUID."""
-        try:
-            comps = cls._hw_components()
-            raw_id = "|".join(comps[k] for k in ("machine_guid", "node", "arch", "cpu", "mac"))
-            return hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:32]
-        except Exception:
-            return hashlib.sha256(b"encomie_fallback_hwid").hexdigest()[:32]
+        """Stable 32-char HWID v2 derived from physical hardware attributes (SMBIOS, board, CPU, disk)."""
+        return get_stable_machine_id()
+
+    @classmethod
+    def get_legacy_machine_id(cls) -> str:
+        """Legacy HWID v1 for backward compatibility with older Windows 10/11 activations."""
+        return get_legacy_machine_id()
 
     # ------------------------------------------------------------------ #
     # Local cache
@@ -116,11 +125,12 @@ class LicenseManager:
         from core.app_paths import app_data_dir
         return app_data_dir() / "license.json"
 
-    def _save_cache(self, key: str, token: str):
+    def _save_cache(self, key: str, token: str, machine_id: Optional[str] = None):
+        mid = machine_id or self._machine_id
         try:
             saved_at = datetime.now().isoformat()
-            checksum = compute_cache_hmac(key, self._machine_id, saved_at, token)
-            payload = {"key": key, "machine_id": self._machine_id, "token": token,
+            checksum = compute_cache_hmac(key, mid, saved_at, token)
+            payload = {"key": key, "machine_id": mid, "token": token,
                        "saved_at": saved_at, "checksum": checksum}
             with open(self._cache_file, "w", encoding="utf-8") as f:
                 json.dump(payload, f, indent=2)
@@ -174,11 +184,12 @@ class LicenseManager:
                                    raw_data={"error": {"message": f"Suspicious process '{proc}' detected."}})
         return None
 
-    def _signed_body(self, key: str, extra: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def _signed_body(self, key: str, extra: Optional[Dict[str, Any]] = None, machine_id_override: Optional[str] = None) -> Dict[str, Any]:
+        mid = machine_id_override or self._machine_id
         nonce = generate_nonce()
         timestamp = int(time.time() * 1000)
-        signature = compute_hmac_signature(f"{key}|{self._machine_id}|{nonce}|{timestamp}")
-        body = {"key": key, "machine_id": self._machine_id, "nonce": nonce,
+        signature = compute_hmac_signature(f"{key}|{mid}|{nonce}|{timestamp}")
+        body = {"key": key, "machine_id": mid, "nonce": nonce,
                 "timestamp": timestamp, "signature": signature,
                 "hw_components": self._hw_components()}
         if extra:
@@ -202,7 +213,9 @@ class LicenseManager:
 
     def _validate_claims(self, key: str, claims: Dict[str, Any]) -> Optional[LicenseInfo]:
         """Return a non-VALID LicenseInfo if the token claims fail a local check, else None."""
-        if claims.get("machine_id") != self._machine_id:
+        claimed_mid = claims.get("machine_id")
+        valid_mids = {self._machine_id, self._legacy_machine_id}
+        if claimed_mid not in valid_mids:
             return LicenseInfo(status=LicenseStatus.INVALID, key=key,
                                raw_data={"error": {"message": "License token is bound to another machine."}})
         status = str(claims.get("status", "")).lower()
@@ -285,10 +298,19 @@ class LicenseManager:
             if 0 <= age_ms < self.HEARTBEAT_COALESCE_MS:
                 return self._info_from_token(cached_key, claims, offline=False)
 
+        # Hỗ trợ máy cũ: nếu token trong máy đã cấp cho legacy machine_id,
+        # gửi target_mid tương ứng để server khớp đúng bản ghi đã kích hoạt
+        claimed_mid = claims.get("machine_id", self._machine_id)
+        target_mid = claimed_mid if claimed_mid in (self._machine_id, self._legacy_machine_id) else self._machine_id
+
         # ---- Try online verification (refreshes the token / TTL) ----
         try:
-            resp = requests.post(f"{self.API_BASE_URL}/api/license/verify",
-                                 json=self._signed_body(cached_key), timeout=8)
+            extra_payload = {"hwid_v2": self._machine_id} if target_mid == self._legacy_machine_id else None
+            resp = requests.post(
+                f"{self.API_BASE_URL}/api/license/verify",
+                json=self._signed_body(cached_key, extra=extra_payload, machine_id_override=target_mid),
+                timeout=8,
+            )
             data = resp.json()
 
             if resp.status_code == 200 and data.get("success"):
@@ -302,7 +324,8 @@ class LicenseManager:
                     if nbad.status in (LicenseStatus.REVOKED, LicenseStatus.INVALID):
                         self._clear_cache()
                     return nbad
-                self._save_cache(cached_key, token)
+                new_token_mid = new_claims.get("machine_id", target_mid)
+                self._save_cache(cached_key, token, machine_id=new_token_mid)
                 return self._info_from_token(cached_key, new_claims)
 
             err_code = data.get("error", {}).get("code", "")
@@ -337,9 +360,14 @@ class LicenseManager:
             self._clear_cache()
             return True
         cached_key = cached.get("key", "")
+        cached_mid = cached.get("machine_id", self._machine_id)
+        target_mid = cached_mid if cached_mid in (self._machine_id, self._legacy_machine_id) else self._machine_id
         try:
-            resp = requests.post(f"{self.API_BASE_URL}/api/license/deactivate",
-                                 json=self._signed_body(cached_key), timeout=8)
+            resp = requests.post(
+                f"{self.API_BASE_URL}/api/license/deactivate",
+                json=self._signed_body(cached_key, machine_id_override=target_mid),
+                timeout=8,
+            )
             self._clear_cache()
             return resp.status_code == 200
         except requests.RequestException:

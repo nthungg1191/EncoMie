@@ -20,6 +20,12 @@ _root = str(_Path(__file__).parent.parent)
 if _root not in _sys.path:
     _sys.path.insert(0, _root)
 
+from core.app_paths import get_resource_path
+_spin_up_p = str(get_resource_path("Asset/Img/spin_up.png")).replace("\\", "/")
+_spin_down_p = str(get_resource_path("Asset/Img/spin_down.png")).replace("\\", "/")
+_spin_up_h = str(get_resource_path("Asset/Img/spin_up_hover.png")).replace("\\", "/")
+_spin_down_h = str(get_resource_path("Asset/Img/spin_down_hover.png")).replace("\\", "/")
+
 import math
 
 from PyQt6.QtWidgets import (
@@ -177,10 +183,16 @@ class ColorPickerPopup(QDialog):
                 border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px;
             }}
             QSpinBox::up-arrow {{
-                image: url("{_root}/assets/spin_up.svg"); width: 8px; height: 5px;
+                image: url("{_spin_up_p}"); width: 9px; height: 9px;
+            }}
+            QSpinBox::up-arrow:hover {{
+                image: url("{_spin_up_h}");
             }}
             QSpinBox::down-arrow {{
-                image: url("{_root}/assets/spin_down.svg"); width: 8px; height: 5px;
+                image: url("{_spin_down_p}"); width: 9px; height: 9px;
+            }}
+            QSpinBox::down-arrow:hover {{
+                image: url("{_spin_down_h}");
             }}
             QSlider::groove:horizontal {{
                 border-radius: 3px; height: 6px;
@@ -2481,8 +2493,6 @@ class SubtitleStyleEditor(QWidget):
         s.setSuffix(suffix)
         s.setFixedWidth(width)
         s.setFixedHeight(26)
-        up_p = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "spin_up.svg")).replace("\\", "/")
-        down_p = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets", "spin_down.svg")).replace("\\", "/")
         s.setStyleSheet(
             f"QSpinBox, QDoubleSpinBox {{ background: {C_ELEVATED_BG}; color: {C_TEXT}; "
             f"border: 1px solid {C_BORDER}; border-radius: 4px; "
@@ -2494,9 +2504,13 @@ class SubtitleStyleEditor(QWidget):
             f"subcontrol-origin: border; subcontrol-position: bottom right; "
             f"background: {C_HOVER}; width: 15px; height: 11px; border-left: 1px solid {C_BORDER}; border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px; }}"
             f"QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ "
-            f"image: url(\"{up_p}\"); width: 8px; height: 5px; }}"
+            f"image: url(\"{_spin_up_p}\"); width: 9px; height: 9px; }}"
+            f"QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{ "
+            f"image: url(\"{_spin_up_h}\"); }}"
             f"QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{ "
-            f"image: url(\"{down_p}\"); width: 8px; height: 5px; }}"
+            f"image: url(\"{_spin_down_p}\"); width: 9px; height: 9px; }}"
+            f"QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {{ "
+            f"image: url(\"{_spin_down_h}\"); }}"
         )
         return s
 

@@ -598,9 +598,10 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("EncoMie")
         
         # Thiết lập Icon cho cửa sổ ứng dụng
-        logo_path = _root / "Asset" / "Img" / "Logo.png"
-        if logo_path.exists():
-            self.setWindowIcon(QIcon(str(logo_path)))
+        from core.app_paths import get_app_icon
+        app_icon = get_app_icon()
+        if not app_icon.isNull():
+            self.setWindowIcon(app_icon)
 
         self.setMinimumSize(1100, 720)
         self.resize(1280, 800)
@@ -962,9 +963,27 @@ class MainWindow(QMainWindow):
         except ImportError:
             pass
 
-        assets_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "assets")).replace("\\", "/")
-        up_icon = f"{assets_dir}/spin_up.svg"
-        down_icon = f"{assets_dir}/spin_down.svg"
+        from core.app_paths import get_resource_path
+        # Ưu tiên file PNG để đảm bảo hiển thị 100% không phụ thuộc plugin QtSvg ngoài
+        up_path = get_resource_path("Asset/Img/spin_up.png")
+        if not up_path.exists():
+            up_path = get_resource_path("assets/spin_up.png")
+        if not up_path.exists():
+            up_path = get_resource_path("assets/spin_up.svg")
+
+        down_path = get_resource_path("Asset/Img/spin_down.png")
+        if not down_path.exists():
+            down_path = get_resource_path("assets/spin_down.png")
+        if not down_path.exists():
+            down_path = get_resource_path("assets/spin_down.svg")
+
+        up_hover_path = get_resource_path("Asset/Img/spin_up_hover.png")
+        down_hover_path = get_resource_path("Asset/Img/spin_down_hover.png")
+
+        up_icon = str(up_path).replace("\\", "/")
+        down_icon = str(down_path).replace("\\", "/")
+        up_hover_icon = str(up_hover_path).replace("\\", "/") if up_hover_path.exists() else up_icon
+        down_hover_icon = str(down_hover_path).replace("\\", "/") if down_hover_path.exists() else down_icon
 
         qss = """
         /* Global Reset & Typography */
@@ -1060,14 +1079,22 @@ class MainWindow(QMainWindow):
 
         QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
             image: url("__UP_ICON__");
-            width: 8px;
-            height: 5px;
+            width: 9px;
+            height: 9px;
+        }
+
+        QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {
+            image: url("__UP_HOVER_ICON__");
         }
 
         QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
             image: url("__DOWN_ICON__");
-            width: 8px;
-            height: 5px;
+            width: 9px;
+            height: 9px;
+        }
+
+        QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {
+            image: url("__DOWN_HOVER_ICON__");
         }
 
         QComboBox::drop-down {
@@ -1195,7 +1222,13 @@ class MainWindow(QMainWindow):
             border-bottom: 2px solid #007aff;
             font-weight: 700;
         }
-        """.replace("__UP_ICON__", up_icon).replace("__DOWN_ICON__", down_icon)
+        """
+        qss = (
+            qss.replace("__UP_ICON__", up_icon)
+            .replace("__DOWN_ICON__", down_icon)
+            .replace("__UP_HOVER_ICON__", up_hover_icon)
+            .replace("__DOWN_HOVER_ICON__", down_hover_icon)
+        )
         self.setStyleSheet(qss)
 
     def _build_ui(self):
@@ -2288,22 +2321,19 @@ class MainWindow(QMainWindow):
         # Restore Edit Video layers (5 layers)
         for idx, widget in enumerate(self.video_layer_widgets):
             layer_num = idx + 1
-            widget.chk_enabled.setChecked(s.get(f"vlayer_enabled_{layer_num}", layer_num in (1, 2, 3)))
+            is_l1 = (layer_num == 1)
+            widget.chk_enabled.setChecked(s.get(f"vlayer_enabled_{layer_num}", is_l1))
+            widget.cmb_source_type.setCurrentIndex(s.get(f"vlayer_source_type_{layer_num}", 0 if is_l1 else 1))
+            widget.edit_path.setText(s.get(f"vlayer_path_{layer_num}", ""))
             
-            src_type = s.get(f"vlayer_source_type_{layer_num}", 0 if layer_num == 1 else 1 if layer_num == 2 else 2)
-            widget.cmb_source_type.setCurrentIndex(src_type)
+            widget.cmb_pos.setCurrentIndex(s.get(f"vlayer_position_{layer_num}", 0))
+            widget.spn_size.setValue(s.get(f"vlayer_size_{layer_num}", 100))
+            widget.spn_opacity.setValue(s.get(f"vlayer_opacity_{layer_num}", 100))
             
-            path_val = s.get(f"vlayer_path_{layer_num}", "logo.png" if layer_num == 3 else "")
-            widget.edit_path.setText(path_val)
-            
-            widget.cmb_pos.setCurrentIndex(s.get(f"vlayer_position_{layer_num}", 0 if layer_num in (1, 2) else 1))
-            widget.spn_size.setValue(s.get(f"vlayer_size_{layer_num}", 100 if layer_num == 1 else 40 if layer_num == 2 else 15))
-            widget.spn_opacity.setValue(s.get(f"vlayer_opacity_{layer_num}", 90 if layer_num == 1 else 100))
-            
-            widget.spn_margin_t.setValue(s.get(f"vlayer_margin_t_{layer_num}", 0 if layer_num == 1 else 20))
-            widget.spn_margin_b.setValue(s.get(f"vlayer_margin_b_{layer_num}", 0 if layer_num == 1 else 20))
-            widget.spn_margin_l.setValue(s.get(f"vlayer_margin_l_{layer_num}", 0 if layer_num == 1 else 20))
-            widget.spn_margin_r.setValue(s.get(f"vlayer_margin_r_{layer_num}", 0 if layer_num == 1 else 20))
+            widget.spn_margin_t.setValue(s.get(f"vlayer_margin_t_{layer_num}", 0))
+            widget.spn_margin_b.setValue(s.get(f"vlayer_margin_b_{layer_num}", 0))
+            widget.spn_margin_l.setValue(s.get(f"vlayer_margin_l_{layer_num}", 0))
+            widget.spn_margin_r.setValue(s.get(f"vlayer_margin_r_{layer_num}", 0))
             
             widget.spn_crop_t.setValue(s.get(f"vlayer_crop_t_{layer_num}", 0))
             widget.spn_crop_b.setValue(s.get(f"vlayer_crop_b_{layer_num}", 0))
@@ -2324,9 +2354,12 @@ class MainWindow(QMainWindow):
             widget.spn_luma_tolerance.setValue(s.get(f"vlayer_luma_tolerance_{layer_num}", 0.05))
             widget.spn_luma_softness.setValue(s.get(f"vlayer_luma_softness_{layer_num}", 0.05))
             widget.luma_params_frame.setVisible(widget.chk_luma_enabled.isChecked())
-            widget.color_panel.set_config(s.get(f"vlayer_color_grade_{layer_num}"))
+            if f"vlayer_color_grade_{layer_num}" in s:
+                widget.color_panel.set_config(s.get(f"vlayer_color_grade_{layer_num}"))
 
             widget._update_speed_visibility()
+
+        self._on_video_layer_changed()
 
         self._on_video_layer_changed()
 
@@ -2345,11 +2378,11 @@ class MainWindow(QMainWindow):
                 self.cmb_preset.setCurrentIndex(idx)
 
         if hasattr(self, "layer_tab_widget"):
-            self.layer_tab_widget.setCurrentIndex(s.get("active_logo_tab", 0))
+            self.layer_tab_widget.setCurrentIndex(0)
         if hasattr(self, "video_tab_widget"):
-            self.video_tab_widget.setCurrentIndex(s.get("active_video_tab", 0))
+            self.video_tab_widget.setCurrentIndex(0)
         if hasattr(self, "inspector_tab_widget"):
-            self.inspector_tab_widget.setCurrentIndex(s.get("active_inspector_tab", 0))
+            self.inspector_tab_widget.setCurrentIndex(0)
 
         # setCurrentIndex is a no-op when the index is unchanged, so sync each
         # preview's crop-edit state to the active layer's restored toggle here.
@@ -2559,7 +2592,8 @@ class MainWindow(QMainWindow):
 
     def _save_settings(self):
         settings_dict = self._serialize_workspace_state()
-        # Loại bỏ các thông tin tiến trình dự án trước khi lưu vào settings.json toàn cục
+        # Remove per-layer configurations and temporary project paths from global settings.json
+        keys_to_remove = [k for k in settings_dict if k.startswith("vlayer_") or k.startswith("logo_")]
         project_keys = [
             "audio_files", "srt_files", "vid_src_files", "vid_bg_files",
             "unchecked_audio_files", "unchecked_video_files",
@@ -2568,7 +2602,7 @@ class MainWindow(QMainWindow):
             "selected_audio_row", "selected_video_row", "bg_files",
             "logo_path", "logo_files"
         ]
-        for key in project_keys:
+        for key in project_keys + keys_to_remove:
             settings_dict.pop(key, None)
             
         cfg.save(settings_dict)

@@ -137,16 +137,16 @@ def detect_vm() -> Optional[str]:
     """Best-effort detection of a virtual machine environment (soft signal only)."""
     if not sys.platform.startswith("win"):
         return None
+    vm_terms = ("vbox", "vmware", "qemu", "virtualbox", "hyper-v")
     try:
-        output = subprocess.check_output(
-            "wmic bios get serialnumber /format:csv",
-            shell=True,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            text=True,
-            errors="ignore",
-        ).lower()
-        if any(term in output for term in ["vbox", "vmware", "qemu", "virtualbox", "hyper-v"]):
-            return "Virtual Machine Environment Detected"
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\BIOS") as key:
+            for val_name in ("SystemManufacturer", "SystemProductName", "BIOSVendor"):
+                try:
+                    val, _ = winreg.QueryValueEx(key, val_name)
+                    if any(term in str(val).lower() for term in vm_terms):
+                        return "Virtual Machine Environment Detected"
+                except Exception:
+                    pass
     except Exception:
         pass
     return None

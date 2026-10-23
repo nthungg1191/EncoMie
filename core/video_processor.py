@@ -972,6 +972,7 @@ def build_ffmpeg_cmd(
         cpu = cpu_plan(getattr(config, "max_concurrent_renders", 2))
     filter_threads = cpu["filter_threads"]
     encoder_threads = cpu["encoder_threads"]
+    decoder_threads = cpu.get("decoder_threads", encoder_threads)
 
     if config.use_gpu:
         vcodec = config.codec
@@ -989,10 +990,12 @@ def build_ffmpeg_cmd(
     # "Thread message queue blocking".
     TQ = "384"
     cmd.extend([
+        "-threads", str(decoder_threads),
         "-thread_queue_size", TQ,
         "-ss", f"{bg_start:.3f}",
         "-t", f"{bg_segment_duration:.3f}",
         "-i", bg_video,
+        "-threads", str(decoder_threads),
         "-thread_queue_size", TQ,
         "-i", audio_path,
     ])
@@ -1000,12 +1003,14 @@ def build_ffmpeg_cmd(
         is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
         if is_video:
             cmd.extend([
+                "-threads", str(decoder_threads),
                 "-thread_queue_size", TQ,
                 "-stream_loop", "-1",
                 "-i", layer._resolved_path
             ])
         else:
             cmd.extend([
+                "-threads", str(decoder_threads),
                 "-thread_queue_size", TQ,
                 "-i", layer._resolved_path
             ])
@@ -1189,7 +1194,7 @@ def build_ffmpeg_cmd(
     filter_expr = ";".join(filter_parts)
 
     cmd += [
-        "-filter_threads", str(filter_threads),  # song song hóa bộ lọc CPU (scale/overlay/subtitles)
+        "-filter_complex_threads", str(filter_threads),
         "-filter_complex",
         filter_expr,
         "-map", "[vout]",
@@ -1392,6 +1397,13 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
         bufsize=1,
         creationflags=creationflags
     )
+
+    if sys.platform == "win32":
+        from core.render_coord import apply_cpu_limit
+        if not apply_cpu_limit(int(process._handle)):
+            process.terminate()
+            process.wait(timeout=5)
+            raise RuntimeError("Không thể áp dụng giới hạn CPU 50% cho FFmpeg")
 
     for line in process.stdout:
         if slot is not None:
