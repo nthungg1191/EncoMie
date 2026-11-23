@@ -17,6 +17,8 @@ build.py
 EncoMie.bat 
 html.html
 /tests
-
+/ui_audit
+/scripts
+/screenshots
 ui_mockup.html
 wireframe_box_b.html

@@ -5,7 +5,7 @@ sections can be open at once (matches an Effects-panel-style properties list,
 not a strict one-open accordion), and each header can carry a small status
 badge + subtitle so a layer's state reads without opening every section.
 """
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
 from PyQt6.QtCore import Qt
 
 _BADGE_STYLES = {
@@ -39,15 +39,20 @@ class CollapsibleSection(QWidget):
         hl.setSpacing(7)
 
         self._chevron = QLabel("▸")
+        self._chevron.setToolTip("Mở hoặc thu gọn")
         self._chevron.setFixedWidth(11)
         self._chevron.setStyleSheet("font-size: 10px; color: #9a98a6; border: none;")
         hl.addWidget(self._chevron)
 
         self._title_lbl = QLabel(title)
+        self._title_lbl.setToolTip(title)
+        self._title_lbl.setMinimumWidth(0)
+        self._title_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self._title_lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #1c1c1e; border: none;")
         hl.addWidget(self._title_lbl, 1)
 
         self._sub_lbl = QLabel("")
+        self._sub_lbl.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed)
         self._sub_lbl.setStyleSheet("font-size: 9.5px; color: #9a98a6; border: none;")
         hl.addWidget(self._sub_lbl)
 
@@ -60,7 +65,7 @@ class CollapsibleSection(QWidget):
 
         self._body = QWidget(self)
         self.body_layout = QVBoxLayout(self._body)
-        self.body_layout.setContentsMargins(11, 3, 11, 11)
+        self.body_layout.setContentsMargins(3, 3, 3, 8)
         self.body_layout.setSpacing(8)
         outer.addWidget(self._body)
 
@@ -82,6 +87,7 @@ class CollapsibleSection(QWidget):
 
     def set_subtitle(self, text: str):
         self._sub_lbl.setText(text or "")
+        self._sub_lbl.setToolTip(text or "")
 
     def set_badge(self, text: str, kind: str = "off"):
         if not text:
@@ -89,6 +95,7 @@ class CollapsibleSection(QWidget):
             return
         bg, fg = _BADGE_STYLES.get(kind, _BADGE_STYLES["off"])
         self._badge_lbl.setText(text)
+        self._badge_lbl.setToolTip(text)
         self._badge_lbl.setStyleSheet(
             f"font-size: 9px; font-weight: 600; padding: 2px 7px; border-radius: 8px; "
             f"background: {bg}; color: {fg}; border: none;"

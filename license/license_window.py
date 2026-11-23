@@ -39,7 +39,8 @@ class LicenseWindow(QDialog):
 
     def _init_ui(self):
         self.setWindowTitle("Kích Hoạt Bản Quyền - EncoMie")
-        self.setFixedSize(480, 320)
+        self.setMinimumSize(420, 300)
+        self.resize(480, 320)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0f172a;
@@ -104,6 +105,7 @@ class LicenseWindow(QDialog):
 
         # Header Title
         title_lbl = QLabel("Vui Lòng Nhập License Key", self)
+        title_lbl.setWordWrap(True)
         title_lbl.setStyleSheet("font-size: 18px; font-weight: bold; color: #ffffff;")
         layout.addWidget(title_lbl)
 
@@ -200,7 +202,8 @@ class LicenseInfoDialog(QDialog):
 
     def _init_ui(self):
         self.setWindowTitle("Thông Tin Bản Quyền - EncoMie Pro")
-        self.setFixedSize(480, 430)
+        self.setMinimumSize(420, 390)
+        self.resize(480, 430)
         self.setStyleSheet("""
             QDialog {
                 background-color: #0f172a;
@@ -249,10 +252,13 @@ class LicenseInfoDialog(QDialog):
 
         header_lay = QHBoxLayout()
         icon_lbl = QLabel("🛡️", self)
+        icon_lbl.setMinimumWidth(36)
+        icon_lbl.setToolTip("Bản quyền ứng dụng")
         icon_lbl.setStyleSheet("font-size: 24px;")
         header_lay.addWidget(icon_lbl)
 
         title = QLabel("Thông Tin Bản Quyền Ứng Dụng", self)
+        title.setWordWrap(True)
         title.setStyleSheet("font-size: 17px; font-weight: 700; color: #ffffff;")
         header_lay.addWidget(title)
         header_lay.addStretch()
@@ -344,13 +350,19 @@ class LicenseInfoDialog(QDialog):
                 feature_bits.append(f"{max_videos} video/ngày")
         plan_suffix = f" &nbsp;<font color='#64748b' style='font-size: 11px;'>({', '.join(feature_bits)})</font>" if feature_bits else ""
 
-        f_lay.addWidget(QLabel(f"<b>🔑 Mã License Key:</b> &nbsp;<font color='#38bdf8' style='font-family: monospace; font-size: 14px;'>{key_val}</font>"))
-        f_lay.addWidget(QLabel(f"<b>{status_icon} Trạng thái:</b> &nbsp;<font color='{status_color}'><b>{status_display}</b></font>"))
-        f_lay.addWidget(QLabel(f"<b>{plan_icon} Gói:</b> &nbsp;<font color='{plan_color}'><b>{plan_display}</b></font>{plan_suffix}"))
-        f_lay.addWidget(QLabel(f"<b>📅 Ngày bắt đầu:</b> &nbsp;<font color='#f1f5f9'>{created_val}</font>"))
-        f_lay.addWidget(QLabel(f"<b>⏳ Ngày hết hạn:</b> &nbsp;<font color='#f59e0b'><b>{expires_val}</b></font>"))
-        f_lay.addWidget(QLabel(f"<b>🖥️ Số thiết bị tối đa:</b> &nbsp;<font color='#f1f5f9'>{max_devices_val} Máy</font>"))
-        f_lay.addWidget(QLabel(f"<b>🆔 Mã máy (HWID):</b> &nbsp;<font color='#94a3b8' style='font-family: monospace;'>{machine_preview}</font>"))
+        info_lines = [
+            f"<b>🔑 Mã License Key:</b> &nbsp;<font color='#38bdf8' style='font-family: monospace; font-size: 14px;'>{key_val}</font>",
+            f"<b>{status_icon} Trạng thái:</b> &nbsp;<font color='{status_color}'><b>{status_display}</b></font>",
+            f"<b>{plan_icon} Gói:</b> &nbsp;<font color='{plan_color}'><b>{plan_display}</b></font>{plan_suffix}",
+            f"<b>📅 Ngày bắt đầu:</b> &nbsp;<font color='#f1f5f9'>{created_val}</font>",
+            f"<b>⏳ Ngày hết hạn:</b> &nbsp;<font color='#f59e0b'><b>{expires_val}</b></font>",
+            f"<b>🖥️ Số thiết bị tối đa:</b> &nbsp;<font color='#f1f5f9'>{max_devices_val} Máy</font>",
+            f"<b>🆔 Mã máy (HWID):</b> &nbsp;<font color='#94a3b8' style='font-family: monospace;'>{machine_preview}</font>",
+        ]
+        for text in info_lines:
+            label = QLabel(text)
+            label.setWordWrap(True)
+            f_lay.addWidget(label)
 
         layout.addWidget(frame)
 

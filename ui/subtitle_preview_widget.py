@@ -32,7 +32,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox,
     QPushButton, QFrame, QToolButton, QSizePolicy,
-    QLineEdit, QSlider, QDialog, QScrollArea,
+    QLineEdit, QSlider, QDialog, QScrollArea, QLayout,
 )
 from PyQt6.QtCore import Qt, QRect, QSize, pyqtSignal, QPoint
 from PyQt6.QtGui import (
@@ -40,6 +40,7 @@ from PyQt6.QtGui import (
     QPainterPath, QLinearGradient, QImage, QPixmap,
     QMouseEvent, QRadialGradient,
 )
+from ui.flow_layout import FlowWidget
 
 from core.subtitle_model import SubtitleEntry, SubtitleStylePreset
 from core.srt_service import SrtService
@@ -105,6 +106,7 @@ class ColorPickerPopup(QDialog):
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setModal(False)
+        self.setMinimumWidth(460)
         self._setup_style()
 
         self._prev_hex = initial_hex
@@ -128,7 +130,7 @@ class ColorPickerPopup(QDialog):
     # ---- UI construction ----
 
     def _setup_style(self):
-        self.setFixedWidth(360)
+        self.setMinimumWidth(460)
         self._pad = 14
         self._corner = 8
         self.setStyleSheet(f"""
@@ -167,7 +169,7 @@ class ColorPickerPopup(QDialog):
                 border-radius: 4px;
                 color: {C_TEXT};
                 font-size: 12px;
-                padding: 2px 20px 2px 4px;
+                padding: 2px 4px 2px 6px;
             }}
             QSpinBox:focus {{ border-color: {C_ACCENT}; }}
             QSpinBox::up-button {{
@@ -234,8 +236,8 @@ class ColorPickerPopup(QDialog):
         self._hue_wheel.hue_changed.connect(self._on_hue_changed)
         right_col.addWidget(self._hue_wheel)
 
-        for label_text in ("Current", "Previous"):
-            preview_frame = self._make_preview(label_text)
+        for label_text, is_current in (("Hiện tại", True), ("Trước đó", False)):
+            preview_frame = self._make_preview(label_text, is_current)
             right_col.addWidget(preview_frame)
 
         right_col.addStretch()
@@ -243,32 +245,38 @@ class ColorPickerPopup(QDialog):
         root.addLayout(top_row)
 
         # ── Hex + RGB row ─────────────────────────────────────────────────
-        hex_rgb = QHBoxLayout()
-        hex_rgb.setSpacing(6)
+        hex_rgb = QGridLayout()
+        hex_rgb.setHorizontalSpacing(8)
+        hex_rgb.setVerticalSpacing(6)
 
         lbl_hex = QLabel("HEX")
+        lbl_hex.setMinimumWidth(40)
         lbl_hex.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; font-weight: 600;")
-        hex_rgb.addWidget(lbl_hex)
+        hex_rgb.addWidget(lbl_hex, 0, 0)
 
         self._le_hex = QLineEdit()
         self._le_hex.setFixedHeight(26)
         self._le_hex.setMaxLength(7)
         self._le_hex.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._le_hex.textEdited.connect(self._on_hex_edited)
-        hex_rgb.addWidget(self._le_hex, 1)
+        hex_rgb.addWidget(self._le_hex, 0, 1, 1, 5)
 
         lbl_r, lbl_g, lbl_b = QLabel("R"), QLabel("G"), QLabel("B")
-        for lbl in (lbl_r, lbl_g, lbl_b):
+        for column, lbl in enumerate((lbl_r, lbl_g, lbl_b)):
+            lbl.setMinimumWidth(18)
             lbl.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; font-weight: 600;")
-            hex_rgb.addWidget(lbl)
+            hex_rgb.addWidget(lbl, 1, column * 2)
 
-        for channel, attr in [("r", "_spn_r"), ("g", "_spn_g"), ("b", "_spn_b")]:
+        for column, (channel, attr) in enumerate([("r", "_spn_r"), ("g", "_spn_g"), ("b", "_spn_b")]):
             spn = QSpinBox()
             spn.setRange(0, 255)
+            spn.setMinimumWidth(84)
+            spn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            spn.setAlignment(Qt.AlignmentFlag.AlignRight)
             spn.setFixedHeight(26)
             spn.valueChanged.connect(self._on_rgb_changed)
             setattr(self, attr, spn)
-            hex_rgb.addWidget(spn)
+            hex_rgb.addWidget(spn, 1, column * 2 + 1)
 
         root.addLayout(hex_rgb)
 
@@ -276,7 +284,8 @@ class ColorPickerPopup(QDialog):
         alpha_row = QHBoxLayout()
         alpha_row.setSpacing(6)
 
-        lbl_a = QLabel("Opacity")
+        lbl_a = QLabel("Độ mờ")
+        lbl_a.setFixedWidth(64)
         lbl_a.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; font-weight: 600;")
         alpha_row.addWidget(lbl_a)
 
@@ -288,14 +297,14 @@ class ColorPickerPopup(QDialog):
         alpha_row.addWidget(self._alpha_slider, 1)
 
         self._alpha_val = QLabel("100%")
-        self._alpha_val.setFixedWidth(34)
+        self._alpha_val.setFixedWidth(48)
         self._alpha_val.setStyleSheet(f"color: {C_TEXT}; font-size: 11px;")
         alpha_row.addWidget(self._alpha_val)
 
         root.addLayout(alpha_row)
 
         # ── Preset swatches ──────────────────────────────────────────────
-        swatch_lbl = QLabel("Presets")
+        swatch_lbl = QLabel("Màu mẫu")
         swatch_lbl.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 10px; font-weight: 600;")
         swatch_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft)
         root.addWidget(swatch_lbl)
@@ -320,14 +329,14 @@ class ColorPickerPopup(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
 
-        cancel = QPushButton("Cancel")
-        cancel.setFixedSize(72, 28)
+        cancel = QPushButton("Hủy")
+        cancel.setMinimumSize(84, 28)
         cancel.setStyleSheet(self._btn_dark())
         cancel.clicked.connect(self.reject)
         btn_row.addWidget(cancel)
 
         ok = QPushButton("OK")
-        ok.setFixedSize(72, 28)
+        ok.setMinimumSize(84, 28)
         ok.setStyleSheet(self._btn_accent())
         ok.clicked.connect(self._on_ok)
         btn_row.addWidget(ok)
@@ -339,9 +348,10 @@ class ColorPickerPopup(QDialog):
         wrapper.setContentsMargins(0, 0, 0, 0)
         wrapper.addWidget(outer)
 
-    def _make_preview(self, label: str) -> QFrame:
+    def _make_preview(self, label: str, is_current: bool) -> QFrame:
         f = QFrame()
         f.setFixedHeight(30)
+        f.setMinimumWidth(130)
         f.setStyleSheet(f"""
             QFrame {{ background: {C_SECTION_BG};
                       border: 1px solid {C_BORDER};
@@ -350,17 +360,18 @@ class ColorPickerPopup(QDialog):
         lay = QHBoxLayout(f)
         lay.setContentsMargins(6, 2, 6, 2)
         lbl = QLabel(label)
+        lbl.setMinimumWidth(lbl.sizeHint().width() + 4)
         lbl.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 10px;")
         lay.addWidget(lbl)
         color_sw = QLabel()
         color_sw.setFixedSize(50, 18)
         color_sw.setStyleSheet(f"""
-            background: {self._prev_hex if label == "Previous" else self._current_hex};
+            background: {self._current_hex if is_current else self._prev_hex};
             border-radius: 3px;
             border: 1px solid {C_BORDER};
         """)
         lay.addWidget(color_sw)
-        if label == "Current":
+        if is_current:
             self._preview_cur = color_sw
         else:
             self._preview_prv = color_sw
@@ -534,13 +545,17 @@ class ColorPickerButton(QPushButton):
         self._hex = hex_color.upper()
         self._popup: ColorPickerPopup | None = None
         self.setFixedHeight(28)
-        self.setMinimumWidth(80)
+        self.setMinimumWidth(92)
+        self.setText(self._hex)
+        self.setAccessibleName(f"Chọn màu {self._hex}")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(self._button_style())
         self.clicked.connect(self._open_picker)
 
     def set_color(self, hex_color: str):
         self._hex = hex_color.upper()
+        self.setText(self._hex)
+        self.setAccessibleName(f"Chọn màu {self._hex}")
         self.setStyleSheet(self._button_style())
         self.update()
 
@@ -550,10 +565,12 @@ class ColorPickerButton(QPushButton):
     def _button_style(self) -> str:
         return (
             f"QPushButton {{ background: {C_ELEVATED_BG}; border: 1px solid {C_BORDER}; "
-            f"border-radius: 5px; padding: 2px 10px 2px 6px; text-align: left; color: {C_TEXT}; "
-            f"font-family: monospace; font-size: 12px; }}"
+            f"border-radius: 5px; padding: 2px 4px 2px 36px; text-align: left; color: {C_TEXT}; "
+            f"font-family: monospace; font-size: 10px; }}"
             f"QPushButton:hover {{ background: {C_HOVER}; border-color: {C_ACCENT}; }}"
             f"QPushButton:pressed {{ background: {C_ACCENT_DIM}; }}"
+            f"QPushButton:focus {{ border: 2px solid {C_ACCENT}; }}"
+            f"QPushButton:disabled {{ color: #777b86; background: #191c26; border-color: #343845; }}"
         )
 
     def paintEvent(self, event):
@@ -561,7 +578,7 @@ class ColorPickerButton(QPushButton):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         col = QColor(self._hex)
-        rect = self.rect().adjusted(8, 6, -self.fontMetrics().horizontalAdvance(self._hex) - 22, -6)
+        rect = QRect(6, 3, 24, 22)
         p.setPen(QPen(QColor("#555555"), 1))
         p.setBrush(col)
         p.drawRoundedRect(rect, 3, 3)
@@ -1269,11 +1286,13 @@ class LiveFramePreview(SubtitlePreviewWidget):
     layerMoved = pyqtSignal(int, int, int, int, int)
     layerResized = pyqtSignal(int, int)
     layerCropped = pyqtSignal(int, int, int, int, int)
+    bgZoomChanged = pyqtSignal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMouseTracking(True)
         self._frame_img: QImage | None = None
+        self._bg_zoom: float = 100.0
         self._logo_img: QImage | None = None
         self._logo_path: str | None = None
         self._logo_position: int = 0
@@ -1311,6 +1330,11 @@ class LiveFramePreview(SubtitlePreviewWidget):
             self._frame_img = frame.toImage()
         else:
             self._frame_img = frame
+        self.update()
+
+    def set_bg_zoom(self, zoom: float):
+        """Set background zoom factor in percent (e.g. 100.0)."""
+        self._bg_zoom = float(zoom)
         self.update()
 
     def set_logo(self, logo_path: str | None, position: int, size: int, opacity: float):
@@ -1713,6 +1737,15 @@ class LiveFramePreview(SubtitlePreviewWidget):
         self._crop_handle = None
         self.setCursor(Qt.CursorShape.ArrowCursor)
 
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = 5.0 if event.angleDelta().y() > 0 else -5.0
+            new_zoom = max(20.0, min(300.0, getattr(self, "_bg_zoom", 100.0) + delta))
+            self.bgZoomChanged.emit(new_zoom)
+            event.accept()
+            return
+        super().wheelEvent(event)
+
     def _update_cursor(self, pos: QPoint):
         if hasattr(self, "_eyedropper_active") and self._eyedropper_active > 0:
             self.setCursor(Qt.CursorShape.CrossCursor)
@@ -1929,18 +1962,17 @@ class LiveFramePreview(SubtitlePreviewWidget):
         if self._frame_img and not self._frame_img.isNull():
             img_w = self._frame_img.width()
             img_h = self._frame_img.height()
-            img_scale = min(vw / float(img_w), vh / float(img_h))
-            draw_w = int(img_w * img_scale)
-            draw_h = int(img_h * img_scale)
+            img_scale = min(vw / float(img_w), vh / float(img_h)) if img_w > 0 and img_h > 0 else 1.0
+            zoom = getattr(self, "_bg_zoom", 100.0) / 100.0
+            draw_w = int(img_w * img_scale * zoom)
+            draw_h = int(img_h * img_scale * zoom)
             draw_x = vx + (vw - draw_w) // 2
             draw_y = vy + (vh - draw_h) // 2
 
-            scaled = self._frame_img.scaled(
-                draw_w, draw_h,
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            p.drawImage(QPoint(draw_x, draw_y), scaled)
+            p.save()
+            p.setClipRect(vx, vy, vw, vh)
+            p.drawImage(QRect(draw_x, draw_y, draw_w, draw_h), self._frame_img)
+            p.restore()
 
         # Vignette overlay (optional, only within workspace)
         vignette = QRadialGradient(cw / 2, ch / 2, max(cw, ch) * 0.7)
@@ -1979,6 +2011,8 @@ class ToggleSwitch(QWidget):
         super().__init__(parent)
         self._on = initial
         self.setFixedSize(36, 20)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        self.setAccessibleName("Bật hoặc tắt nhóm")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setStyleSheet(self._ss())
         self.toggled.connect
@@ -2019,6 +2053,13 @@ class ToggleSwitch(QWidget):
 
     def mousePressEvent(self, event):
         self.setChecked(not self._on)
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.setChecked(not self._on)
+            event.accept()
+            return
+        super().keyPressEvent(event)
 
     def changeEvent(self, event):
         if event.type() == event.Type.EnabledChange:
@@ -2171,11 +2212,13 @@ class SubtitleStyleEditor(QWidget):
     def _build_ui(self):
         self.setStyleSheet(f"background: {C_BG};")
         root = QHBoxLayout(self)
-        root.setContentsMargins(8, 8, 8, 8)
+        root.setContentsMargins(0, 4, 0, 4)
         root.setSpacing(10)
 
         # Left: controls panel
         self._ctrl = QWidget()
+        # Keep the inspector wide enough for labels, spinbox text and arrow buttons.
+        self._ctrl.setMinimumWidth(0)
         self._ctrl.setStyleSheet(f"background: {C_BG};")
         ctrlLay = QVBoxLayout(self._ctrl)
         ctrlLay.setContentsMargins(0, 0, 0, 0)
@@ -2199,9 +2242,12 @@ class SubtitleStyleEditor(QWidget):
 
         # Container widget for sections arranged VERTICALLY
         scroll_widget = QWidget()
+        scroll_widget.setMinimumWidth(0)
+        scroll_widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         scroll_widget.setStyleSheet("background-color: transparent;")
         scroll_layout = QVBoxLayout(scroll_widget)
-        scroll_layout.setContentsMargins(0, 4, 0, 4)
+        scroll_layout.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        scroll_layout.setContentsMargins(0, 4, 0, 28)
         scroll_layout.setSpacing(10)
 
         # Build and add sections VERTICALLY
@@ -2235,14 +2281,17 @@ class SubtitleStyleEditor(QWidget):
     # ---- Preset bar ----
 
     def _build_preset_bar(self) -> QWidget:
-        bar = QWidget()
+        bar = QFrame()
+        bar.setObjectName("subtitlePresetBar")
         bar.setFixedHeight(32)
-        bar.setStyleSheet(f"background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER};")
+        bar.setStyleSheet(
+            f"QFrame#subtitlePresetBar {{ background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER}; }}"
+        )
         lay = QHBoxLayout(bar)
         lay.setContentsMargins(8, 0, 8, 0)
         lay.setSpacing(6)
 
-        title = QLabel("Presets")
+        title = QLabel("Mẫu")
         title.setStyleSheet(f"color: {C_TEXT}; font-size: 11px; font-weight: 600;")
         lay.addWidget(title)
 
@@ -2256,13 +2305,14 @@ class SubtitleStyleEditor(QWidget):
         lay.addWidget(self._cmb_preset)
 
         for icon, tip, handler in [
-            ("💾", "Save preset", self._save_preset),
-            ("🗑", "Delete preset", self._delete_preset),
-            ("↺", "Reset defaults", self._reset_defaults),
+            ("💾", "Lưu mẫu", self._save_preset),
+            ("🗑", "Xóa mẫu", self._delete_preset),
+            ("↺", "Khôi phục mặc định", self._reset_defaults),
         ]:
             btn = QPushButton(icon)
             btn.setFixedSize(28, 22)
             btn.setToolTip(tip)
+            btn.setAccessibleName(tip)
             btn.setStyleSheet(self._icon_btn_style())
             btn.clicked.connect(handler)
             lay.addWidget(btn)
@@ -2273,16 +2323,19 @@ class SubtitleStyleEditor(QWidget):
     # ---- TEXT section ----
 
     def _build_text_section(self) -> QWidget:
-        sec = QWidget()
-        sec.setStyleSheet(f"background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER};")
+        sec = QFrame()
+        sec.setObjectName("subtitleTextSection")
+        sec.setStyleSheet(
+            f"QFrame#subtitleTextSection {{ background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER}; }}"
+        )
         lay = QGridLayout(sec)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(5)
+        lay.setContentsMargins(6, 8, 6, 8)
+        lay.setHorizontalSpacing(8)
+        lay.setVerticalSpacing(6)
         lay.setColumnStretch(1, 1)
-        lay.setColumnStretch(3, 1)
 
         # Row 0: Font | Size
-        lay.addWidget(QLabel("Font"), 0, 0)
+        lay.addWidget(QLabel("Phông chữ"), 0, 0)
         self._cmb_font = QComboBox()
         
         # Lọc danh sách FONTS để chỉ hiển thị những font chữ thực sự đã cài trên hệ thống
@@ -2297,32 +2350,45 @@ class SubtitleStyleEditor(QWidget):
         self._cmb_font.currentIndexChanged.connect(self._on_changed)
         lay.addWidget(self._cmb_font, 0, 1)
 
-        lay.addWidget(QLabel("Size"), 0, 2)
+        lay.addWidget(QLabel("Cỡ"), 1, 0)
         self._spn_size = self._spin(14, 120, 36, 2, "", 60)
         self._spn_size.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_size, 0, 3)
+        lay.addWidget(self._spn_size, 1, 1)
 
         # Row 1: Color | Fill color
-        lay.addWidget(QLabel("Color"), 1, 0)
+        lay.addWidget(QLabel("Màu"), 2, 0)
         self._btn_font_color = ColorPickerButton("#FFFFFF")
         self._btn_font_color.color_changed.connect(self._on_changed)
-        lay.addWidget(self._btn_font_color, 1, 1, 1, 3)
+        lay.addWidget(self._btn_font_color, 2, 1)
+
+        compact_flow = FlowWidget()
+        compact_flow.add_field("Cỡ:", self._spn_size)
+        compact_flow.add_field("Màu:", self._btn_font_color)
+        lay.addWidget(compact_flow, 1, 0, 2, 2)
+        for label in sec.findChildren(QLabel, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            if label.text() in {"Cỡ", "Màu"}:
+                label.hide()
 
         for w in sec.findChildren(QLabel):
-            w.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
+            w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+            w.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; border: none; background: transparent;")
+            if not w.toolTip():
+                w.setToolTip(w.text())
         return sec
 
     # ---- APPEARANCE section ----
 
     def _build_appearance_section(self) -> QWidget:
-        sec = QWidget()
-        sec.setStyleSheet(f"background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER};")
+        sec = QFrame()
+        sec.setObjectName("subtitleAppearanceSection")
+        sec.setStyleSheet(
+            f"QFrame#subtitleAppearanceSection {{ background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER}; }}"
+        )
         lay = QGridLayout(sec)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(5)
+        lay.setContentsMargins(6, 8, 6, 8)
+        lay.setHorizontalSpacing(8)
+        lay.setVerticalSpacing(6)
         lay.setColumnStretch(1, 1)
-        lay.setColumnStretch(3, 1)
-        lay.setColumnStretch(5, 1)
 
         # Stroke row
         lay.addWidget(QLabel("Stroke"), 0, 0)
@@ -2330,105 +2396,170 @@ class SubtitleStyleEditor(QWidget):
         self._sw_stroke.toggled.connect(self._on_changed)
         lay.addWidget(self._sw_stroke, 0, 1, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        lay.addWidget(QLabel("Color"), 0, 2)
+        lay.addWidget(QLabel("Color"), 1, 0)
         self._btn_stroke_color = ColorPickerButton("#000000")
         self._btn_stroke_color.color_changed.connect(self._on_changed)
-        lay.addWidget(self._btn_stroke_color, 0, 3)
+        lay.addWidget(self._btn_stroke_color, 1, 1)
 
-        lay.addWidget(QLabel("Width"), 0, 4)
+        lay.addWidget(QLabel("Width"), 2, 0)
         self._spn_stroke_width = self._spin(0, 12, 2.0, 0.5, "px", 60, dbl=True)
         self._spn_stroke_width.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_stroke_width, 0, 5)
+        lay.addWidget(self._spn_stroke_width, 2, 1)
 
         # Background row
-        lay.addWidget(QLabel("BG"), 1, 0)
+        lay.addWidget(QLabel("BG"), 3, 0)
         self._sw_bg = ToggleSwitch(True)
         self._sw_bg.toggled.connect(self._on_changed)
-        lay.addWidget(self._sw_bg, 1, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(self._sw_bg, 3, 1, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        lay.addWidget(QLabel("Color"), 1, 2)
+        lay.addWidget(QLabel("Color"), 4, 0)
         self._btn_bg_color = ColorPickerButton("#000000")
         self._btn_bg_color.color_changed.connect(self._on_changed)
-        lay.addWidget(self._btn_bg_color, 1, 3)
+        lay.addWidget(self._btn_bg_color, 4, 1)
 
-        lay.addWidget(QLabel("Opacity"), 1, 4)
+        lay.addWidget(QLabel("Opacity"), 5, 0)
         self._spn_bg_opacity = self._spin(0, 100, 70, 5, "%", 60)
         self._spn_bg_opacity.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_bg_opacity, 1, 5)
+        lay.addWidget(self._spn_bg_opacity, 5, 1)
 
         # Padding row
-        lay.addWidget(QLabel("Pad X"), 2, 0)
+        lay.addWidget(QLabel("Đệm ngang"), 6, 0)
         self._spn_bg_pad_x = self._spin(0, 80, 12, 1, "px", 60)
         self._spn_bg_pad_x.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_bg_pad_x, 2, 1)
+        lay.addWidget(self._spn_bg_pad_x, 6, 1)
 
-        lay.addWidget(QLabel("Pad Y"), 2, 2)
+        lay.addWidget(QLabel("Đệm dọc"), 7, 0)
         self._spn_bg_pad_y = self._spin(0, 40, 6, 1, "px", 60)
         self._spn_bg_pad_y.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_bg_pad_y, 2, 3)
+        lay.addWidget(self._spn_bg_pad_y, 7, 1)
 
-        lay.addWidget(QLabel("Radius"), 2, 4)
+        lay.addWidget(QLabel("Radius"), 8, 0)
         self._spn_bg_radius = self._spin(0, 40, 4, 1, "px", 60)
         self._spn_bg_radius.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_bg_radius, 2, 5)
+        lay.addWidget(self._spn_bg_radius, 8, 1)
 
         # Shadow row
-        lay.addWidget(QLabel("Shadow"), 3, 0)
+        lay.addWidget(QLabel("Shadow"), 9, 0)
         self._sw_shadow = ToggleSwitch(False)
         self._sw_shadow.toggled.connect(self._on_changed)
-        lay.addWidget(self._sw_shadow, 3, 1, alignment=Qt.AlignmentFlag.AlignLeft)
+        lay.addWidget(self._sw_shadow, 9, 1, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        lay.addWidget(QLabel("Color"), 3, 2)
+        lay.addWidget(QLabel("Color"), 10, 0)
         self._btn_shadow_color = ColorPickerButton("#000000")
         self._btn_shadow_color.color_changed.connect(self._on_changed)
-        lay.addWidget(self._btn_shadow_color, 3, 3)
+        lay.addWidget(self._btn_shadow_color, 10, 1)
 
-        lay.addWidget(QLabel("Opacity"), 3, 4)
+        lay.addWidget(QLabel("Opacity"), 11, 0)
         self._spn_shadow_opacity = self._spin(0, 100, 80, 5, "%", 60)
         self._spn_shadow_opacity.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_shadow_opacity, 3, 5)
+        lay.addWidget(self._spn_shadow_opacity, 11, 1)
 
         # Shadow angle/dist/blur row
-        lay.addWidget(QLabel("Angle"), 4, 0)
-        self._spn_shadow_angle = self._spin(0, 360, 45, 5, "deg", 60)
+        lay.addWidget(QLabel("Angle"), 12, 0)
+        self._spn_shadow_angle = self._spin(0, 360, 45, 5, "°", 72)
         self._spn_shadow_angle.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_shadow_angle, 4, 1)
+        lay.addWidget(self._spn_shadow_angle, 12, 1)
 
-        lay.addWidget(QLabel("Dist"), 4, 2)
+        lay.addWidget(QLabel("Dist"), 13, 0)
         self._spn_shadow_dist = self._spin(0, 30, 4, 1, "px", 60)
         self._spn_shadow_dist.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_shadow_dist, 4, 3)
+        lay.addWidget(self._spn_shadow_dist, 13, 1)
 
-        lay.addWidget(QLabel("Blur"), 4, 4)
+        lay.addWidget(QLabel("Blur"), 14, 0)
         self._spn_shadow_blur = self._spin(0, 20, 3, 1, "px", 60)
         self._spn_shadow_blur.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_shadow_blur, 4, 5)
+        lay.addWidget(self._spn_shadow_blur, 14, 1)
+
+        def add_group(row, title, toggle, fields):
+            group = QFrame(sec)
+            group_name = f"subtitleGroup_{row}"
+            group.setObjectName(group_name)
+            top_border = f"border-top: 1px solid {C_BORDER};" if row > 0 else "border-top: none;"
+            group.setStyleSheet(
+                f"QFrame#{group_name} {{ border: none; {top_border} border-radius: 0px; background: transparent; }}"
+            )
+            group_lay = QVBoxLayout(group)
+            group_lay.setContentsMargins(2, 7, 2, 4)
+            group_lay.setSpacing(6)
+            header = QHBoxLayout()
+            header.setContentsMargins(0, 0, 0, 0)
+            title_label = QLabel(title)
+            title_label.setStyleSheet(
+                f"font-size: 11px; font-weight: 600; color: {C_TEXT}; border: none; background: transparent;"
+            )
+            header.addWidget(title_label)
+            header.addStretch(1)
+            toggle.setAccessibleName(f"Bật hoặc tắt {title.lower()}")
+            header.addWidget(toggle)
+            group_lay.addLayout(header)
+            flow = FlowWidget()
+            controls = []
+            for field_label, control, field_width in fields:
+                flow.add_field(field_label, control, input_width=field_width)
+                controls.append(control)
+            group_lay.addWidget(flow)
+
+            def sync_enabled(on):
+                flow.setEnabled(on)
+                flow.setGraphicsEffect(None)
+                flow.setStyleSheet("opacity: 1;" if on else "color: #777b86;")
+
+            toggle.toggled.connect(sync_enabled)
+            sync_enabled(toggle.isChecked())
+            lay.addWidget(group, row, 0, 1, 2)
+
+        add_group(0, "Viền", self._sw_stroke, (
+            ("Màu", self._btn_stroke_color, 92),
+            ("Rộng", self._spn_stroke_width, 112),
+        ))
+        add_group(1, "Nền", self._sw_bg, (
+            ("Màu", self._btn_bg_color, 92),
+            ("Độ mờ", self._spn_bg_opacity, 80),
+            ("Đệm ngang", self._spn_bg_pad_x, 80),
+            ("Đệm dọc", self._spn_bg_pad_y, 80),
+            ("Bo góc", self._spn_bg_radius, 80),
+        ))
+        add_group(2, "Bóng", self._sw_shadow, (
+            ("Màu", self._btn_shadow_color, 92),
+            ("Độ mờ", self._spn_shadow_opacity, 80),
+            ("Góc", self._spn_shadow_angle, 80),
+            ("Khoảng cách", self._spn_shadow_dist, 80),
+            ("Độ nhòe", self._spn_shadow_blur, 80),
+        ))
+        for label in sec.findChildren(QLabel, options=Qt.FindChildOption.FindDirectChildrenOnly):
+            label.hide()
 
         for w in sec.findChildren(QLabel):
-            w.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
+            w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+            if w.font().weight() < QFont.Weight.DemiBold:
+                w.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; border: none; background: transparent;")
+            if not w.toolTip():
+                w.setToolTip(w.text())
         return sec
 
     # ---- LAYOUT section ----
 
     def _build_layout_section(self) -> QWidget:
-        sec = QWidget()
-        sec.setStyleSheet(f"background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER};")
+        sec = QFrame()
+        sec.setObjectName("subtitleLayoutSection")
+        sec.setStyleSheet(
+            f"QFrame#subtitleLayoutSection {{ background: {C_SECTION_BG}; border-radius: 5px; border: 1px solid {C_BORDER}; }}"
+        )
         lay = QGridLayout(sec)
-        lay.setContentsMargins(10, 8, 10, 8)
-        lay.setSpacing(5)
+        lay.setContentsMargins(6, 8, 6, 8)
+        lay.setHorizontalSpacing(8)
+        lay.setVerticalSpacing(6)
         lay.setColumnStretch(0, 0)
         lay.setColumnStretch(1, 1)
-        lay.setColumnStretch(2, 0)
-        lay.setColumnStretch(3, 1)
 
         # Alignment label
-        lbl_align = QLabel("Position")
-        lbl_align.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
-        lay.addWidget(lbl_align, 0, 0, 1, 4)
+        lbl_align = QLabel("Vị trí")
+        lbl_align.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; border: none; background: transparent;")
+        lay.addWidget(lbl_align, 0, 0, 1, 2)
 
         # 3x3 alignment grid
         grid = QWidget()
-        grid.setStyleSheet("background: transparent;")
+        grid.setStyleSheet("background: transparent; border: none;")
         gridLay = QGridLayout(grid)
         gridLay.setContentsMargins(0, 0, 0, 0)
         gridLay.setSpacing(2)
@@ -2448,35 +2579,52 @@ class SubtitleStyleEditor(QWidget):
         for r, row in enumerate(configs):
             for c, (icon, code) in enumerate(row):
                 btn = QPushButton(icon)
-                btn.setFixedSize(28, 22)
+                btn.setFixedSize(30, 28)
+                btn.setAccessibleName(f"Chọn vị trí phụ đề {code}")
+                btn.setToolTip(f"Vị trí phụ đề {code}")
+                btn.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
                 btn.setStyleSheet(self._align_btn_style(False))
                 btn.clicked.connect(lambda _, b=btn: self._on_align_clicked(b))
                 gridLay.addWidget(btn, r, c)
                 self._align_buttons.append(btn)
 
-        lay.addWidget(grid, 1, 0, 1, 4)
+        lay.addWidget(grid, 1, 0, 1, 2)
 
         # Margins row
-        lbl_vm = QLabel("Margin V")
+        lbl_vm = QLabel("Lề dọc")
         lbl_vm.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
         lay.addWidget(lbl_vm, 2, 0)
         self._spn_margin_v = self._spin(0, 500, 50, 5, "px", 60)
         self._spn_margin_v.valueChanged.connect(self._on_changed)
         lay.addWidget(self._spn_margin_v, 2, 1)
 
-        lbl_lm = QLabel("Margin L")
+        lbl_lm = QLabel("Lề trái")
         lbl_lm.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
-        lay.addWidget(lbl_lm, 2, 2)
+        lay.addWidget(lbl_lm, 3, 0)
         self._spn_margin_l = self._spin(0, 200, 20, 5, "px", 60)
         self._spn_margin_l.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_margin_l, 2, 3)
+        lay.addWidget(self._spn_margin_l, 3, 1)
 
-        lbl_rm = QLabel("Margin R")
+        lbl_rm = QLabel("Lề phải")
         lbl_rm.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px;")
-        lay.addWidget(lbl_rm, 3, 0)
+        lay.addWidget(lbl_rm, 4, 0)
         self._spn_margin_r = self._spin(0, 200, 20, 5, "px", 60)
         self._spn_margin_r.valueChanged.connect(self._on_changed)
-        lay.addWidget(self._spn_margin_r, 3, 1)
+        lay.addWidget(self._spn_margin_r, 4, 1)
+
+        margin_flow = FlowWidget()
+        margin_flow.add_field("Lề dọc", self._spn_margin_v)
+        margin_flow.add_field("Lề trái", self._spn_margin_l)
+        margin_flow.add_field("Lề phải", self._spn_margin_r)
+        lay.addWidget(margin_flow, 2, 0, 3, 2)
+        for label in (lbl_vm, lbl_lm, lbl_rm):
+            label.hide()
+
+        for w in sec.findChildren(QLabel):
+            w.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+            w.setStyleSheet(f"color: {C_TEXT_MUTED}; font-size: 11px; border: none; background: transparent;")
+            if not w.toolTip():
+                w.setToolTip(w.text())
 
         return sec
 
@@ -2487,22 +2635,33 @@ class SubtitleStyleEditor(QWidget):
     def _spin(self, min_v, max_v, val, step=1, suffix="", width=70, dbl=False):
         cls = QDoubleSpinBox if dbl else QSpinBox
         s = cls()
+        if dbl:
+            s.setDecimals(1)
         s.setRange(min_v, max_v)
         s.setValue(val)
         s.setSingleStep(step)
+        if suffix in {"px", "%"}:
+            suffix = f" {suffix}"
         s.setSuffix(suffix)
-        s.setFixedWidth(width)
-        s.setFixedHeight(26)
+        # Reserve room for four digits, suffix and the native up/down buttons.
+        # Let grid columns expand when there is additional inspector width.
+        s.setMinimumWidth(max(84, width))
+        s.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        s.setFixedHeight(28)
+        s.setAlignment(Qt.AlignmentFlag.AlignRight)
+        spin_font = s.font()
+        spin_font.setPixelSize(11)
+        s.setFont(spin_font)
         s.setStyleSheet(
             f"QSpinBox, QDoubleSpinBox {{ background: {C_ELEVATED_BG}; color: {C_TEXT}; "
             f"border: 1px solid {C_BORDER}; border-radius: 4px; "
-            f"padding: 0px 20px 0px 4px; font-size: 11px; }}"
+            f"padding: 0px 4px 0px 6px; font-size: 11px; }}"
             f"QSpinBox::up-button, QDoubleSpinBox::up-button {{ "
             f"subcontrol-origin: border; subcontrol-position: top right; "
-            f"background: {C_HOVER}; width: 15px; height: 11px; border-left: 1px solid {C_BORDER}; border-bottom: 0.5px solid {C_BORDER}; border-top-right-radius: 4px; margin-top: 1px; margin-right: 1px; }}"
+            f"background: {C_HOVER}; width: 18px; height: 13px; border-left: 1px solid {C_BORDER}; border-bottom: 0.5px solid {C_BORDER}; border-top-right-radius: 4px; margin-top: 1px; margin-right: 1px; }}"
             f"QSpinBox::down-button, QDoubleSpinBox::down-button {{ "
             f"subcontrol-origin: border; subcontrol-position: bottom right; "
-            f"background: {C_HOVER}; width: 15px; height: 11px; border-left: 1px solid {C_BORDER}; border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px; }}"
+            f"background: {C_HOVER}; width: 18px; height: 13px; border-left: 1px solid {C_BORDER}; border-bottom-right-radius: 4px; margin-bottom: 1px; margin-right: 1px; }}"
             f"QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{ "
             f"image: url(\"{_spin_up_p}\"); width: 9px; height: 9px; }}"
             f"QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {{ "
@@ -2535,6 +2694,8 @@ class SubtitleStyleEditor(QWidget):
             f"border: 1px solid {C_BORDER}; border-radius: 4px; "
             f"font-size: 12px; padding: 0; }}"
             f"QPushButton:hover {{ background: {C_HOVER}; border-color: {C_ACCENT}; }}"
+            f"QPushButton:focus {{ border: 2px solid {C_ACCENT}; }}"
+            f"QPushButton:disabled {{ color: #777b86; background: #191c26; border-color: #343845; }}"
         )
 
     def _align_btn_style(self, active: bool) -> str:
@@ -2547,6 +2708,8 @@ class SubtitleStyleEditor(QWidget):
             f"font-size: 12px; font-weight: {'bold' if active else 'normal'}; "
             f"padding: 0; }}"
             f"QPushButton:hover {{ background: {C_HOVER}; border-color: {C_ACCENT}; }}"
+            f"QPushButton:focus {{ border: 2px solid {C_ACCENT}; }}"
+            f"QPushButton:disabled {{ color: #777b86; background: #191c26; border-color: #343845; }}"
         )
 
     # ------------------------------------------------------------------

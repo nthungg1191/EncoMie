@@ -224,6 +224,7 @@ class RenderConfig:
     subtitle_style: SubtitleStyle = None
     slow_min: float = 35.0
     slow_max: float = 45.0
+    bg_zoom: float = 100.0
     codec: str = "hevc_nvenc"
     resolution: str = "1280x720"
     use_gpu: bool = True
@@ -1029,11 +1030,23 @@ def build_ffmpeg_cmd(
         preset_flags = ["-preset", "veryfast" if vcodec == "libx264" else "fast"]
 
     # Sử dụng filter graph CPU tối ưu (Bilinear scale và pad trên CPU)
-    vf_parts = [
-        f"setpts={pts_expr}",
-        f"scale={w}:{h}:flags=bilinear:force_original_aspect_ratio=decrease",
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-    ]
+    bg_zoom = getattr(config, "bg_zoom", 100.0)
+    zoom_factor = max(0.2, bg_zoom / 100.0)
+    if abs(zoom_factor - 1.0) < 0.001:
+        vf_parts = [
+            f"setpts={pts_expr}",
+            f"scale={w}:{h}:flags=bilinear:force_original_aspect_ratio=decrease",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+        ]
+    else:
+        sw = max(2, (int(int(w) * zoom_factor) // 2) * 2)
+        sh = max(2, (int(int(h) * zoom_factor) // 2) * 2)
+        vf_parts = [
+            f"setpts={pts_expr}",
+            f"scale={sw}:{sh}:flags=bilinear:force_original_aspect_ratio=decrease",
+            f"crop=w='min(iw,{w})':h='min(ih,{h})':x='(iw-out_w)/2':y='(ih-out_h)/2'",
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
+        ]
 
     vf = ",".join(vf_parts)
     filter_parts = [f"[0:v]{vf}[v_base]"]

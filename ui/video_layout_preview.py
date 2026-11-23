@@ -13,6 +13,7 @@ class VideoLayoutPreview(QWidget):
     layerResized = pyqtSignal(int, int) # index, scale_pct
     layerCropped = pyqtSignal(int, int, int, int, int) # index, t, b, l, r
     colorPicked = pyqtSignal(int, str) # index (1-based), hex_color
+    bgZoomChanged = pyqtSignal(float)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -24,6 +25,7 @@ class VideoLayoutPreview(QWidget):
         self._selected_index = 1 # Layer 1 selected by default
         self._is_crop_mode = False
         self._eyedropper_active = False
+        self._bg_zoom = 100.0
         
         # Actual preview frames (background and layers)
         self._bg_image = None
@@ -66,6 +68,10 @@ class VideoLayoutPreview(QWidget):
 
     def set_bg_image(self, img: QImage | None):
         self._bg_image = img
+        self.update()
+
+    def set_bg_zoom(self, zoom: float):
+        self._bg_zoom = float(zoom)
         self.update()
 
     def set_layer_image(self, index: int, img: QImage | None):
@@ -171,7 +177,18 @@ class VideoLayoutPreview(QWidget):
         self._ws_x, self._ws_y, self._ws_w_rendered, self._ws_h_rendered = vx, vy, vw, vh
         p.fillRect(vx, vy, vw, vh, QColor("#1e293b"))
         if self._bg_image and not self._bg_image.isNull():
-            p.drawImage(QRect(vx, vy, vw, vh), self._bg_image)
+            img_w = self._bg_image.width()
+            img_h = self._bg_image.height()
+            img_scale = min(vw / float(img_w), vh / float(img_h)) if img_w > 0 and img_h > 0 else 1.0
+            zoom = getattr(self, "_bg_zoom", 100.0) / 100.0
+            draw_w = int(img_w * img_scale * zoom)
+            draw_h = int(img_h * img_scale * zoom)
+            draw_x = vx + (vw - draw_w) // 2
+            draw_y = vy + (vh - draw_h) // 2
+            p.save()
+            p.setClipRect(vx, vy, vw, vh)
+            p.drawImage(QRect(draw_x, draw_y, draw_w, draw_h), self._bg_image)
+            p.restore()
         
         # Workspace Border
         p.setPen(QPen(QColor("#334155"), 1))
@@ -633,6 +650,15 @@ class VideoLayoutPreview(QWidget):
         self._resize_handle = None
         self._crop_handle = None
         self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def wheelEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            delta = 5.0 if event.angleDelta().y() > 0 else -5.0
+            new_zoom = max(20.0, min(300.0, getattr(self, "_bg_zoom", 100.0) + delta))
+            self.bgZoomChanged.emit(new_zoom)
+            event.accept()
+            return
+        super().wheelEvent(event)
 
     def _update_cursor(self, pos: QPoint):
         if hasattr(self, "_eyedropper_active") and self._eyedropper_active:

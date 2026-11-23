@@ -22,11 +22,11 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QDialog, QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QLineEdit, QFileDialog,
     QTableWidget, QTableWidgetItem, QHeaderView,
-    QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox,
+    QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
     QPlainTextEdit, QProgressBar, QSplitter, QCheckBox,
     QSizePolicy, QSlider, QMessageBox, QStatusBar,
     QFrame, QGridLayout, QAbstractItemView, QTabWidget,
-    QScrollArea
+    QScrollArea, QLayout
 )
 from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject, QTimer
 from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap, QKeySequence
@@ -41,6 +41,8 @@ from ui.subtitle_preview_widget import SubtitlePreviewWidget, SubtitleStyleEdito
 from ui.video_layer_config import VideoLayerConfigWidget
 from ui.video_layout_preview import VideoLayoutPreview
 from ui.collapsible_section import CollapsibleSection
+from ui.flow_layout import FlowWidget, StackedField
+from ui.spinbox_behavior import install_spinbox_behavior
 from utils import settings as cfg
 from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
 from core.license_manager import LicenseManager, LicenseStatus
@@ -90,23 +92,28 @@ class FolderPicker(QWidget):
             "FolderPicker { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 6px; }"
         )
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(6, 4, 6, 4)
-        lay.setSpacing(6)
+        lay.setContentsMargins(8, 4, 8, 4)
+        lay.setSpacing(8)
 
         self.lbl = QLabel(label, self)
-        self.lbl.setFixedWidth(65)
+        self.lbl.setMinimumWidth(max(58, self.lbl.sizeHint().width() + 4))
+        self.lbl.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #475569;")
 
         self.edit = QLineEdit(self)
         self.edit.setPlaceholderText(placeholder)
         self.edit.setReadOnly(True)
+        self.edit.textChanged.connect(self.edit.setToolTip)
+        self.edit.setMinimumWidth(84)
+        self.edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.edit.setStyleSheet(
             "QLineEdit { font-size: 11px; padding: 5px 8px; background-color: #ffffff; "
             "border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; }"
         )
 
         self.btn = QPushButton("Chọn", self)
-        self.btn.setFixedWidth(52)
+        self.btn.setMinimumWidth(56)
+        self.btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn.setStyleSheet(
             "QPushButton { font-size: 11px; padding: 5px 8px; background-color: #ffffff; "
@@ -218,8 +225,8 @@ class ImageLayerControl(QWidget):
         lay.setSpacing(8)
 
         # Row 1: Kích hoạt + File logo
-        row1 = QHBoxLayout()
-        row1.setSpacing(10)
+        row1 = QVBoxLayout()
+        row1.setSpacing(8)
         
         self.chk_enabled = QCheckBox("Kích hoạt Layer")
         self.chk_enabled.setStyleSheet("font-size: 11px; font-weight: bold;")
@@ -233,9 +240,8 @@ class ImageLayerControl(QWidget):
             "Image files (*.png *.jpg *.jpeg *.bmp);;All files (*.*)"
         )
         self.pick_logo.btn.setText("Chọn…")
-        self.pick_logo.lbl.setFixedWidth(50)
         self.pick_logo.set_callback(self._on_file_changed)
-        row1.addWidget(self.pick_logo, 1)
+        row1.addWidget(self.pick_logo)
         lay.addLayout(row1)
 
         # Row 2: Vị trí
@@ -243,7 +249,7 @@ class ImageLayerControl(QWidget):
         row2.setSpacing(6)
         pos_lbl = QLabel("Vị trí:")
         pos_lbl.setStyleSheet("font-size: 11px;")
-        pos_lbl.setFixedWidth(50)
+        pos_lbl.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         row2.addWidget(pos_lbl)
 
         self.cmb_logo_pos = QComboBox()
@@ -260,38 +266,48 @@ class ImageLayerControl(QWidget):
         lay.addLayout(row2)
 
         # Row 3: Cỡ (Size) & Độ mờ (Opacity)
-        row3 = QHBoxLayout()
-        row3.setSpacing(10)
+        row3 = QGridLayout()
+        row3.setHorizontalSpacing(8)
+        row3.setVerticalSpacing(6)
 
         sz_lbl = QLabel("Cỡ (px):")
         sz_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(sz_lbl)
+        row3.addWidget(sz_lbl, 0, 0)
 
         self.spn_logo_size = QSpinBox()
         self.spn_logo_size.setRange(20, 500)
         self.spn_logo_size.setValue(100)
         self.spn_logo_size.setSingleStep(10)
+        self.spn_logo_size.setSuffix(" px")
         self.spn_logo_size.setStyleSheet("font-size: 11px;")
         self.spn_logo_size.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_logo_size, 1)
+        row3.addWidget(self.spn_logo_size, 0, 1)
 
         op_lbl = QLabel("Độ mờ (%):")
         op_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(op_lbl)
+        row3.addWidget(op_lbl, 1, 0)
 
         self.spn_logo_opacity = QSpinBox()
         self.spn_logo_opacity.setRange(10, 100)
         self.spn_logo_opacity.setValue(90)
         self.spn_logo_opacity.setSingleStep(5)
+        self.spn_logo_opacity.setSuffix(" %")
         self.spn_logo_opacity.setStyleSheet("font-size: 11px;")
         self.spn_logo_opacity.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_logo_opacity, 1)
+        row3.addWidget(self.spn_logo_opacity, 1, 1)
+        row3.setColumnStretch(1, 1)
         lay.addLayout(row3)
+        logo_flow = FlowWidget()
+        logo_flow.add_field("Cỡ:", self.spn_logo_size)
+        logo_flow.add_field("Độ mờ:", self.spn_logo_opacity)
+        lay.addWidget(logo_flow)
+        sz_lbl.hide()
+        op_lbl.hide()
 
         # Row 4: Margins (Top, Bottom, Left, Right)
         margin_grp = QGroupBox("Cân chỉnh khoảng lề (Margin - px)")
         margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        margin_lay = QHBoxLayout(margin_grp)
+        margin_lay = QGridLayout(margin_grp)
         margin_lay.setContentsMargins(6, 6, 6, 6)
         margin_lay.setSpacing(6)
 
@@ -302,11 +318,12 @@ class ImageLayerControl(QWidget):
         self.spn_margin_t = QSpinBox()
         self.spn_margin_t.setRange(0, 300)
         self.spn_margin_t.setValue(20)
+        self.spn_margin_t.setSuffix(" px")
         self.spn_margin_t.setStyleSheet("font-size: 10px;")
         self.spn_margin_t.valueChanged.connect(self._on_changed)
         t_lay.addWidget(t_lbl)
         t_lay.addWidget(self.spn_margin_t)
-        margin_lay.addLayout(t_lay)
+        margin_lay.addLayout(t_lay, 0, 0)
 
         # Bottom
         b_lay = QHBoxLayout()
@@ -315,11 +332,12 @@ class ImageLayerControl(QWidget):
         self.spn_margin_b = QSpinBox()
         self.spn_margin_b.setRange(0, 300)
         self.spn_margin_b.setValue(20)
+        self.spn_margin_b.setSuffix(" px")
         self.spn_margin_b.setStyleSheet("font-size: 10px;")
         self.spn_margin_b.valueChanged.connect(self._on_changed)
         b_lay.addWidget(b_lbl)
         b_lay.addWidget(self.spn_margin_b)
-        margin_lay.addLayout(b_lay)
+        margin_lay.addLayout(b_lay, 0, 1)
 
         # Left
         l_lay_margin = QHBoxLayout()
@@ -328,11 +346,12 @@ class ImageLayerControl(QWidget):
         self.spn_margin_l = QSpinBox()
         self.spn_margin_l.setRange(0, 500)
         self.spn_margin_l.setValue(20)
+        self.spn_margin_l.setSuffix(" px")
         self.spn_margin_l.setStyleSheet("font-size: 10px;")
         self.spn_margin_l.valueChanged.connect(self._on_changed)
         l_lay_margin.addWidget(l_lbl)
         l_lay_margin.addWidget(self.spn_margin_l)
-        margin_lay.addLayout(l_lay_margin)
+        margin_lay.addLayout(l_lay_margin, 1, 0)
 
         # Right
         r_lay_margin = QHBoxLayout()
@@ -341,14 +360,34 @@ class ImageLayerControl(QWidget):
         self.spn_margin_r = QSpinBox()
         self.spn_margin_r.setRange(0, 500)
         self.spn_margin_r.setValue(20)
+        self.spn_margin_r.setSuffix(" px")
         self.spn_margin_r.setStyleSheet("font-size: 10px;")
         self.spn_margin_r.valueChanged.connect(self._on_changed)
         r_lay_margin.addWidget(r_lbl)
         r_lay_margin.addWidget(self.spn_margin_r)
-        margin_lay.addLayout(r_lay_margin)
+        margin_lay.addLayout(r_lay_margin, 1, 1)
+
+        margin_flow = FlowWidget(max_columns=2)
+        margin_flow.add_field("Trên:", self.spn_margin_t)
+        margin_flow.add_field("Dưới:", self.spn_margin_b)
+        margin_flow.add_field("Trái:", self.spn_margin_l)
+        margin_flow.add_field("Phải:", self.spn_margin_r)
+        margin_lay.addWidget(margin_flow, 0, 0, 2, 2)
+        for label in (t_lbl, b_lbl, l_lbl, r_lbl):
+            label.hide()
+
+        for spin in margin_grp.findChildren(QSpinBox):
+            spin.setMinimumWidth(84)
+            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            spin.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         lay.addSpacing(5)
         lay.addWidget(margin_grp)
+
+        for spin in content.findChildren(QSpinBox):
+            spin.setMinimumWidth(84)
+            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            spin.setAlignment(Qt.AlignmentFlag.AlignRight)
 
         # Set max height and wrap in scroll area
         content.setMaximumHeight(self.MAX_HEIGHT)
@@ -381,11 +420,14 @@ class ImageLayerControl(QWidget):
 class PairTable(QTableWidget):
     """Table showing matched audio↔SRT file pairs."""
 
-    COLS = ["#", "🎵 AUDIO / MEDIA", "📝 PHỤ ĐỀ (.SRT)", "TRẠNG THÁI"]
+    COLS = ["#", "MEDIA", "PHỤ ĐỀ", "TRẠNG THÁI"]
 
     def __init__(self, parent=None):
         super().__init__(0, len(self.COLS), parent)
         self.setHorizontalHeaderLabels(self.COLS)
+        header_tips = ("Số thứ tự", "Tệp audio hoặc video", "Tệp phụ đề SRT", "Trạng thái ghép cặp")
+        for column, tip in enumerate(header_tips):
+            self.horizontalHeaderItem(column).setToolTip(tip)
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setAlternatingRowColors(True)
@@ -396,6 +438,8 @@ class PairTable(QTableWidget):
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hdr.setStretchLastSection(False)
+        hdr.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.setColumnWidth(0, 42)
         self.setColumnWidth(3, 100)
 
@@ -455,6 +499,7 @@ class PairTable(QTableWidget):
     @staticmethod
     def _cell(text: str, center: bool = False, checkable: bool = False) -> QTableWidgetItem:
         item = QTableWidgetItem(text)
+        item.setToolTip(text)
         if center:
             item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         if checkable:
@@ -603,8 +648,8 @@ class MainWindow(QMainWindow):
         if not app_icon.isNull():
             self.setWindowIcon(app_icon)
 
-        self.setMinimumSize(1100, 720)
-        self.resize(1280, 800)
+        self.setMinimumSize(1100, 650)
+        self.resize(1280, 760)
 
         self._settings = cfg.load()
         self._pairs: list[FilePair] = []
@@ -651,6 +696,7 @@ class MainWindow(QMainWindow):
         self._license_timer.start()
 
         self._build_ui()
+        install_spinbox_behavior(self)
         self._create_menu_bar()
         self._apply_saved_settings()
         self._log_debug("MainWindow initialized")
@@ -1036,7 +1082,7 @@ class MainWindow(QMainWindow):
             background-color: #ffffff;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
-            padding: 1px 18px 1px 4px;
+            padding: 1px 4px 1px 6px;
             color: #0f172a;
             font-size: 11px;
             min-height: 22px;
@@ -1050,8 +1096,8 @@ class MainWindow(QMainWindow):
         QSpinBox::up-button, QDoubleSpinBox::up-button {
             subcontrol-origin: border;
             subcontrol-position: top right;
-            width: 16px;
-            height: 11px;
+            width: 18px;
+            height: 13px;
             border-left: 1px solid #cbd5e1;
             border-bottom: 0.5px solid #e2e8f0;
             border-top-right-radius: 5px;
@@ -1063,8 +1109,8 @@ class MainWindow(QMainWindow):
         QSpinBox::down-button, QDoubleSpinBox::down-button {
             subcontrol-origin: border;
             subcontrol-position: bottom right;
-            width: 16px;
-            height: 11px;
+            width: 18px;
+            height: 13px;
             border-left: 1px solid #cbd5e1;
             border-bottom-right-radius: 5px;
             background-color: #f8fafc;
@@ -1262,6 +1308,9 @@ class MainWindow(QMainWindow):
         self.style_panel._preview.setVisible(True)
 
         self.layer_tab_widget = QTabWidget()
+        self.layer_tab_widget.tabBar().setExpanding(True)
+        self.layer_tab_widget.tabBar().setUsesScrollButtons(False)
+        self.layer_tab_widget.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
         self.layer_tab_widget.setStyleSheet(
             "QTabWidget::pane { border: 1px solid #e5e5ea; border-radius: 4px; background: #ffffff; }"
             "QTabBar::tab { font-size: 10px; font-weight: bold; padding: 4px 10px; background: #f2f2f7; color: #636366; border: 1px solid #e5e5ea; }"
@@ -1274,10 +1323,14 @@ class MainWindow(QMainWindow):
             ctrl.eyedropperRequested.connect(self._on_logo_eyedropper_requested)
             ctrl.cropModeToggled.connect(self._on_logo_crop_toggled)
             self.logo_layers.append(ctrl)
-            self.layer_tab_widget.addTab(ctrl, f"L {i}")
+            self.layer_tab_widget.addTab(ctrl, f"L{i}")
+            self.layer_tab_widget.setTabToolTip(i - 1, f"Layer {i}")
         self.layer_tab_widget.currentChanged.connect(self._on_logo_tab_changed)
 
         self.video_tab_widget = QTabWidget()
+        self.video_tab_widget.tabBar().setExpanding(True)
+        self.video_tab_widget.tabBar().setUsesScrollButtons(False)
+        self.video_tab_widget.tabBar().setElideMode(Qt.TextElideMode.ElideNone)
         self.video_tab_widget.setStyleSheet(
             "QTabWidget::pane { border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; }"
             "QTabBar::tab { font-size: 11px; font-weight: 600; padding: 5px 12px; background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; border-top-left-radius: 6px; border-top-right-radius: 6px; margin-right: 2px; }"
@@ -1290,25 +1343,31 @@ class MainWindow(QMainWindow):
             widget.cropModeToggled.connect(self._on_video_layer_crop_toggled)
             widget.eyedropperRequested.connect(self._on_eyedropper_requested)
             self.video_layer_widgets.append(widget)
-            self.video_tab_widget.addTab(widget, f"L {i}")
+            self.video_tab_widget.addTab(widget, f"L{i}")
+            self.video_tab_widget.setTabToolTip(i - 1, f"Layer {i}")
         self.video_tab_widget.currentChanged.connect(self._on_video_tab_changed)
 
         # --- 3-panel horizontal splitter ---
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.main_splitter = splitter
         splitter.setHandleWidth(1)
+        splitter.setChildrenCollapsible(False)
         splitter.setStyleSheet("QSplitter::handle { background-color: #e2e8f0; }")
 
         left   = self._build_left_panel()    # file selection
         middle = self._build_middle_panel()  # video player
         right  = self._build_right_panel()   # inspector tabs & render log
+        left.setMinimumWidth(300)
+        middle.setMinimumWidth(320)
+        right.setMinimumWidth(360)
 
         splitter.addWidget(left)
         splitter.addWidget(middle)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 10)
-        splitter.setStretchFactor(1, 22)
-        splitter.setStretchFactor(2, 10)
-        splitter.setSizes([330, 650, 340])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
+        splitter.setSizes([300, 618, 360])
 
         root_lay.addWidget(splitter, 1)
 
@@ -1420,11 +1479,12 @@ class MainWindow(QMainWindow):
         panel = QWidget()
         panel.setStyleSheet("background-color: #ffffff; border-right: 1px solid #e5e5ea;")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(10, 10, 10, 10)
-        lay.setSpacing(10)
+        lay.setContentsMargins(0, 8, 0, 8)
+        lay.setSpacing(8)
 
         header_lay = QHBoxLayout()
-        header_lbl = QLabel("📁  PROJECT MEDIA")
+        header_lbl = QLabel("TỆP DỰ ÁN")
+        header_lbl.setToolTip("Project Media")
         header_lbl.setStyleSheet("font-size: 12px; font-weight: bold; color: #1c1c1e;")
         header_lay.addWidget(header_lbl)
         header_lay.addStretch()
@@ -1481,10 +1541,12 @@ class MainWindow(QMainWindow):
         pair_btn_lay = QHBoxLayout()
         pair_btn_lay.setContentsMargins(0, 0, 0, 0)
         pair_btn_lay.setSpacing(6)
-        self.btn_pair_select_all = QPushButton("Chọn tất cả")
+        self.btn_pair_select_all = QPushButton("Chọn hết")
+        self.btn_pair_select_all.setToolTip("Chọn tất cả")
         self.btn_pair_select_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_pair_select_all.clicked.connect(self._pair_select_all)
-        self.btn_pair_deselect_all = QPushButton("Bỏ chọn tất cả")
+        self.btn_pair_deselect_all = QPushButton("Bỏ chọn")
+        self.btn_pair_deselect_all.setToolTip("Bỏ chọn tất cả")
         self.btn_pair_deselect_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_pair_deselect_all.clicked.connect(self._pair_deselect_all)
         pair_btn_lay.addWidget(self.btn_pair_select_all)
@@ -1517,7 +1579,9 @@ class MainWindow(QMainWindow):
             vid_lay.addWidget(w)
 
         self.vid_batch_table = QTableWidget(0, 4)
-        self.vid_batch_table.setHorizontalHeaderLabels(["#", "Tên video nguồn", "Độ phân giải", "Trạng thái"])
+        self.vid_batch_table.setHorizontalHeaderLabels(["#", "VIDEO", "ĐỘ PHÂN GIẢI", "TRẠNG THÁI"])
+        for column, tip in enumerate(("Số thứ tự", "Tên video nguồn", "Độ phân giải", "Trạng thái")):
+            self.vid_batch_table.horizontalHeaderItem(column).setToolTip(tip)
         self.vid_batch_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.vid_batch_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.vid_batch_table.setAlternatingRowColors(True)
@@ -1527,6 +1591,8 @@ class MainWindow(QMainWindow):
         hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        hdr.setStretchLastSection(False)
+        hdr.setTextElideMode(Qt.TextElideMode.ElideRight)
         self.vid_batch_table.setColumnWidth(0, 40)
         self.vid_batch_table.setColumnWidth(3, 100)
         # Stylesheet is managed globally
@@ -1544,10 +1610,12 @@ class MainWindow(QMainWindow):
         vid_btn_lay = QHBoxLayout()
         vid_btn_lay.setContentsMargins(0, 0, 0, 0)
         vid_btn_lay.setSpacing(6)
-        self.btn_vid_select_all = QPushButton("Chọn tất cả")
+        self.btn_vid_select_all = QPushButton("Chọn hết")
+        self.btn_vid_select_all.setToolTip("Chọn tất cả")
         self.btn_vid_select_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_vid_select_all.clicked.connect(self._vid_select_all)
-        self.btn_vid_deselect_all = QPushButton("Bỏ chọn tất cả")
+        self.btn_vid_deselect_all = QPushButton("Bỏ chọn")
+        self.btn_vid_deselect_all.setToolTip("Bỏ chọn tất cả")
         self.btn_vid_deselect_all.setStyleSheet("font-size: 11px; padding: 3px 8px;")
         self.btn_vid_deselect_all.clicked.connect(self._vid_deselect_all)
         vid_btn_lay.addWidget(self.btn_vid_select_all)
@@ -1564,7 +1632,7 @@ class MainWindow(QMainWindow):
         panel = QWidget()
         panel.setStyleSheet("background-color: #f8fafc;")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setContentsMargins(12, 12, 12, 12)
         lay.setSpacing(8)
 
         # Viewport Header Bar (Matching Light Theme UI Mockup)
@@ -1575,13 +1643,16 @@ class MainWindow(QMainWindow):
         vh_lay.setContentsMargins(12, 4, 12, 4)
         vh_lay.setSpacing(8)
 
-        vh_title = QLabel("🖥  XEM TRƯỚC (LIVE MONITOR)")
+        vh_title = QLabel("🖥  XEM TRƯỚC")
+        vh_title.setToolTip("XEM TRƯỚC (LIVE MONITOR)")
         vh_title.setStyleSheet("font-size: 11px; font-weight: 700; color: #0f172a;")
         
-        self.lbl_viewport_res = QLabel("1280x720 (16:9 HD)")
+        self.lbl_viewport_res = QLabel("1280x720")
+        self.lbl_viewport_res.setToolTip("1280x720 (16:9 HD)")
         self.lbl_viewport_res.setStyleSheet("font-size: 10px; font-weight: 500; color: #64748b;")
 
-        vh_badge = QLabel("● Live Sync 1:1")
+        vh_badge = QLabel("● Live")
+        vh_badge.setToolTip("Live Sync 1:1")
         vh_badge.setStyleSheet(
             "background-color: #ecfdf5; color: #059669; border: 1px solid #a7f3d0; "
             "border-radius: 6px; padding: 2px 6px; font-size: 9px; font-weight: 600;"
@@ -1610,6 +1681,7 @@ class MainWindow(QMainWindow):
         self.preview_widget.layerMoved.connect(self._on_logo_preview_layer_moved)
         self.preview_widget.layerResized.connect(self._on_logo_preview_layer_resized)
         self.preview_widget.layerCropped.connect(self._on_logo_preview_layer_cropped)
+        self.preview_widget.bgZoomChanged.connect(self._on_preview_bg_zoom_changed)
         self.preview_widget.setMinimumHeight(240)
         self.preview_widget.setSizePolicy(
             QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
@@ -1634,6 +1706,7 @@ class MainWindow(QMainWindow):
         self.video_layout_preview.layerResized.connect(self._on_preview_layer_resized)
         self.video_layout_preview.layerCropped.connect(self._on_preview_layer_cropped)
         self.video_layout_preview.colorPicked.connect(self._on_preview_color_picked)
+        self.video_layout_preview.bgZoomChanged.connect(self._on_preview_bg_zoom_changed)
         vid_view_lay.addWidget(self.video_layout_preview)
         viewer_lay.addWidget(self.middle_video_container)
         self.middle_video_container.setVisible(False)
@@ -1652,7 +1725,8 @@ class MainWindow(QMainWindow):
         """Sync resolution changes to video_layout_preview, preview_widget, and top Live Monitor label."""
         full_text = self.cmb_resolution.currentText()
         if hasattr(self, "lbl_viewport_res"):
-            self.lbl_viewport_res.setText(full_text)
+            self.lbl_viewport_res.setText(full_text.split(" ")[0])
+            self.lbl_viewport_res.setToolTip(full_text)
 
         res_val = full_text.split(" ")[0]
         if "x" in res_val:
@@ -1665,6 +1739,22 @@ class MainWindow(QMainWindow):
                         self.preview_widget.set_target_resolution(w, h)
             except Exception as e:
                 print(f"[DEBUG] Error setting target resolution on previews: {e}")
+
+    def _on_bg_zoom_changed(self, val: float):
+        if hasattr(self, "video_layout_preview"):
+            self.video_layout_preview.set_bg_zoom(val)
+        if hasattr(self, "preview_widget"):
+            if hasattr(self.preview_widget, "set_bg_zoom"):
+                self.preview_widget.set_bg_zoom(val)
+        if hasattr(self, "_save_timer"):
+            self._save_timer.start(1000)
+
+    def _on_preview_bg_zoom_changed(self, val: float):
+        if hasattr(self, "spn_bg_zoom"):
+            self.spn_bg_zoom.blockSignals(True)
+            self.spn_bg_zoom.setValue(val)
+            self.spn_bg_zoom.blockSignals(False)
+            self._on_bg_zoom_changed(val)
 
     def _on_logo_changed(self, files):
         self._on_logo_settings_changed()
@@ -1690,8 +1780,11 @@ class MainWindow(QMainWindow):
         for idx, ctrl in enumerate(self.logo_layers):
             cfg_obj = ctrl.get_config()
             configs.append(cfg_obj)
-            status = " (•)" if cfg_obj.enabled and cfg_obj.path else ""
-            self.layer_tab_widget.setTabText(idx, f"Layer {idx+1}{status}")
+            active = cfg_obj.enabled and bool(cfg_obj.path)
+            self.layer_tab_widget.setTabText(idx, f"L{idx + 1}")
+            self.layer_tab_widget.setTabToolTip(
+                idx, f"Layer {idx + 1}{' (đang bật)' if active else ''}"
+            )
             
             # Extract video/image frame for logo preview
             layer_img = None
@@ -1755,9 +1848,10 @@ class MainWindow(QMainWindow):
 
     def _build_right_panel(self) -> QWidget:
         panel = QWidget()
+        panel.setMinimumWidth(360)
         panel.setStyleSheet("background-color: #ffffff; border-left: 1px solid #e5e5ea;")
         lay = QVBoxLayout(panel)
-        lay.setContentsMargins(10, 10, 10, 10)
+        lay.setContentsMargins(12, 12, 12, 12)
         lay.setSpacing(8)
 
         # --- Flat Segmented Control Inspector Tab Bar ---
@@ -1771,8 +1865,14 @@ class MainWindow(QMainWindow):
         ts_lay.setSpacing(3)
 
         self.inspector_tab_buttons = []
-        for i, text in enumerate(["Phụ đề (Subtitles)", "Layers (5 Lớp)", "Xuất Video"]):
+        tab_specs = [
+            ("Phụ đề", "Chỉnh kiểu phụ đề"),
+            ("Lớp", "Cấu hình 5 lớp"),
+            ("Xuất", "Xuất video"),
+        ]
+        for i, (text, tooltip) in enumerate(tab_specs):
             btn = QPushButton(text)
+            btn.setToolTip(tooltip)
             btn.setCheckable(True)
             btn.setFixedHeight(28)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -1808,11 +1908,13 @@ class MainWindow(QMainWindow):
         pst_lay.setContentsMargins(8, 0, 8, 0)
         pst_lay.setSpacing(6)
 
-        title = QLabel("Presets:")
+        title = QLabel("Mẫu:")
+        title.setToolTip("Mẫu kiểu phụ đề")
         title.setStyleSheet("color: #636366; font-size: 10px; font-weight: bold;")
         pst_lay.addWidget(title)
 
         self.cmb_preset = QComboBox()
+        self.cmb_preset.setMinimumWidth(84)
         self.cmb_preset.setStyleSheet(
             "QComboBox { background: #ffffff; color: #1c1c1e; border: 1px solid #e5e5ea; "
             "border-radius: 4px; padding: 0px 8px; font-size: 11px; height: 24px; }"
@@ -1821,13 +1923,14 @@ class MainWindow(QMainWindow):
         pst_lay.addWidget(self.cmb_preset, 1)
 
         for icon, tip, handler in [
-            ("💾", "Save preset", self._on_save_preset),
-            ("🗑", "Delete preset", self._on_delete_preset_inline),
-            ("↺", "Reset defaults", self._on_reset_defaults_inline),
+            ("💾", "Lưu mẫu", self._on_save_preset),
+            ("🗑", "Xóa mẫu", self._on_delete_preset_inline),
+            ("↺", "Khôi phục mặc định", self._on_reset_defaults_inline),
         ]:
             btn = QPushButton(icon)
             btn.setFixedSize(26, 22)
             btn.setToolTip(tip)
+            btn.setAccessibleName(tip)
             btn.setStyleSheet(
                 "QPushButton { background: #ffffff; color: #1c1c1e; border: 1px solid #e5e5ea; "
                 "border-radius: 4px; font-size: 11px; padding: 0; }"
@@ -1844,23 +1947,39 @@ class MainWindow(QMainWindow):
         tab_sub_lay.addWidget(self.style_panel, 1)
 
         # Timing Tools (Moved from right panel)
-        grp_timing = QGroupBox("⏱  Timing Tools")
-        grp_timing.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
+        grp_timing = QGroupBox("Công cụ thời gian")
+        grp_timing.setStyleSheet(
+            "QGroupBox { font-size: 11px; font-weight: 600; color: #374151; }"
+        )
         timing_lay = QHBoxLayout(grp_timing)
         timing_lay.setContentsMargins(8, 8, 8, 8)
         timing_lay.setSpacing(6)
 
-        self.btn_first_to_zero = QPushButton("⏮  Shift To 0s")
-        self.btn_first_to_zero.setStyleSheet("font-size: 11px;")
+        self.btn_first_to_zero = QPushButton("⏮  Dời về 0s")
+        self.btn_first_to_zero.setAccessibleName("Dời phụ đề đầu tiên về 0 giây")
+        self.btn_first_to_zero.setStyleSheet(
+            "QPushButton { min-height: 30px; font-size: 11px; font-weight: 600; color: white; "
+            "background: #007aff; border: 1px solid #007aff; border-radius: 5px; padding: 0 10px; }"
+            "QPushButton:hover { background: #0066d6; }"
+            "QPushButton:focus { border: 2px solid #60a5fa; }"
+            "QPushButton:disabled { background: #a8c9ee; border-color: #a8c9ee; color: #f8fafc; }"
+        )
         self.btn_first_to_zero.setToolTip(
-            "Shift subtitle timeline so the first subtitle starts at 0s."
+            "Dời toàn bộ thời gian để phụ đề đầu tiên bắt đầu tại 0 giây."
         )
         self.btn_first_to_zero.clicked.connect(self._on_first_sub_to_zero)
         timing_lay.addWidget(self.btn_first_to_zero)
 
-        self.btn_undo_timing = QPushButton("↩  Undo")
-        self.btn_undo_timing.setStyleSheet("font-size: 11px;")
-        self.btn_undo_timing.setToolTip("Undo the last timing change.")
+        self.btn_undo_timing = QPushButton("↩  Hoàn tác")
+        self.btn_undo_timing.setAccessibleName("Hoàn tác thay đổi thời gian")
+        self.btn_undo_timing.setStyleSheet(
+            "QPushButton { min-height: 30px; font-size: 11px; color: #334155; background: transparent; "
+            "border: 1px solid #94a3b8; border-radius: 5px; padding: 0 10px; }"
+            "QPushButton:hover { background: #f1f5f9; border-color: #007aff; }"
+            "QPushButton:focus { border: 2px solid #007aff; }"
+            "QPushButton:disabled { color: #9ca3af; border-color: #d1d5db; background: #f8fafc; }"
+        )
+        self.btn_undo_timing.setToolTip("Hoàn tác lần thay đổi thời gian gần nhất.")
         self.btn_undo_timing.setEnabled(False)
         self.btn_undo_timing.clicked.connect(self._on_undo_timing)
         timing_lay.addWidget(self.btn_undo_timing)
@@ -1888,11 +2007,20 @@ class MainWindow(QMainWindow):
         tab_export_scroll = QScrollArea()
         tab_export_scroll.setWidgetResizable(True)
         tab_export_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        tab_export_scroll.setStyleSheet("QScrollArea { background: transparent; }")
+        tab_export_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        tab_export_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        tab_export_scroll.setStyleSheet(
+            "QScrollArea { background: transparent; border: none; }"
+            "QScrollBar:vertical { width: 6px; background: #f8fafc; border-radius: 3px; }"
+            "QScrollBar::handle:vertical { background: #cbd5e1; border-radius: 3px; min-height: 20px; }"
+            "QScrollBar::handle:vertical:hover { background: #94a3b8; }"
+        )
 
         tab_export = QWidget()
+        tab_export.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         tab_export_lay = QVBoxLayout(tab_export)
-        tab_export_lay.setContentsMargins(4, 4, 4, 4)
+        tab_export_lay.setSizeConstraint(QLayout.SizeConstraint.SetNoConstraint)
+        tab_export_lay.setContentsMargins(0, 2, 0, 2)
         tab_export_lay.setSpacing(6)
 
         # 1. Thư mục xuất video
@@ -1900,7 +2028,7 @@ class MainWindow(QMainWindow):
         grp_output.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         out_lay = QVBoxLayout(grp_output)
         out_lay.setContentsMargins(6, 6, 6, 6)
-        self.pick_output = FolderPicker("📤 Xuất:", "Chọn thư mục xuất video", parent=grp_output)
+        self.pick_output = FolderPicker("Xuất:", "Chọn thư mục xuất video", parent=grp_output)
         self.pick_output.btn.setText("Chọn")
         out_lay.addWidget(self.pick_output)
         tab_export_lay.addWidget(grp_output)
@@ -1910,7 +2038,7 @@ class MainWindow(QMainWindow):
         grp_render.setStyleSheet("QGroupBox { font-size: 11px; font-weight: bold; }")
         r_lay = QVBoxLayout(grp_render)
         r_lay.setSpacing(4)
-        r_lay.setContentsMargins(6, 6, 6, 6)
+        r_lay.setContentsMargins(0, 6, 0, 6)
 
         # Target Resolution Dropdown
         res_lbl = QLabel("Độ phân giải:", grp_render)
@@ -1934,13 +2062,18 @@ class MainWindow(QMainWindow):
             self.cmb_codec.addItem(label)
         r_lay.addWidget(self.cmb_codec)
 
-        fps_lbl = QLabel("Tốc độ khung hình (FPS):", grp_render)
+        # Group FPS & Concurrent in one compact 2-column row
+        perf_row = QHBoxLayout()
+        perf_row.setSpacing(8)
+
+        fps_col = QVBoxLayout()
+        fps_col.setSpacing(2)
+        fps_lbl = QLabel("Khung hình (FPS):", grp_render)
+        fps_lbl.setWordWrap(True)
         fps_lbl.setStyleSheet("font-size: 11px; color: #636366;")
-        r_lay.addWidget(fps_lbl)
+        fps_col.addWidget(fps_lbl)
 
         self.cmb_fps = QComboBox(grp_render)
-        # Data is the exact ffmpeg -r argument (string). 23.976 must be the
-        # rational 24000/1001, not 23 -- the old int mapping rendered it wrong.
         self.cmb_fps.addItem("60 FPS", "60")
         self.cmb_fps.addItem("50 FPS", "50")
         self.cmb_fps.addItem("30 FPS", "30")
@@ -1948,16 +2081,25 @@ class MainWindow(QMainWindow):
         self.cmb_fps.addItem("24 FPS", "24")
         self.cmb_fps.addItem("23.976 FPS", "24000/1001")
         self.cmb_fps.setCurrentIndex(2) # Default to 30 FPS
-        r_lay.addWidget(self.cmb_fps)
+        fps_col.addWidget(self.cmb_fps)
+        perf_row.addLayout(fps_col, 1)
 
-        concurrent_lbl = QLabel("Render song song đồng thời:", grp_render)
+        conc_col = QVBoxLayout()
+        conc_col.setSpacing(2)
+        concurrent_lbl = QLabel("Render song song:", grp_render)
+        concurrent_lbl.setWordWrap(True)
         concurrent_lbl.setStyleSheet("font-size: 11px; color: #636366;")
-        r_lay.addWidget(concurrent_lbl)
+        conc_col.addWidget(concurrent_lbl)
 
         self.spn_concurrent = QSpinBox(grp_render)
         self.spn_concurrent.setRange(1, 8)
+        self.spn_concurrent.setProperty("spinDebugName", "export.concurrent")
         self.spn_concurrent.setValue(2)
-        r_lay.addWidget(self.spn_concurrent)
+        self.spn_concurrent.setSuffix(" luồng")
+        conc_col.addWidget(self.spn_concurrent)
+        perf_row.addLayout(conc_col, 1)
+
+        r_lay.addLayout(perf_row)
 
         speed_lbl = QLabel("Tốc độ chậm của video nền:", grp_render)
         speed_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
@@ -1971,9 +2113,12 @@ class MainWindow(QMainWindow):
         speed_row.addWidget(min_lbl)
 
         self.spn_slow_min = QDoubleSpinBox(grp_render)
-        self.spn_slow_min.setRange(10, 80)
+        self.spn_slow_min.setRange(10, 100)
+        self.spn_slow_min.setProperty("spinDebugName", "export.slow_min")
+        self.spn_slow_min.setDecimals(0)
         self.spn_slow_min.setValue(35.0)
         self.spn_slow_min.setSingleStep(1.0)
+        self.spn_slow_min.setSuffix(" %")
         speed_row.addWidget(self.spn_slow_min, 1)
 
         max_lbl = QLabel("Max:", grp_render)
@@ -1981,17 +2126,48 @@ class MainWindow(QMainWindow):
         speed_row.addWidget(max_lbl)
 
         self.spn_slow_max = QDoubleSpinBox(grp_render)
-        self.spn_slow_max.setRange(10, 80)
+        self.spn_slow_max.setRange(10, 100)
+        self.spn_slow_max.setProperty("spinDebugName", "export.slow_max")
+        self.spn_slow_max.setDecimals(0)
         self.spn_slow_max.setValue(45.0)
         self.spn_slow_max.setSingleStep(1.0)
+        self.spn_slow_max.setSuffix(" %")
         speed_row.addWidget(self.spn_slow_max, 1)
 
         r_lay.addLayout(speed_row)
 
-        slow_hint = QLabel("ℹ️  Ví dụ: 40% = video nền chạy chậm 40% so với gốc", grp_render)
-        slow_hint.setWordWrap(True)
-        slow_hint.setStyleSheet("font-size: 10px; color: #8e8e93;")
-        r_lay.addWidget(slow_hint)
+        # Thu phóng video nền (gọn, không nút 100%, không mô tả)
+        zoom_row = QHBoxLayout()
+        zoom_row.setSpacing(6)
+        zoom_lbl = QLabel("Thu phóng nền:", grp_render)
+        zoom_lbl.setStyleSheet("font-size: 11px; color: #8e8e93;")
+        zoom_lbl.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        zoom_row.addWidget(zoom_lbl)
+
+        self.spn_bg_zoom = QDoubleSpinBox(grp_render)
+        self.spn_bg_zoom.setRange(20, 300)
+        self.spn_bg_zoom.setProperty("spinDebugName", "export.bg_zoom")
+        self.spn_bg_zoom.setDecimals(0)
+        self.spn_bg_zoom.setValue(100.0)
+        self.spn_bg_zoom.setSingleStep(5.0)
+        self.spn_bg_zoom.setSuffix(" %")
+        self.spn_bg_zoom.setToolTip("Tỷ lệ thu phóng video nền (100% = vừa khung, >100% = phóng to. Giữ Ctrl + cuộn chuột trên Preview để thu phóng)")
+        self.spn_bg_zoom.valueChanged.connect(self._on_bg_zoom_changed)
+        zoom_row.addWidget(self.spn_bg_zoom, 1)
+
+        r_lay.addLayout(zoom_row)
+        perf_flow = FlowWidget()
+        perf_flow.add_field("FPS:", self.cmb_fps, input_width=78)
+        perf_flow.add_field("Luồng:", self.spn_concurrent, input_width=78)
+        r_lay.addWidget(perf_flow)
+
+        bg_flow = FlowWidget()
+        bg_flow.add_field("Chậm min:", self.spn_slow_min, input_width=78)
+        bg_flow.add_field("Chậm max:", self.spn_slow_max, input_width=78)
+        bg_flow.add_field("Thu phóng:", self.spn_bg_zoom, input_width=78)
+        r_lay.addWidget(bg_flow)
+        for label in (fps_lbl, concurrent_lbl, speed_lbl, min_lbl, max_lbl, zoom_lbl):
+            label.hide()
         tab_export_lay.addWidget(grp_render)
 
         # 3. Render controls
@@ -2013,10 +2189,12 @@ class MainWindow(QMainWindow):
         ctrl_lay.addWidget(self.progress_bar)
 
         self.lbl_status = QLabel("Sẵn sàng", grp_ctrl)
+        self.lbl_status.setWordWrap(True)
         self.lbl_status.setStyleSheet("font-size: 11px; color: #636366;")
         ctrl_lay.addWidget(self.lbl_status)
 
-        self.btn_render = QPushButton("🚀 Bắt đầu Render", grp_ctrl)
+        self.btn_render = QPushButton("Xuất video", grp_ctrl)
+        self.btn_render.setToolTip("Bắt đầu xuất video")
         self.btn_render.setFixedHeight(30)
         self.btn_render.setStyleSheet(
             "QPushButton { background: #007aff; color: white; font-size: 11px; "
@@ -2027,10 +2205,12 @@ class MainWindow(QMainWindow):
         self.btn_render.clicked.connect(self._start_render)
         ctrl_lay.addWidget(self.btn_render)
 
-        btn_row = QHBoxLayout()
-        btn_row.setSpacing(4)
+        btn_row = QGridLayout()
+        btn_row.setHorizontalSpacing(6)
+        btn_row.setVerticalSpacing(4)
 
-        self.btn_pause = QPushButton("⏸ Tạm dừng", grp_ctrl)
+        self.btn_pause = QPushButton("Tạm dừng", grp_ctrl)
+        self.btn_pause.setToolTip("Tạm dừng hoặc tiếp tục xuất video")
         self.btn_pause.setFixedHeight(24)
         self.btn_pause.setEnabled(False)
         self.btn_pause.setStyleSheet(
@@ -2040,9 +2220,10 @@ class MainWindow(QMainWindow):
             "QPushButton:disabled { background: #f8fafc; color: #cbd5e1; border-color: #e2e8f0; }"
         )
         self.btn_pause.clicked.connect(self._toggle_pause_render)
-        btn_row.addWidget(self.btn_pause, 1)
+        btn_row.addWidget(self.btn_pause, 0, 0)
 
-        self.btn_stop = QPushButton("⏹ Dừng hẳn", grp_ctrl)
+        self.btn_stop = QPushButton("Hủy render", grp_ctrl)
+        self.btn_stop.setToolTip("Hủy tiến trình xuất video đang chạy")
         self.btn_stop.setFixedHeight(24)
         self.btn_stop.setEnabled(False)
         self.btn_stop.setStyleSheet(
@@ -2052,9 +2233,10 @@ class MainWindow(QMainWindow):
             "QPushButton:disabled { background: #f8fafc; color: #cbd5e1; border-color: #e2e8f0; }"
         )
         self.btn_stop.clicked.connect(self._stop_render)
-        btn_row.addWidget(self.btn_stop, 1)
+        btn_row.addWidget(self.btn_stop, 0, 1)
 
-        self.btn_export = QPushButton("📤 Xuất JSON", grp_ctrl)
+        self.btn_export = QPushButton("Xuất JSON", grp_ctrl)
+        self.btn_export.setToolTip("Xuất cấu hình dự án ra JSON")
         self.btn_export.setFixedHeight(24)
         self.btn_export.setStyleSheet(
             "QPushButton { background: #dcfce7; color: #166534; font-size: 10.5px; "
@@ -2062,10 +2244,12 @@ class MainWindow(QMainWindow):
             "QPushButton:hover { background: #bbf7d0; }"
         )
         self.btn_export.clicked.connect(self._export_json)
-        btn_row.addWidget(self.btn_export, 1)
+        btn_row.addWidget(self.btn_export, 1, 0, 1, 2)
+        btn_row.setColumnStretch(0, 1)
+        btn_row.setColumnStretch(1, 1)
 
         ctrl_lay.addLayout(btn_row)
-        tab_export_lay.addWidget(grp_ctrl)
+        # Added below the scroll area so render controls remain pinned.
 
         # 4. FFmpeg log
         grp_log = CollapsibleSection("📝  Log FFmpeg")
@@ -2075,22 +2259,55 @@ class MainWindow(QMainWindow):
         self.log_text = QPlainTextEdit()
         self.log_text.setReadOnly(True)
         self.log_text.setMaximumBlockCount(100)
-        self.log_text.setFixedHeight(60)
+        self.log_text.setMinimumHeight(80)
+        self.log_text.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.log_text.setStyleSheet(
             "background: #f8fafc; color: #166534; font-family: monospace; font-size: 10px; border-radius: 4px; border: 1px solid #e2e8f0;"
         )
         log_lay.addWidget(self.log_text)
         
         self.btn_clear_log = QPushButton("Xóa log")
-        self.btn_clear_log.setFixedSize(60, 18)
+        self.btn_clear_log.setMinimumSize(72, 24)
+        self.btn_clear_log.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         self.btn_clear_log.setStyleSheet("font-size: 10px; padding: 0;")
         self.btn_clear_log.clicked.connect(self.log_text.clear)
         log_lay.addWidget(self.btn_clear_log)
         grp_log.body_layout.addLayout(log_lay)
         tab_export_lay.addWidget(grp_log)
+        tab_export_lay.addStretch(1)
+
+        for field in tab_export.findChildren((QSpinBox, QDoubleSpinBox, QLineEdit, QComboBox)):
+            if (
+                isinstance(field.parentWidget(), (StackedField, QAbstractSpinBox))
+                or field.objectName().startswith("qt_spinbox_")
+            ):
+                continue
+            field.setMinimumWidth(84)
+            if isinstance(field, (QSpinBox, QDoubleSpinBox)):
+                field.setMaximumWidth(110)
+                field.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+                field.setAlignment(Qt.AlignmentFlag.AlignRight)
+            else:
+                field.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            if isinstance(field, QComboBox):
+                field.setSizeAdjustPolicy(
+                    QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+                )
+                field.setMinimumContentsLength(8)
+
+        for label in (min_lbl, max_lbl, zoom_lbl):
+            label.setMinimumWidth(56)
+            label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            label.setStyleSheet("font-size: 11px; color: #636366; border: none;")
 
         tab_export_scroll.setWidget(tab_export)
-        self.inspector_tab_widget.addTab(tab_export_scroll, "Cài đặt xuất")
+        tab_export_page = QWidget()
+        tab_export_page_lay = QVBoxLayout(tab_export_page)
+        tab_export_page_lay.setContentsMargins(0, 4, 0, 0)
+        tab_export_page_lay.setSpacing(8)
+        tab_export_page_lay.addWidget(tab_export_scroll, 1)
+        tab_export_page_lay.addWidget(grp_ctrl, 0)
+        self.inspector_tab_widget.addTab(tab_export_page, "Cài đặt xuất")
 
         lay.addWidget(self.inspector_tab_widget, 1)
         return panel
@@ -2253,6 +2470,9 @@ class MainWindow(QMainWindow):
         self.spn_concurrent.setValue(s.get("max_concurrent_renders", 2))
         self.spn_slow_min.setValue(s.get("slow_min", 35.0))
         self.spn_slow_max.setValue(s.get("slow_max", 45.0))
+        bg_zoom_val = float(s.get("bg_zoom", 100.0))
+        self.spn_bg_zoom.setValue(bg_zoom_val)
+        self._on_bg_zoom_changed(bg_zoom_val)
 
         # Tolerate legacy int-saved fps values (30) and the old "23" for 23.976.
         _fps_saved = str(s.get("fps", "30"))
@@ -2427,6 +2647,7 @@ class MainWindow(QMainWindow):
                 "codec": CODECS[self.cmb_codec.currentIndex()][1],
                 "slow_min": self.spn_slow_min.value(),
                 "slow_max": self.spn_slow_max.value(),
+                "bg_zoom": self.spn_bg_zoom.value(),
             },
             "pairs": [
                 {
@@ -2482,6 +2703,7 @@ class MainWindow(QMainWindow):
             "resolution": self.cmb_resolution.currentIndex(),
             "slow_min": self.spn_slow_min.value(),
             "slow_max": self.spn_slow_max.value(),
+            "bg_zoom": self.spn_bg_zoom.value(),
             "codec": CODECS[self.cmb_codec.currentIndex()][1],
             "fps": self.cmb_fps.currentData(),
             "use_gpu": True,
@@ -2676,6 +2898,7 @@ class MainWindow(QMainWindow):
                 "codec": CODECS[self.cmb_codec.currentIndex()][1],
                 "slow_min": self.spn_slow_min.value(),
                 "slow_max": self.spn_slow_max.value(),
+                "bg_zoom": self.spn_bg_zoom.value(),
             },
             "pairs": matched_pairs,
         }
@@ -2884,6 +3107,7 @@ class MainWindow(QMainWindow):
                 subtitle_style=SubtitleStyle(font_size=0, stroke_enabled=False, bg_enabled=False),
                 slow_min=self.spn_slow_min.value(),
                 slow_max=self.spn_slow_max.value(),
+                bg_zoom=self.spn_bg_zoom.value(),
                 codec=codec_val,
                 use_gpu="nvenc" in codec_val,
                 logo_path=None,
@@ -2911,6 +3135,7 @@ class MainWindow(QMainWindow):
                 subtitle_style=style,
                 slow_min=self.spn_slow_min.value(),
                 slow_max=self.spn_slow_max.value(),
+                bg_zoom=self.spn_bg_zoom.value(),
                 codec=codec_val,
                 use_gpu="nvenc" in codec_val,
                 logo_path=layer1.path if (layer1 and layer1.enabled) else None,
@@ -3139,11 +3364,11 @@ class MainWindow(QMainWindow):
         """Shift the entire subtitle timeline so the first subtitle starts at 0s."""
         srt_files = self.pick_srt.selected_files()
         if not srt_files:
-            QMessageBox.information(self, "Shift To 0s", "Chưa có file SRT nào được chọn.")
+            QMessageBox.information(self, "Dời về 0s", "Chưa có file SRT nào được chọn.")
             return
 
         reply = QMessageBox.question(
-            self, "Shift To 0s",
+            self, "Dời về 0s",
             f"Shift toàn bộ timeline của {len(srt_files)} file SRT về 0s?\n"
             "Thời gian bắt đầu đầu tiên sẽ được trừ đi khỏi mọi subtitle.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -3172,7 +3397,7 @@ class MainWindow(QMainWindow):
             self.btn_undo_timing.setEnabled(True)
             offset_s = total_offset_ms / 1000.0
             QMessageBox.information(
-                self, "Shift To 0s",
+                self, "Dời về 0s",
                 f"Shifted subtitle timeline by -{offset_s:.3f} seconds.\n"
                 f"Đã xử lý {changed} file."
             )
@@ -3182,7 +3407,7 @@ class MainWindow(QMainWindow):
                 if hasattr(self, "preview_widget"):
                     self.preview_widget.reload_srt_entries(srt_files[0])
         elif errors:
-            QMessageBox.warning(self, "Shift To 0s", f"Lỗi: {', '.join(errors)}")
+            QMessageBox.warning(self, "Dời về 0s", f"Lỗi: {', '.join(errors)}")
         self._log(f"[Timing] Shift to 0s: {changed} file, offset=-{total_offset_ms}ms")
 
     def _on_undo_timing(self):
@@ -3190,7 +3415,7 @@ class MainWindow(QMainWindow):
         if not self._timing_undo:
             return
         reply = QMessageBox.question(
-            self, "Undo", f"Hoàn tác {len(self._timing_undo)} file về trạng thái trước đó?",
+            self, "Hoàn tác", f"Hoàn tác {len(self._timing_undo)} file về trạng thái trước đó?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
@@ -3211,8 +3436,8 @@ class MainWindow(QMainWindow):
         msg = f"Đã khôi phục {restored} file."
         if errors:
             msg += f"\nLỗi: {', '.join(errors)}"
-        QMessageBox.information(self, "Undo", msg)
-        self._log(f"[Timing] Undo: {restored} file khôi phục")
+        QMessageBox.information(self, "Hoàn tác", msg)
+        self._log(f"[Thời gian] Hoàn tác: {restored} file khôi phục")
 
     def _on_inspector_tab_clicked(self, idx: int):
         self.inspector_tab_widget.setCurrentIndex(idx)
@@ -3319,10 +3544,15 @@ class MainWindow(QMainWindow):
                     item_idx.setCheckState(Qt.CheckState.Checked)
                 self.vid_batch_table.setItem(row, 0, item_idx)
                 
-                self.vid_batch_table.setItem(row, 1, QTableWidgetItem(os.path.basename(file_path)))
-                self.vid_batch_table.setItem(row, 2, QTableWidgetItem("1280x720 (16:9)"))
+                item_name = QTableWidgetItem(os.path.basename(file_path))
+                item_name.setToolTip(file_path)
+                self.vid_batch_table.setItem(row, 1, item_name)
+                item_resolution = QTableWidgetItem("1280x720 (16:9)")
+                item_resolution.setToolTip("1280x720 (16:9)")
+                self.vid_batch_table.setItem(row, 2, item_resolution)
                 
                 item_status = QTableWidgetItem("Sẵn sàng")
+                item_status.setToolTip("Sẵn sàng")
                 item_status.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 item_status.setForeground(QColor("#2563eb"))
                 self.vid_batch_table.setItem(row, 3, item_status)
@@ -3353,8 +3583,11 @@ class MainWindow(QMainWindow):
         for idx, widget in enumerate(self.video_layer_widgets):
             layer_num = idx + 1
             configs[layer_num] = widget.get_config()
-            status = " (•)" if configs[layer_num].enabled else ""
-            self.video_tab_widget.setTabText(idx, f"Layer {layer_num}{status}")
+            active = configs[layer_num].enabled
+            self.video_tab_widget.setTabText(idx, f"L{layer_num}")
+            self.video_tab_widget.setTabToolTip(
+                idx, f"Layer {layer_num}{' (đang bật)' if active else ''}"
+            )
 
         self.video_layout_preview.set_configs(configs)
         self._update_video_preview_frames()
