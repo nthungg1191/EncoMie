@@ -5,6 +5,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
 from ui.main_window import MainWindow
 import subprocess
 
@@ -41,6 +42,9 @@ def main():
     if not apply_cpu_limit():
         raise RuntimeError("Không thể áp dụng giới hạn CPU 50% cho EncoMie")
 
+    QApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
+    )
     app = QApplication(sys.argv)
     app.setApplicationName("EncoMie")
     app.setOrganizationName("EncoMie")
