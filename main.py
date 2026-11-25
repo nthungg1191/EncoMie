@@ -37,11 +37,9 @@ if sys.platform.startswith("win"):
     subprocess.Popen = _hidden_popen
 
 def main():
-    # Every instance and its child processes share the same half of the CPUs.
-    from core.render_coord import apply_cpu_limit
-    if not apply_cpu_limit():
-        raise RuntimeError("Không thể áp dụng giới hạn CPU 50% cho EncoMie")
-
+    # Keep the Qt GUI process unconstrained so UI stays responsive on P-cores
+    # while child ffmpeg.exe render processes are isolated to the background
+    # CPU set (E-cores / high-index cores) by core.render_coord.apply_cpu_limit.
     QApplication.setHighDpiScaleFactorRoundingPolicy(
         Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
     )
