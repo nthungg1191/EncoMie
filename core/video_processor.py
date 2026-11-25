@@ -244,67 +244,86 @@ class RenderConfig:
 
 
 # ---------------------------------------------------------------------------
-# FFprobe helpers
+# FFprobe helpers (cached by file path + mtime_ns + size to avoid spawning
+# ffprobe subprocesses repeatedly on shared background/layer files in batches)
 # ---------------------------------------------------------------------------
 
-def probe_duration(file_path: str) -> float:
+from functools import lru_cache
+
+
+def _file_cache_key(file_path: str) -> tuple[str, int, int] | None:
+    try:
+        st = os.stat(file_path)
+        return (os.path.abspath(file_path), st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+
+
+@lru_cache(maxsize=256)
+def _probe_video_stream_cached(abs_path: str, _mtime_ns: int, _size: int) -> tuple[bool, int, int]:
+    """Single ffprobe call returning (has_video, width, height)."""
+    cmd = [
+        FFPROBE_PATH, "-v", "quiet",
+        "-print_format", "json",
+        "-show_streams",
+        "-select_streams", "v:0",
+        abs_path
+    ]
+    try:
+        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=15)
+        if result.returncode == 0 and result.stdout.strip():
+            data = json.loads(result.stdout)
+            streams = data.get("streams") or []
+            if streams:
+                w = int(streams[0].get("width", 1280))
+                h = int(streams[0].get("height", 720))
+                return True, w, h
+    except Exception:
+        pass
+    return False, 1280, 720
+
+
+@lru_cache(maxsize=256)
+def _probe_duration_cached(abs_path: str, _mtime_ns: int, _size: int) -> float:
     cmd = [
         FFPROBE_PATH, "-v", "quiet",
         "-print_format", "json",
         "-show_format",
-        file_path
+        abs_path
     ]
+    result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=30)
+    if result.returncode != 0:
+        raise RuntimeError(f"ffprobe returned non-zero code {result.returncode}. Stderr: {result.stderr}")
+    if not result.stdout.strip():
+        raise RuntimeError("ffprobe output is empty")
+    data = json.loads(result.stdout)
+    return float(data["format"]["duration"])
+
+
+def probe_duration(file_path: str) -> float:
+    key = _file_cache_key(file_path)
     try:
-        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=30)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffprobe returned non-zero code {result.returncode}. Stderr: {result.stderr}")
-        if not result.stdout.strip():
-            raise RuntimeError("ffprobe output is empty")
-        data = json.loads(result.stdout)
-        return float(data["format"]["duration"])
+        if key is not None:
+            return _probe_duration_cached(*key)
+        return _probe_duration_cached(file_path, 0, 0)
     except Exception as e:
         raise RuntimeError(f"ffprobe failed on {file_path}: {e}")
 
+
 def probe_resolution(file_path: str) -> tuple[int, int]:
-    cmd = [
-        FFPROBE_PATH, "-v", "quiet",
-        "-print_format", "json",
-        "-show_streams",
-        "-select_streams", "v:0",
-        file_path
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=30)
-        if result.returncode != 0:
-            raise RuntimeError(f"ffprobe returned non-zero code {result.returncode}. Stderr: {result.stderr}")
-        if not result.stdout.strip():
-            raise RuntimeError("ffprobe output is empty")
-        data = json.loads(result.stdout)
-        if "streams" in data and len(data["streams"]) > 0:
-            w = int(data["streams"][0]["width"])
-            h = int(data["streams"][0]["height"])
-            return w, h
-        raise ValueError("No video/image stream found")
-    except Exception as e:
+    key = _file_cache_key(file_path)
+    if key is None:
         return 1280, 720
+    has_v, w, h = _probe_video_stream_cached(*key)
+    return (w, h) if has_v else (1280, 720)
 
 
 def has_video_stream(file_path: str) -> bool:
-    cmd = [
-        FFPROBE_PATH, "-v", "quiet",
-        "-print_format", "json",
-        "-show_streams",
-        "-select_streams", "v:0",
-        file_path
-    ]
-    try:
-        result = subprocess.run(cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=10)
-        if result.returncode == 0 and result.stdout.strip():
-            data = json.loads(result.stdout)
-            return "streams" in data and len(data["streams"]) > 0
-    except Exception:
-        pass
-    return False
+    key = _file_cache_key(file_path)
+    if key is None:
+        return False
+    has_v, _w, _h = _probe_video_stream_cached(*key)
+    return has_v
 
 
 def list_video_files(folder: str) -> list[str]:
@@ -864,6 +883,7 @@ def build_ffmpeg_cmd(
     output_path: str,
     config: RenderConfig,
     cpu: Optional[dict] = None,
+    use_hwaccel_decode: Optional[bool] = None,
 ) -> list[str]:
     speed_factor = slow_pct / 100.0
     pts_expr = f"PTS/{speed_factor:.4f}"
@@ -973,45 +993,48 @@ def build_ffmpeg_cmd(
         cpu = cpu_plan(getattr(config, "max_concurrent_renders", 2))
     filter_threads = cpu["filter_threads"]
     encoder_threads = cpu["encoder_threads"]
-    decoder_threads = cpu.get("decoder_threads", encoder_threads)
+    base_decoder_threads = cpu.get("decoder_threads", encoder_threads)
 
     if config.use_gpu:
         vcodec = config.codec
     else:
         vcodec = "libx265" if "hevc" in config.codec else "libx264"
 
-    # No per-input -threads: decoding is rarely the bottleneck and forcing it on
-    # every input over-subscribes the scheduler once several inputs / jobs stack.
+    # Keep decode on CPU with the dynamic per-input thread cap computed by
+    # render_coord.cpu_plan (turbo: up to 4, balanced: up to 3, eco: up to 2).
+    hw_decode = False if use_hwaccel_decode is None else bool(use_hwaccel_decode)
+    video_decoder_threads = 1 if hw_decode else max(1, int(base_decoder_threads))
+
     # thread_queue_size is jitter-absorption between the decode thread and the
-    # filter graph, not a throughput knob: for local files the decoder is faster
-    # than the CPU filter graph so the queue sits near-full anyway. 384 (down
-    # from 1024) cuts the per-input packet buffer to ~a third -- a real RAM
-    # saving with N inputs x 2 concurrent renders -- and tested clean with no
-    # wall-clock cost. Raise it back if the ffmpeg log ever shows
-    # "Thread message queue blocking".
+    # filter graph, not a throughput knob. 384 cuts per-input packet buffer RAM
+    # to ~1/3 while avoiding queue blocking on local files.
     TQ = "384"
+    if hw_decode:
+        cmd.extend(["-hwaccel", "cuda"])
     cmd.extend([
-        "-threads", str(decoder_threads),
+        "-threads", str(video_decoder_threads),
         "-thread_queue_size", TQ,
         "-ss", f"{bg_start:.3f}",
         "-t", f"{bg_segment_duration:.3f}",
         "-i", bg_video,
-        "-threads", str(decoder_threads),
+        "-threads", "1",
         "-thread_queue_size", TQ,
         "-i", audio_path,
     ])
     for layer in active_layers:
         is_video = Path(layer._resolved_path).suffix.lower() in VIDEO_EXTENSIONS
         if is_video:
+            if hw_decode:
+                cmd.extend(["-hwaccel", "cuda"])
             cmd.extend([
-                "-threads", str(decoder_threads),
+                "-threads", str(video_decoder_threads),
                 "-thread_queue_size", TQ,
                 "-stream_loop", "-1",
                 "-i", layer._resolved_path
             ])
         else:
             cmd.extend([
-                "-threads", str(decoder_threads),
+                "-threads", "1",
                 "-thread_queue_size", TQ,
                 "-i", layer._resolved_path
             ])
@@ -1029,24 +1052,32 @@ def build_ffmpeg_cmd(
         # x264 handles veryfast well; x265 collapses in quality below ~fast.
         preset_flags = ["-preset", "veryfast" if vcodec == "libx264" else "fast"]
 
-    # Sử dụng filter graph CPU tối ưu (Bilinear scale và pad trên CPU)
+    # Sử dụng filter graph CPU tối ưu (bỏ qua setpts / scale / pad khi không cần)
     bg_zoom = getattr(config, "bg_zoom", 100.0)
     zoom_factor = max(0.2, bg_zoom / 100.0)
+    vf_parts = []
+    if abs(speed_factor - 1.0) >= 0.001:
+        vf_parts.append(f"setpts={pts_expr}")
+
+    bg_w_orig, bg_h_orig = probe_resolution(bg_video) if os.path.exists(bg_video) else (0, 0)
+    target_w_int, target_h_int = int(w), int(h)
     if abs(zoom_factor - 1.0) < 0.001:
-        vf_parts = [
-            f"setpts={pts_expr}",
-            f"scale={w}:{h}:flags=bilinear:force_original_aspect_ratio=decrease",
-            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-        ]
+        if bg_w_orig != target_w_int or bg_h_orig != target_h_int:
+            vf_parts.extend([
+                f"scale={w}:{h}:flags=fast_bilinear:force_original_aspect_ratio=decrease",
+                f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
+            ])
     else:
-        sw = max(2, (int(int(w) * zoom_factor) // 2) * 2)
-        sh = max(2, (int(int(h) * zoom_factor) // 2) * 2)
-        vf_parts = [
-            f"setpts={pts_expr}",
-            f"scale={sw}:{sh}:flags=bilinear:force_original_aspect_ratio=decrease",
+        sw = max(2, (int(target_w_int * zoom_factor) // 2) * 2)
+        sh = max(2, (int(target_h_int * zoom_factor) // 2) * 2)
+        vf_parts.extend([
+            f"scale={sw}:{sh}:flags=fast_bilinear:force_original_aspect_ratio=decrease",
             f"crop=w='min(iw,{w})':h='min(ih,{h})':x='(iw-out_w)/2':y='(ih-out_h)/2'",
-            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2"
-        ]
+            f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
+        ])
+
+    if not vf_parts:
+        vf_parts.append("null")
 
     vf = ",".join(vf_parts)
     filter_parts = [f"[0:v]{vf}[v_base]"]
@@ -1154,15 +1185,35 @@ def build_ffmpeg_cmd(
         _cg = _build_color_filter(getattr(layer, "color_grade", None))
         grade_filter = f"{_cg}," if _cg else ""
 
-        # Working pixel format: rgba is 4 bytes/px and drives peak filter-graph
-        # RAM. colorkey/despill work in RGB; without it, yuva420p (1.5 bytes/px,
-        # alpha kept for opacity/blur/overlay) halves the decode->scale->blur
-        # buffers. ffmpeg auto-converts for the RGB-only tail filters
-        # (curves / colorchannelmixer).
-        layer_fmt = "rgba" if chroma_filter else "yuva420p"
+        # Working pixel format:
+        # - Keep YUV whenever possible so FFmpeg doesn't burn CPU converting
+        #   YUV <-> RGBA on every frame.
+        # - Previously `colorchannelmixer=aa=1.00` was ALWAYS appended, which
+        #   only accepts RGB and silently forced an expensive yuva420p->rgba
+        #   conversion even at 100% opacity!
+        # - When opacity == 100% and no alpha-producing filter (chroma/luma/blur)
+        #   is active, keep plain `yuv420p` (no alpha channel at all -> fastest
+        #   overlay blit). Otherwise use `yuva420p` + `lut=a='val*...'` in YUV,
+        #   reserving `rgba` + `colorchannelmixer` only for RGB-only filters.
+        needs_rgba = bool(chroma_filter) or bool(grade_filter)
+        needs_alpha = needs_rgba or bool(luma_filter) or bool(blur_filter) or (layer.opacity < 0.999)
+        if needs_rgba:
+            layer_fmt = "rgba"
+        elif needs_alpha:
+            layer_fmt = "yuva420p"
+        else:
+            layer_fmt = "yuv420p"
+
+        if layer.opacity >= 0.999:
+            opacity_filter = ""
+        elif needs_rgba:
+            opacity_filter = f"colorchannelmixer=aa={layer.opacity:.2f},"
+        else:
+            opacity_filter = f"lut=a='val*{layer.opacity:.2f}',"
+
         filter_parts.append(
-            f"[{input_index}:v]{crop_filter}{pts_filter}format={layer_fmt},scale={pixel_w}:-2:flags=bilinear,"
-            f"{chroma_filter}{luma_filter}{blur_filter}{grade_filter}colorchannelmixer=aa={layer.opacity:.2f},setsar=1[{layer_output}]"
+            f"[{input_index}:v]{crop_filter}{pts_filter}format={layer_fmt},scale={pixel_w}:-2:flags=fast_bilinear,"
+            f"{chroma_filter}{luma_filter}{blur_filter}{grade_filter}{opacity_filter}setsar=1[{layer_output}]"
         )
 
         # Position calculations with scaled margins
@@ -1194,7 +1245,7 @@ def build_ffmpeg_cmd(
             overlay_pos = f"x={ml}+{crop_l_pixel}:y={mt}+{crop_t_pixel}"
             
         next_base = f"v_base_next_{idx}" if idx < len(active_layers) - 1 else "v_layers_out"
-        filter_parts.append(f"[{current_base}][{layer_output}]overlay={overlay_pos}[{next_base}]")
+        filter_parts.append(f"[{current_base}][{layer_output}]overlay={overlay_pos}:format=auto[{next_base}]")
         current_base = next_base
 
     # Bước cuối cùng: Áp dụng phụ đề trên CPU sau khi đã gộp layers
@@ -1353,8 +1404,11 @@ def render_pair(
 
         with RenderSlot() as _slot:
             plan = cpu_plan(getattr(config, "max_concurrent_renders", 2))
-            _log(f"[sched] {active_render_count()} render(s) machine-wide -> "
-                 f"{plan['filter_threads']} filter / {plan['encoder_threads']} encoder threads each")
+            _log(
+                f"[sched] mode={plan['mode']} | {plan['renders']} render(s) machine-wide -> "
+                f"{plan['filter_threads']} filter / {plan['encoder_threads']} encoder / "
+                f"{plan['decoder_threads']} decoder threads"
+            )
 
             cmd = build_ffmpeg_cmd(
                 bg_video=bg_video,
@@ -1374,8 +1428,30 @@ def render_pair(
                 _log(f"[{pair.index}] Đang render — {config.resolution}, {config.codec}")
             _dbg("FFmpeg command: " + " ".join(shlex.quote(c) for c in cmd))
 
-            _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort,
-                        slot=_slot)
+            try:
+                _run_ffmpeg(cmd, audio_duration, _progress, _log, pair.index, should_abort,
+                            slot=_slot, planned_renders=plan["renders"])
+            except RuntimeError as hw_err:
+                # If NVDEC hardware decode failed (e.g. unsupported pixel format/codec),
+                # transparently retry once with CPU decode while keeping GPU encoding.
+                if config.use_gpu and "-hwaccel" in cmd:
+                    _log(f"[{pair.index}] NVDEC decode không tương thích ({hw_err}), tự động chuyển sang decode CPU...")
+                    cmd_cpu_dec = build_ffmpeg_cmd(
+                        bg_video=bg_video,
+                        bg_start=bg_start,
+                        bg_segment_duration=bg_seg_dur,
+                        slow_pct=slow_pct,
+                        audio_path=pair.audio_path,
+                        srt_path=temp_srt_path,
+                        output_path=output_path,
+                        config=config,
+                        cpu=plan,
+                        use_hwaccel_decode=False,
+                    )
+                    _run_ffmpeg(cmd_cpu_dec, audio_duration, _progress, _log, pair.index, should_abort,
+                                slot=_slot, planned_renders=plan["renders"])
+                else:
+                    raise
     finally:
         try:
             if os.path.exists(temp_srt_path):
@@ -1391,15 +1467,18 @@ def render_pair(
 
 
 def _run_ffmpeg(cmd: list[str], total_duration: float,
-                progress_cb, log_cb, label: str, should_abort=None, slot=None):
+                progress_cb, log_cb, label: str, should_abort=None, slot=None,
+                planned_renders: int = 1):
+    import time as _time
     time_pattern = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
 
     creationflags = 0
     if sys.platform == "win32":
-        # BELOW_NORMAL keeps the reserved CPU headroom genuinely available to
-        # the OS / foreground apps; the thread budget (render_coord.cpu_plan)
-        # is what actually holds total render CPU near ~50%.
-        creationflags = 0x00004000 | 0x08000000  # BELOW_NORMAL_PRIORITY_CLASS | CREATE_NO_WINDOW
+        # Initial priority: BELOW_NORMAL for 1-2 renders, IDLE for >=3 renders.
+        # apply_render_profile() below enforces the exact CPU Affinity, Priority,
+        # and Disk I/O Priority and dynamically rebalances if concurrency changes.
+        prio_flag = 0x00000040 if planned_renders >= 3 else 0x00004000
+        creationflags = prio_flag | 0x08000000  # priority | CREATE_NO_WINDOW
 
     process = subprocess.Popen(
         cmd,
@@ -1411,16 +1490,33 @@ def _run_ffmpeg(cmd: list[str], total_duration: float,
         creationflags=creationflags
     )
 
+    current_mode = ""
+    last_rebalance = _time.monotonic()
     if sys.platform == "win32":
-        from core.render_coord import apply_cpu_limit
-        if not apply_cpu_limit(int(process._handle)):
+        from core.render_coord import apply_render_profile, active_render_count, resolve_render_mode
+        try:
+            initial_renders = max(planned_renders, active_render_count(), 1)
+            current_mode = apply_render_profile(int(process._handle), initial_renders)
+        except Exception:
             process.terminate()
             process.wait(timeout=5)
-            raise RuntimeError("Không thể áp dụng giới hạn CPU 50% cho FFmpeg")
+            raise
 
     for line in process.stdout:
         if slot is not None:
             slot.touch()
+        if sys.platform == "win32":
+            now_t = _time.monotonic()
+            if now_t - last_rebalance >= 3.0:
+                last_rebalance = now_t
+                live_renders = max(active_render_count(), 1)
+                target_mode = resolve_render_mode(live_renders)
+                if target_mode != current_mode:
+                    try:
+                        current_mode = apply_render_profile(int(process._handle), live_renders)
+                        log_cb(f"[sched] Tự động chuyển chế độ {current_mode} ({live_renders} luồng toàn máy)")
+                    except Exception:
+                        pass
         if should_abort and should_abort():
             process.terminate()
             process.wait(timeout=5)
