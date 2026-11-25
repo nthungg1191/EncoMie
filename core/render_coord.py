@@ -31,9 +31,27 @@ from pathlib import Path
 
 from core.app_paths import app_data_dir
 
-# Fraction of logical CPUs the whole application is allowed to run on. Every
-# EncoMie instance uses the same CPU set, so more instances cannot expand it.
+# Machine-wide CPU budget fractions by dynamic workload mode:
+#   - turbo    (1 active render): up to 65% of logical CPUs, P-core-first (still protects Core 0)
+#   - balanced (2 active renders): 50% of logical CPUs, E-core-first + high P-cores
+#   - eco      (>=3 active renders): 50% of logical CPUs, E-core-first + IDLE priority + Low I/O
 CPU_BUDGET_FRACTION = 0.5
+TURBO_CPU_BUDGET_FRACTION = 0.65
+
+WIN_IDLE_PRIORITY_CLASS = 0x00000040
+WIN_BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
+IO_PRIORITY_LOW = 1
+IO_PRIORITY_NORMAL = 2
+
+
+def resolve_render_mode(total_renders: int) -> str:
+    """Classify machine-wide render concurrency into a dynamic resource profile."""
+    n = max(1, int(total_renders or 1))
+    if n == 1:
+        return "turbo"
+    if n == 2:
+        return "balanced"
+    return "eco"
 
 _STALE_SEC = 45          # a slot older than this is treated as dead and swept
 _TOUCH_MIN_INTERVAL = 5  # don't rewrite our own slot more often than this
@@ -64,42 +82,112 @@ def active_render_count() -> int:
     return len(_live_slots())
 
 
-def allowed_cpu_count(logical: int | None = None) -> int:
-    """Maximum logical CPUs shared by all instances (never over 50%)."""
+def allowed_cpu_count(logical: int | None = None, mode: str = "eco") -> int:
+    """Maximum logical CPUs shared by all instances for the given mode."""
     total = max(1, int(logical if logical is not None else (os.cpu_count() or 1)))
+    if mode == "turbo":
+        # Protect at least 1 physical core (typically 2 logical threads on SMT)
+        return max(1, min(total - 1 if total >= 2 else 1, int(total * TURBO_CPU_BUDGET_FRACTION)))
     return max(1, int(total * CPU_BUDGET_FRACTION))
 
 
-def allowed_cpu_ids(logical: int | None = None) -> tuple[int, ...]:
+def allowed_cpu_ids(logical: int | None = None, mode: str = "eco") -> tuple[int, ...]:
     """Fallback CPU indices when Windows CPU topology is unavailable."""
     total = max(1, int(logical if logical is not None else (os.cpu_count() or 1)))
-    count = allowed_cpu_count(total)
+    count = allowed_cpu_count(total, mode=mode)
     return tuple(range(total - count, total))
 
 
-def _select_cpu_sets(records: list[tuple[int, int, int]], count: int) -> tuple[int, ...]:
-    """Choose CPU Set IDs by efficiency, spreading work across physical cores.
+def _select_cpu_sets(records: list[tuple[int, int, int]], count: int, mode: str = "eco") -> tuple[int, ...]:
+    """Choose CPU Set IDs adaptively across all CPU architectures and modes.
 
     Each record is ``(cpu_set_id, core_index, efficiency_class)``. Windows uses
-    a larger EfficiencyClass for faster cores, so ascending order selects
-    efficient E-cores before P-cores. Within a class, one logical processor per
-    physical core is selected before SMT siblings.
+    a larger EfficiencyClass for faster P-cores and smaller (e.g. 0) for
+    efficient E-cores.
+
+    Strategy:
+      1. Hybrid CPUs (>= 2 efficiency classes, e.g. Intel 12/13/14th Gen):
+         - ``turbo`` (1 active render): protect Core 0 (first P-core) for OS/UI,
+           then pick high-speed P-cores FIRST (from highest-index down to Core 1)
+           for maximum single-job FPS, then fill remaining budget with E-cores.
+         - ``balanced`` / ``eco`` (>= 2 active renders): take all E-cores first
+           (ascending efficiency class), then borrow from highest-index P-cores
+           while strictly protecting the first 2 P-cores (Core 0 & Core 1).
+      2. Symmetric CPUs (1 efficiency class, e.g. AMD Ryzen, older Intel, Xeon):
+         - ``turbo``: protect Core 0 (when physical_cores >= 2), pick from
+           highest-index cores first (distinct physical cores before SMT).
+         - ``balanced`` / ``eco``: protect Core 0 & Core 1 (when physical_cores >= 8)
+           or Core 0 (when physical_cores >= 2), pick from highest-index cores.
     """
+    if not records or count <= 0:
+        return ()
+
+    efficiencies = sorted({record[2] for record in records})
+    is_hybrid = len(efficiencies) >= 2
     selected: list[int] = []
-    for efficiency in sorted({record[2] for record in records}):
-        tier = sorted((r for r in records if r[2] == efficiency), key=lambda r: (r[1], r[0]))
+
+    def _pick_from_tier(tier_records: list[tuple[int, int, int]], reverse_cores: bool) -> None:
+        ordered = sorted(
+            tier_records,
+            key=lambda r: (-r[1] if reverse_cores else r[1], r[0]),
+        )
         seen_cores: set[int] = set()
-        for cpu_set_id, core_index, _ in tier:
+        for cpu_set_id, core_index, _ in ordered:
             if core_index not in seen_cores:
                 selected.append(cpu_set_id)
                 seen_cores.add(core_index)
                 if len(selected) == count:
-                    return tuple(selected)
-        for cpu_set_id, core_index, _ in tier:
+                    return
+        for cpu_set_id, _core_index, _ in ordered:
             if cpu_set_id not in selected:
                 selected.append(cpu_set_id)
                 if len(selected) == count:
+                    return
+
+    if is_hybrid:
+        highest_eff = efficiencies[-1]
+        p_tier = [r for r in records if r[2] == highest_eff]
+        p_cores = sorted({r[1] for r in p_tier})
+
+        if mode == "turbo":
+            # Protect Core 0 (first P-core) for OS/UI; give P-cores first for max speed
+            reserve_p = 1 if len(p_cores) >= 2 else 0
+            allowed_p_cores = set(p_cores[reserve_p:])
+            fast_p = [r for r in p_tier if r[1] in allowed_p_cores]
+            if fast_p:
+                _pick_from_tier(fast_p, reverse_cores=True)
+                if len(selected) == count:
                     return tuple(selected)
+            for eff in reversed(efficiencies[:-1]):
+                tier = [r for r in records if r[2] == eff]
+                _pick_from_tier(tier, reverse_cores=False)
+                if len(selected) == count:
+                    return tuple(selected)
+            return tuple(selected)
+
+        # balanced / eco: E-cores first, protect first 2 P-cores
+        for eff in efficiencies[:-1]:
+            tier = [r for r in records if r[2] == eff]
+            _pick_from_tier(tier, reverse_cores=False)
+            if len(selected) == count:
+                return tuple(selected)
+
+        reserve_p = 2 if len(p_cores) >= 4 else (1 if len(p_cores) >= 2 else 0)
+        allowed_p_cores = set(p_cores[reserve_p:])
+        borrowable = [r for r in p_tier if r[1] in allowed_p_cores]
+        if borrowable:
+            _pick_from_tier(borrowable, reverse_cores=True)
+        return tuple(selected)
+
+    # Symmetric CPU (single efficiency class)
+    phys_cores = sorted({r[1] for r in records})
+    if mode == "turbo":
+        reserve = 1 if len(phys_cores) >= 2 else 0
+    else:
+        reserve = 2 if len(phys_cores) >= 8 else (1 if len(phys_cores) >= 2 else 0)
+    allowed_cores = set(phys_cores[reserve:])
+    eligible = [r for r in records if r[1] in allowed_cores]
+    _pick_from_tier(eligible, reverse_cores=True)
     return tuple(selected)
 
 
@@ -142,35 +230,38 @@ def _windows_cpu_topology() -> tuple[tuple[int, int, int, int, int], ...]:
             core_index = raw[offset + 15]
             efficiency_class = raw[offset + 18]
             flags = raw[offset + 19]
-            parked = bool(flags & 0x01)
             allocated_elsewhere = bool(flags & 0x02)
-            if not parked and not allocated_elsewhere:
+            # Do NOT exclude temporarily parked cores (flags & 0x01): Windows
+            # dynamically parks idle cores and wakes them on demand. Filtering
+            # parked cores caused different EncoMie instances to pick different
+            # CPU subsets and collectively exceed the 50% machine-wide ceiling.
+            if not allocated_elsewhere:
                 records.append((cpu_set_id, group, logical_index, core_index, efficiency_class))
         offset += size
 
     return tuple(records)
 
 
-@lru_cache(maxsize=1)
-def preferred_windows_cpu_sets() -> tuple[int, ...]:
-    """Return the shared E-core-first CPU Set IDs selected for this machine."""
+@lru_cache(maxsize=4)
+def preferred_windows_cpu_sets(mode: str = "eco") -> tuple[int, ...]:
+    """Return the shared CPU Set IDs selected for this machine and mode."""
     topology = _windows_cpu_topology()
     records = [(cpu_set_id, core_index, efficiency)
                for cpu_set_id, _group, _logical, core_index, efficiency in topology]
-    return _select_cpu_sets(records, min(allowed_cpu_count(), len(records)))
+    return _select_cpu_sets(records, min(allowed_cpu_count(mode=mode), len(records)), mode=mode)
 
 
-def _preferred_windows_affinity_mask() -> int:
+def _preferred_windows_affinity_mask(mode: str = "eco") -> int:
     """Hard affinity mask matching the selected CPU Sets when they share a group."""
-    selected = set(preferred_windows_cpu_sets())
+    selected = set(preferred_windows_cpu_sets(mode))
     chosen = [record for record in _windows_cpu_topology() if record[0] in selected]
     if not chosen or len({record[1] for record in chosen}) != 1:
         return 0
     return sum(1 << record[2] for record in chosen)
 
 
-def apply_cpu_limit(process_handle=None) -> bool:
-    """Constrain this process, or a Windows child handle, to the shared CPU set."""
+def apply_cpu_limit(process_handle=None, mode: str = "eco") -> bool:
+    """Constrain this process, or a Windows child handle, to the mode's CPU set."""
     if sys.platform == "win32":
         import ctypes
         from ctypes import wintypes
@@ -179,7 +270,7 @@ def apply_cpu_limit(process_handle=None) -> bool:
         kernel32.GetCurrentProcess.restype = wintypes.HANDLE
         handle = process_handle if process_handle is not None else kernel32.GetCurrentProcess()
 
-        cpu_sets = preferred_windows_cpu_sets()
+        cpu_sets = preferred_windows_cpu_sets(mode)
         set_cpu_sets = getattr(kernel32, "SetProcessDefaultCpuSets", None)
         cpu_sets_applied = False
         if cpu_sets and set_cpu_sets is not None:
@@ -188,28 +279,87 @@ def apply_cpu_limit(process_handle=None) -> bool:
             ids = (wintypes.ULONG * len(cpu_sets))(*cpu_sets)
             cpu_sets_applied = bool(set_cpu_sets(wintypes.HANDLE(handle), ids, len(cpu_sets)))
 
-        # Fallback for Windows versions without CPU Sets. This cannot identify
-        # hybrid-core classes, but still enforces the same hard 50% ceiling.
         kernel32.SetProcessAffinityMask.argtypes = [wintypes.HANDLE, ctypes.c_size_t]
         kernel32.SetProcessAffinityMask.restype = wintypes.BOOL
 
-        # A Windows processor-group affinity mask is pointer-sized. On machines
-        # with more CPUs this remains stricter than the requested 50% ceiling.
         mask_width = ctypes.sizeof(ctypes.c_size_t) * 8
-        mask = _preferred_windows_affinity_mask()
+        mask = _preferred_windows_affinity_mask(mode)
         if not mask:
-            fallback_ids = tuple(i for i in allowed_cpu_ids() if i < mask_width)
+            fallback_ids = tuple(i for i in allowed_cpu_ids(mode=mode) if i < mask_width)
             mask = sum(1 << cpu_id for cpu_id in fallback_ids)
         affinity_applied = bool(kernel32.SetProcessAffinityMask(wintypes.HANDLE(handle), mask))
         return affinity_applied and (cpu_sets_applied or not cpu_sets)
 
     if process_handle is None and hasattr(os, "sched_setaffinity"):
         try:
-            os.sched_setaffinity(0, set(allowed_cpu_ids()))
+            os.sched_setaffinity(0, set(allowed_cpu_ids(mode=mode)))
             return True
         except OSError:
             return False
     return False
+
+
+def apply_process_priority(process_handle, priority_class: int) -> bool:
+    """Update CPU priority class of a running Windows child process."""
+    if sys.platform != "win32" or not process_handle:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        kernel32.SetPriorityClass.restype = wintypes.BOOL
+        return bool(kernel32.SetPriorityClass(wintypes.HANDLE(process_handle), priority_class))
+    except Exception:
+        return False
+
+
+def apply_background_io_priority(process_handle, io_priority: int = IO_PRIORITY_LOW) -> bool:
+    """Set Disk I/O priority of a Windows child process (ffmpeg.exe) via
+    NtSetInformationProcess(ProcessIoPriority=33): 1=Low, 2=Normal.
+    Best-effort: returns False silently if the OS denies the call.
+    """
+    if sys.platform != "win32" or not process_handle:
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        ntdll = ctypes.WinDLL("ntdll")
+        nt_set = getattr(ntdll, "NtSetInformationProcess", None)
+        if nt_set is None:
+            return False
+        nt_set.argtypes = [wintypes.HANDLE, wintypes.ULONG, ctypes.c_void_p, wintypes.ULONG]
+        nt_set.restype = ctypes.c_long
+        PROCESS_IO_PRIORITY = 33
+        val = ctypes.c_ulong(int(io_priority))
+        status = nt_set(
+            wintypes.HANDLE(process_handle),
+            PROCESS_IO_PRIORITY,
+            ctypes.byref(val),
+            ctypes.sizeof(val),
+        )
+        return status == 0
+    except Exception:
+        return False
+
+
+def apply_render_profile(process_handle, total_renders: int) -> str:
+    """Apply or live-rebalance CPU Affinity, CPU Priority, and Disk I/O Priority
+    on a running ffmpeg.exe process according to machine-wide active render count.
+    Returns the applied mode ('turbo', 'balanced', or 'eco').
+    """
+    mode = resolve_render_mode(total_renders)
+    if not apply_cpu_limit(process_handle, mode=mode):
+        raise RuntimeError(f"Không thể áp dụng giới hạn CPU ({mode}) cho FFmpeg")
+    if mode == "eco":
+        apply_process_priority(process_handle, WIN_IDLE_PRIORITY_CLASS)
+        apply_background_io_priority(process_handle, IO_PRIORITY_LOW)
+    else:
+        apply_process_priority(process_handle, WIN_BELOW_NORMAL_PRIORITY_CLASS)
+        apply_background_io_priority(process_handle, IO_PRIORITY_NORMAL)
+    return mode
 
 
 class RenderSlot:
@@ -244,21 +394,26 @@ class RenderSlot:
 
 def cpu_plan(max_concurrent_this_instance: int) -> dict:
     """
-    Per-render thread budget so that ALL renders on the machine together stay
-    near CPU_BUDGET_FRACTION of the logical CPUs. Call this AFTER entering a
-    RenderSlot so the count includes this render.
+    Dynamic per-render thread budget and profile across all EncoMie instances.
+    Call this AFTER entering a RenderSlot so the count includes this render.
     """
     logical = os.cpu_count() or 4
-    # Floor by this instance's own concurrency: sibling jobs that haven't
-    # reached render_pair yet aren't in the slot count yet, so don't hand the
-    # first one the whole budget.
     renders = max(active_render_count(), 1, int(max_concurrent_this_instance or 1))
+    mode = resolve_render_mode(renders)
 
-    budget = allowed_cpu_count(logical)
+    budget = allowed_cpu_count(logical, mode=mode)
     per = max(1, min(16, budget // renders))
+    if mode == "turbo":
+        dec_cap = min(4, per)
+    elif mode == "balanced":
+        dec_cap = min(3, per)
+    else:
+        dec_cap = min(2, per)
 
     return {
+        "mode": mode,
+        "renders": renders,
         "filter_threads": per,
         "encoder_threads": per,
-        "decoder_threads": per,
+        "decoder_threads": max(1, dec_cap),
     }
