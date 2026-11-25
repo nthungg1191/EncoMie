@@ -3330,15 +3330,37 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Đã Đạt Giới Hạn Gói Free", msg)
 
     def _on_refresh_preview_frame(self):
-        """Extract a frame from the first selected video and set it as preview background."""
+        """Extract a frame asynchronously from the first selected video and set it as preview background."""
         video_files = self.pick_bg.selected_files()
         if not hasattr(self, "preview_widget"):
             return
         if not video_files:
             self.preview_widget.set_frame(None)
             return
-        frame = _extract_video_frame(video_files[0])
-        self.preview_widget.set_frame(frame)
+        path = video_files[0]
+        if not os.path.exists(path):
+            self.preview_widget.set_frame(None)
+            return
+        if not hasattr(self, "_video_frame_cache"):
+            self._video_frame_cache = {}
+        if path in self._video_frame_cache:
+            self.preview_widget.set_frame(self._video_frame_cache[path])
+            return
+        if path in self.running_extractions:
+            return
+        self.running_extractions.add(path)
+        task = FrameExtractTask(path)
+        task.signals.loaded.connect(self._on_sub_preview_frame_loaded)
+        self.frame_pool.start(task)
+
+    def _on_sub_preview_frame_loaded(self, path: str, image: QImage):
+        if path in self.running_extractions:
+            self.running_extractions.remove(path)
+        if image and not image.isNull():
+            self._add_frame_to_cache(path, image)
+            video_files = self.pick_bg.selected_files()
+            if video_files and video_files[0] == path and hasattr(self, "preview_widget"):
+                self.preview_widget.set_frame(self._video_frame_cache.get(path, image))
 
     def _on_pair_selection_changed(self):
         """Update preview background and subtitle text when a pair is selected in the table."""
