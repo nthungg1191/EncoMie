@@ -83,6 +83,7 @@ class RenderWorker(QThread):
         self._completed_pairs = set()
         self._license_mgr = None
         self._last_license_check = 0.0
+        self._last_progress_emit = 0.0
         self._entitlements = None      # core.entitlements.Entitlements, refreshed with the license check
         self._license_key = ""         # active key, for scoping the render quota
 
@@ -122,6 +123,7 @@ class RenderWorker(QThread):
         self._job_messages.clear()
         self._completed_pairs.clear()
         self._last_license_check = 0.0
+        self._last_progress_emit = 0.0
         self._entitlements = None
         self._license_key = ""
 
@@ -189,7 +191,15 @@ class RenderWorker(QThread):
                 self.quit()
                 return
 
+        started = 0
         while len(self._active_jobs) < max_concurrent and self._pending_pairs:
+            if started > 0:
+                # Stagger concurrent launches slightly (250 ms) so N ffmpeg
+                # processes don't spike Disk I/O, RAM, and NVENC init on the
+                # exact same millisecond.
+                time.sleep(0.25)
+                if self._abort:
+                    return
             pair = self._pending_pairs.pop(0)
             
             # Batch index is sequence number starting from 1
@@ -203,6 +213,7 @@ class RenderWorker(QThread):
             
             self._active_jobs[pair.index] = job
             job.start()
+            started += 1
 
         # If no active jobs and no pending queue, stop event loop
         if not self._active_jobs and not self._pending_pairs:
@@ -233,7 +244,7 @@ class RenderWorker(QThread):
             del self._active_jobs[idx]
 
         self.pair_done.emit(idx, out_path)
-        self._emit_unified_progress()
+        self._emit_unified_progress(force=True)
         self._start_next_jobs()
 
     def _on_job_error(self, idx: str, err_msg: str):
@@ -250,10 +261,17 @@ class RenderWorker(QThread):
             self._active_jobs[idx].wait()
             del self._active_jobs[idx]
 
-        self._emit_unified_progress()
+        self._emit_unified_progress(force=True)
         self._start_next_jobs()
 
-    def _emit_unified_progress(self):
+    def _emit_unified_progress(self, force: bool = False):
+        # Throttle UI repaints to at most 4 Hz (250 ms) during active renders
+        # so multi-stream FFmpeg stdout lines never flood the Qt event loop.
+        now = time.monotonic()
+        if not force and (now - self._last_progress_emit) < 0.25:
+            return
+        self._last_progress_emit = now
+
         # Calculate unified progress based on completed jobs and progress of active jobs
         total_pct_sum = 0.0
         for pair in self.pairs:
