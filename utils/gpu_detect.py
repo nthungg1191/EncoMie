@@ -1,23 +1,12 @@
 """Utility: detect NVIDIA GPU, NVENC support, and system resources via FFmpeg / nvidia-smi."""
 
 import subprocess
-import re
-from pathlib import Path
 
-import sys
+from core.app_paths import get_bin_dir, get_ffmpeg_path, get_ffprobe_path
 
-# Local bin path detection
-if getattr(sys, 'frozen', False):
-    exe_bin_dir = Path(sys.executable).parent / "bin"
-    if (exe_bin_dir / "ffmpeg.exe").exists():
-        LOCAL_BIN_DIR = exe_bin_dir
-    else:
-        LOCAL_BIN_DIR = Path(__file__).parent.parent / "bin"
-else:
-    LOCAL_BIN_DIR = Path(__file__).parent.parent / "bin"
-
-FFMPEG_PATH = str(LOCAL_BIN_DIR / "ffmpeg.exe") if (LOCAL_BIN_DIR / "ffmpeg.exe").exists() else "ffmpeg"
-FFPROBE_PATH = str(LOCAL_BIN_DIR / "ffprobe.exe") if (LOCAL_BIN_DIR / "ffprobe.exe").exists() else "ffprobe"
+LOCAL_BIN_DIR = get_bin_dir()
+FFMPEG_PATH = get_ffmpeg_path()
+FFPROBE_PATH = get_ffprobe_path()
 
 
 def detect_gpu() -> dict:

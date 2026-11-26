@@ -1,7 +1,6 @@
 """Persist user settings to a JSON file next to the script."""
 
 import json
-import os
 from pathlib import Path
 
 import sys
