@@ -51,6 +51,27 @@ def get_resource_path(relative_path: str) -> Path:
     return (Path.cwd() / relative_path).resolve()
 
 
+def get_bin_dir() -> Path:
+    """Resolve the local `bin/` directory containing bundled FFmpeg/FFprobe binaries."""
+    if getattr(sys, "frozen", False):
+        exe_bin_dir = Path(sys.executable).parent / "bin"
+        if (exe_bin_dir / "ffmpeg.exe").exists():
+            return exe_bin_dir
+    return Path(__file__).resolve().parent.parent / "bin"
+
+
+def get_ffmpeg_path() -> str:
+    """Return path to bundled `ffmpeg.exe` if present, otherwise `'ffmpeg'` on PATH."""
+    candidate = get_bin_dir() / "ffmpeg.exe"
+    return str(candidate) if candidate.exists() else "ffmpeg"
+
+
+def get_ffprobe_path() -> str:
+    """Return path to bundled `ffprobe.exe` if present, otherwise `'ffprobe'` on PATH."""
+    candidate = get_bin_dir() / "ffprobe.exe"
+    return str(candidate) if candidate.exists() else "ffprobe"
+
+
 def get_app_icon():
     """
     Load the application QIcon with all available multi-resolution frames (16x16 to 256x256).

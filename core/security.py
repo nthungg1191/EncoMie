@@ -19,7 +19,6 @@ Phase 1 security model
 import os
 import sys
 import json
-import time
 import hmac
 import base64
 import hashlib

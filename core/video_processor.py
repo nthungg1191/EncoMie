@@ -16,7 +16,7 @@ import subprocess
 import shlex
 from pathlib import Path
 from dataclasses import dataclass, field
-from typing import Optional, List
+from typing import Optional
 
 
 VIDEO_EXTENSIONS = {".mp4", ".mkv", ".mov", ".avi", ".webm", ".m4v"}
@@ -40,16 +40,14 @@ def _dbg(msg: str = "") -> None:
         _dbg_log.debug(msg)
 
 
+from core.app_paths import get_bin_dir, get_ffmpeg_path, get_ffprobe_path
+from core.subtitle_model import SubtitleStyle
+
 AUDIO_EXTENSIONS = {".mp3", ".m4a", ".wav", ".aac"}
 
-LOCAL_BIN_DIR = Path(__file__).parent.parent / "bin"
-if getattr(sys, 'frozen', False):
-    exe_bin_dir = Path(sys.executable).parent / "bin"
-    if (exe_bin_dir / "ffmpeg.exe").exists():
-        LOCAL_BIN_DIR = exe_bin_dir
-
-FFMPEG_PATH = str(LOCAL_BIN_DIR / "ffmpeg.exe") if (LOCAL_BIN_DIR / "ffmpeg.exe").exists() else "ffmpeg"
-FFPROBE_PATH = str(LOCAL_BIN_DIR / "ffprobe.exe") if (LOCAL_BIN_DIR / "ffprobe.exe").exists() else "ffprobe"
+LOCAL_BIN_DIR = get_bin_dir()
+FFMPEG_PATH = get_ffmpeg_path()
+FFPROBE_PATH = get_ffprobe_path()
 
 
 @dataclass
@@ -59,65 +57,6 @@ class FilePair:
     srt_path: str
     matched: bool = True
     error: str = ""
-
-
-@dataclass
-class SubtitleStyle:
-    font_name: str = "Arial"
-    font_size: int = 40
-
-    font_color: str = "#FFFFFF"
-
-    stroke_color: str = "#000000"
-    stroke_width: float = 2.0
-    stroke_enabled: bool = True
-
-    bg_color: str = "#000000"
-    bg_opacity: float = 0.6
-    bg_padding_x: int = 8
-    bg_padding_y: int = 4
-    bg_corner_radius: int = 4
-    bg_enabled: bool = True
-
-    shadow_color: str = "#000000"
-    shadow_opacity: float = 0.8
-    shadow_angle: float = 45.0
-    shadow_distance: float = 3.0
-    shadow_blur: float = 2.0
-    shadow_enabled: bool = False
-
-    alignment: int = 2
-    margin_v: int = 50
-    margin_l: int = 20
-    margin_r: int = 20
-
-    @staticmethod
-    def from_preset(preset) -> "SubtitleStyle":
-        """Create a RenderConfig-compatible SubtitleStyle from a SubtitleStylePreset."""
-        return SubtitleStyle(
-            font_name=preset.font_name,
-            font_size=preset.font_size,
-            font_color=preset.font_color,
-            stroke_color=preset.stroke_color,
-            stroke_width=preset.stroke_width,
-            stroke_enabled=preset.stroke_enabled,
-            bg_color=preset.bg_color,
-            bg_opacity=preset.bg_opacity,
-            bg_padding_x=preset.bg_padding_x,
-            bg_padding_y=preset.bg_padding_y,
-            bg_corner_radius=preset.bg_corner_radius,
-            bg_enabled=preset.bg_enabled,
-            shadow_color=preset.shadow_color,
-            shadow_opacity=preset.shadow_opacity,
-            shadow_angle=preset.shadow_angle,
-            shadow_distance=preset.shadow_distance,
-            shadow_blur=preset.shadow_blur,
-            shadow_enabled=preset.shadow_enabled,
-            alignment=preset.alignment,
-            margin_v=preset.margin_v,
-            margin_l=preset.margin_l,
-            margin_r=preset.margin_r,
-        )
 
 
 @dataclass

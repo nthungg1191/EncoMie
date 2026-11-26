@@ -1,14 +1,14 @@
 """
 Data models for subtitle editing.
 
-SubtitleEntry  — a single subtitle cue (index, start, end, text).
-SubtitleDocument — a collection of entries from one SRT file.
+SubtitleEntry       — a single subtitle cue (index, start, end, text).
+SubtitleDocument    — a collection of entries from one SRT file (pure data model).
+SubtitleStyle       — base subtitle styling fields shared with RenderConfig.
 SubtitleStylePreset — a named style configuration saved as JSON.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -29,10 +29,10 @@ class SubtitleEntry:
         return self.end_ms() - self.start_ms()
 
     def set_start_ms(self, ms: int):
-        self.start_time = _ms_to_srt(ms)
+        self.start_time = ms_to_srt(ms)
 
     def set_end_ms(self, ms: int):
-        self.end_time = _ms_to_srt(ms)
+        self.end_time = ms_to_srt(ms)
 
     def shift_ms(self, delta_ms: int):
         """Shift both start and end by delta_ms milliseconds."""
@@ -42,7 +42,7 @@ class SubtitleEntry:
 
 @dataclass
 class SubtitleDocument:
-    """All subtitle entries from a single SRT file."""
+    """All subtitle entries from a single SRT file (I/O lives in SrtService)."""
     file_path: str
     entries: list[SubtitleEntry] = field(default_factory=list)
     dirty: bool = False
@@ -51,22 +51,11 @@ class SubtitleDocument:
     def name(self) -> str:
         return Path(self.file_path).stem
 
-    def save(self):
-        from core.srt_service import SrtService
-        SrtService.write(self.file_path, self.entries)
-        self.dirty = False
-
-    def reload(self):
-        from core.srt_service import SrtService
-        self.entries = SrtService.parse(self.file_path)
-        self.dirty = False
-
 
 @dataclass
-class SubtitleStylePreset:
-    """A named, reusable subtitle style configuration."""
+class SubtitleStyle:
+    """Base subtitle styling parameters shared by RenderConfig and SubtitleStylePreset."""
 
-    name: str
     font_name: str = "Arial"
     font_size: int = 40
 
@@ -91,7 +80,7 @@ class SubtitleStylePreset:
     shadow_opacity: float = 0.8
     shadow_angle: float = 45.0       # degrees (clockwise from top)
     shadow_distance: float = 3.0     # pixels
-    shadow_blur: float = 2.0        # pixels
+    shadow_blur: float = 2.0         # pixels
     shadow_enabled: bool = False
 
     # ---- Layout ----
@@ -100,60 +89,26 @@ class SubtitleStylePreset:
     margin_l: int = 20
     margin_r: int = 20
 
+    @staticmethod
+    def from_preset(preset: "SubtitleStyle") -> "SubtitleStyle":
+        """Create a RenderConfig-compatible SubtitleStyle from a SubtitleStylePreset."""
+        return SubtitleStyle(**{f.name: getattr(preset, f.name) for f in fields(SubtitleStyle)})
+
+
+@dataclass
+class SubtitleStylePreset(SubtitleStyle):
+    """A named, reusable subtitle style configuration."""
+
+    name: str = "Classic"
+
     def to_dict(self) -> dict:
-        return {
-            "name": self.name,
-            "font_name": self.font_name,
-            "font_size": self.font_size,
-            "font_color": self.font_color,
-            "stroke_color": self.stroke_color,
-            "stroke_width": self.stroke_width,
-            "stroke_enabled": self.stroke_enabled,
-            "bg_color": self.bg_color,
-            "bg_opacity": self.bg_opacity,
-            "bg_padding_x": self.bg_padding_x,
-            "bg_padding_y": self.bg_padding_y,
-            "bg_corner_radius": self.bg_corner_radius,
-            "bg_enabled": self.bg_enabled,
-            "shadow_color": self.shadow_color,
-            "shadow_opacity": self.shadow_opacity,
-            "shadow_angle": self.shadow_angle,
-            "shadow_distance": self.shadow_distance,
-            "shadow_blur": self.shadow_blur,
-            "shadow_enabled": self.shadow_enabled,
-            "alignment": self.alignment,
-            "margin_v": self.margin_v,
-            "margin_l": self.margin_l,
-            "margin_r": self.margin_r,
-        }
+        return asdict(self)
 
     @classmethod
     def from_dict(cls, data: dict) -> "SubtitleStylePreset":
-        return cls(
-            name=data.get("name", "Unnamed"),
-            font_name=data.get("font_name", "Arial"),
-            font_size=data.get("font_size", 40),
-            font_color=data.get("font_color", "#FFFFFF"),
-            stroke_color=data.get("stroke_color", "#000000"),
-            stroke_width=data.get("stroke_width", 2.0),
-            stroke_enabled=data.get("stroke_enabled", True),
-            bg_color=data.get("bg_color", "#000000"),
-            bg_opacity=data.get("bg_opacity", 0.6),
-            bg_padding_x=data.get("bg_padding_x", 8),
-            bg_padding_y=data.get("bg_padding_y", 4),
-            bg_corner_radius=data.get("bg_corner_radius", 4),
-            bg_enabled=data.get("bg_enabled", True),
-            shadow_color=data.get("shadow_color", "#000000"),
-            shadow_opacity=data.get("shadow_opacity", 0.8),
-            shadow_angle=data.get("shadow_angle", 45.0),
-            shadow_distance=data.get("shadow_distance", 3.0),
-            shadow_blur=data.get("shadow_blur", 2.0),
-            shadow_enabled=data.get("shadow_enabled", False),
-            alignment=data.get("alignment", 2),
-            margin_v=data.get("margin_v", 50),
-            margin_l=data.get("margin_l", 20),
-            margin_r=data.get("margin_r", 20),
-        )
+        defaults = cls(name="Unnamed")
+        kwargs = {f.name: data.get(f.name, getattr(defaults, f.name)) for f in fields(cls)}
+        return cls(**kwargs)
 
     def to_ass_color(self, hex_color: str, alpha: float = 1.0) -> str:
         """Convert hex RGB + opacity to ASS color string &HAABBGGRR."""
@@ -165,7 +120,7 @@ class SubtitleStylePreset:
 
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Timestamp helpers
 # ---------------------------------------------------------------------------
 
 def _srt_to_ms(timestamp: str) -> int:
@@ -175,7 +130,7 @@ def _srt_to_ms(timestamp: str) -> int:
     return (h * 3600 + m * 60 + s) * 1000 + ms
 
 
-def _ms_to_srt(ms: int) -> str:
+def ms_to_srt(ms: int) -> str:
     """Convert milliseconds to SRT timestamp 'HH:MM:SS,mmm'."""
     ms = max(0, ms)
     total_s = ms // 1000
@@ -184,3 +139,6 @@ def _ms_to_srt(ms: int) -> str:
     m = (total_s % 3600) // 60
     s = total_s % 60
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+
+_ms_to_srt = ms_to_srt

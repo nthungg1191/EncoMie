@@ -1,9 +1,7 @@
 import os
-import sys
 import json
 import time
 import uuid
-import hashlib
 import platform
 import requests
 from enum import Enum
