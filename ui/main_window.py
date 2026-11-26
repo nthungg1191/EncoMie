@@ -24,27 +24,27 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView,
     QGroupBox, QComboBox, QSpinBox, QDoubleSpinBox, QAbstractSpinBox,
     QPlainTextEdit, QProgressBar, QSplitter, QCheckBox,
-    QSizePolicy, QSlider, QMessageBox, QStatusBar,
+    QSizePolicy, QMessageBox,
     QFrame, QGridLayout, QAbstractItemView, QTabWidget,
     QScrollArea, QLayout
 )
-from PyQt6.QtCore import Qt, QSize, pyqtSignal, QRunnable, QThreadPool, QObject, QTimer
-from PyQt6.QtGui import QColor, QFont, QIcon, QImage, QPixmap, QKeySequence
+from PyQt6.QtCore import Qt, pyqtSignal, QRunnable, QThreadPool, QObject, QTimer
+from PyQt6.QtGui import QColor, QImage, QKeySequence
 
-from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS
+from core.video_processor import RenderConfig, SubtitleStyle, FilePair, build_pairs
 from core.worker import RenderWorker
 from core.subtitle_model import SubtitleStylePreset
 from core.srt_service import SrtService
 from core.style_preset_service import StylePresetService
 from core.subtitle_model import SubtitleEntry
-from ui.subtitle_preview_widget import SubtitlePreviewWidget, SubtitleStyleEditor, LiveFramePreview
+from ui.subtitle_preview_widget import SubtitleStyleEditor
 from ui.video_layer_config import VideoLayerConfigWidget
 from ui.video_layout_preview import VideoLayoutPreview
 from ui.collapsible_section import CollapsibleSection
 from ui.flow_layout import FlowWidget, StackedField
 from ui.spinbox_behavior import install_spinbox_behavior
 from utils import settings as cfg
-from utils.gpu_detect import detect_gpu, detect_system_info, check_ffmpeg, check_ffprobe
+from utils.gpu_detect import check_ffmpeg, check_ffprobe
 from core.license_manager import LicenseManager, LicenseStatus
 from license.license_window import LicenseWindow, LicenseInfoDialog
 from core.security import is_debugger_present, scan_suspicious_processes
@@ -55,14 +55,6 @@ if getattr(sys, 'frozen', False):
 else:
     EXPORT_PATH = Path(__file__).parent.parent / "selections.json"
     DEBUG_LOG_PATH = Path(__file__).parent.parent / "debug_ui.log"
-HARDCODED_AUDIO_DIR = r"D:\TBN 1\video goc"
-MEDIA_EXTENSIONS = AUDIO_EXTENSIONS | VIDEO_EXTENSIONS
-
-FONTS_AVAILABLE = [
-    "Arial", "Arial Bold", "Roboto", "Open Sans",
-    "Montserrat", "Noto Sans", "Verdana", "Tahoma",
-    "Georgia", "Times New Roman", "Courier New"
-]
 
 CODECS = [
     ("H.265 HEVC — GPU (NVENC)", "hevc_nvenc"),
@@ -71,539 +63,29 @@ CODECS = [
     ("H.264 AVC  — CPU (libx264)", "libx264"),
 ]
 
-ALIGNMENTS = [
-    ("Giữa màn hình (khuyến nghị)", 10),
-    ("Dưới giữa (chuẩn phụ đề)", 2),
-    ("Trên giữa", 6),
-]
-
-
-class FolderPicker(QWidget):
-    """A label + line edit + browse button row."""
-
-    def __init__(self, label: str, placeholder: str = "", parent=None):
-        super().__init__(parent)
-        self._mode = "folder"
-        self._selected_files: list[str] = []
-        self._file_filter = "All files (*.*)"
-        self._dialog_title = "Chọn file"
-
-        self.setStyleSheet(
-            "FolderPicker { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 4px 6px; }"
-        )
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(8, 4, 8, 4)
-        lay.setSpacing(8)
-
-        self.lbl = QLabel(label, self)
-        self.lbl.setMinimumWidth(max(58, self.lbl.sizeHint().width() + 4))
-        self.lbl.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self.lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #475569;")
-
-        self.edit = QLineEdit(self)
-        self.edit.setPlaceholderText(placeholder)
-        self.edit.setReadOnly(True)
-        self.edit.textChanged.connect(self.edit.setToolTip)
-        self.edit.setMinimumWidth(84)
-        self.edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.edit.setStyleSheet(
-            "QLineEdit { font-size: 11px; padding: 5px 8px; background-color: #ffffff; "
-            "border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; }"
-        )
-
-        self.btn = QPushButton("Chọn", self)
-        self.btn.setMinimumWidth(56)
-        self.btn.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self.btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn.setStyleSheet(
-            "QPushButton { font-size: 11px; padding: 5px 8px; background-color: #ffffff; "
-            "border: 1px solid #cbd5e1; border-radius: 6px; color: #0f172a; font-weight: 500; }"
-            "QPushButton:hover { background-color: #f1f5f9; border-color: #007aff; color: #007aff; }"
-        )
-        self.btn.clicked.connect(self._browse)
-
-        lay.addWidget(self.lbl)
-        lay.addWidget(self.edit, 1)
-        lay.addWidget(self.btn)
-
-    def set_mode(self, mode: str):
-        self._mode = mode
-        if mode == "files":
-            self._selected_files = []
-
-    def set_file_dialog(self, dialog_title: str, file_filter: str):
-        self._dialog_title = dialog_title
-        self._file_filter = file_filter
-
-    def _browse(self):
-        current = self.edit.text() or os.path.expanduser("~")
-        if self._mode == "files":
-            if self._selected_files:
-                current = str(Path(self._selected_files[0]).parent)
-            elif current and Path(current).exists() and Path(current).is_file():
-                current = str(Path(current).parent)
-            files, _ = QFileDialog.getOpenFileNames(
-                self,
-                self._dialog_title,
-                current,
-                self._file_filter
-            )
-            if files:
-                self._selected_files = files
-                if len(files) == 1:
-                    self.edit.setText(Path(files[0]).name)
-                else:
-                    self.edit.setText(f"Đã chọn {len(files)} file")
-                if hasattr(self, "_callback"):
-                    self._callback(files)
-            return
-
-        folder = QFileDialog.getExistingDirectory(self, "Chọn thư mục", current)
-        if folder:
-            self.edit.setText(folder)
-            if hasattr(self, "_callback"):
-                self._callback(folder)
-
-    def set_callback(self, fn):
-        self._callback = fn
-
-    def value(self) -> str:
-        try:
-            return self.edit.text()
-        except Exception:
-            return ""
-
-    def set_value(self, v: str):
-        try:
-            self.edit.setText(v)
-        except Exception:
-            pass
-
-    def selected_files(self) -> list[str]:
-        return list(self._selected_files)
-
-    def set_selected_files(self, files: list[str]):
-        self._selected_files = list(files)
-        try:
-            if not files:
-                self.edit.clear()
-            elif len(files) == 1:
-                self.edit.setText(Path(files[0]).name)
-            else:
-                self.edit.setText(f"Đã chọn {len(files)} file")
-        except Exception:
-            pass
-
-
-
-class ImageLayerControl(QWidget):
-    MAX_HEIGHT = 380  # Fixed max height with scrollbar
-    changed = pyqtSignal()
-
-    def __init__(self, index: int, parent=None):
-        super().__init__(parent)
-        self.index = index
-        self.init_ui()
-
-    def init_ui(self):
-        # Outer wrapper with scroll area
-        outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
-        outer.setSpacing(0)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        # Inner content widget
-        content = QWidget()
-        lay = QVBoxLayout(content)
-        lay.setContentsMargins(10, 10, 10, 10)
-        lay.setSpacing(8)
-
-        # Row 1: Kích hoạt + File logo
-        row1 = QVBoxLayout()
-        row1.setSpacing(8)
-        
-        self.chk_enabled = QCheckBox("Kích hoạt Layer")
-        self.chk_enabled.setStyleSheet("font-size: 11px; font-weight: bold;")
-        self.chk_enabled.stateChanged.connect(self._on_changed)
-        row1.addWidget(self.chk_enabled)
-
-        self.pick_logo = FolderPicker("File logo:", "Chọn ảnh logo (.png, .jpg)")
-        self.pick_logo.set_mode("files")
-        self.pick_logo.set_file_dialog(
-            "Chọn file ảnh logo",
-            "Image files (*.png *.jpg *.jpeg *.bmp);;All files (*.*)"
-        )
-        self.pick_logo.btn.setText("Chọn…")
-        self.pick_logo.set_callback(self._on_file_changed)
-        row1.addWidget(self.pick_logo)
-        lay.addLayout(row1)
-
-        # Row 2: Vị trí
-        row2 = QHBoxLayout()
-        row2.setSpacing(6)
-        pos_lbl = QLabel("Vị trí:")
-        pos_lbl.setStyleSheet("font-size: 11px;")
-        pos_lbl.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        row2.addWidget(pos_lbl)
-
-        self.cmb_logo_pos = QComboBox()
-        self.cmb_logo_pos.addItems([
-            "Góc dưới - Phải (Bottom-Right)",
-            "Góc dưới - Trái (Bottom-Left)",
-            "Góc trên - Phải (Top-Right)",
-            "Góc trên - Trái (Top-Left)",
-            "Ở giữa - Trên (Top-Center)"
-        ])
-        self.cmb_logo_pos.setStyleSheet("font-size: 11px;")
-        self.cmb_logo_pos.currentIndexChanged.connect(self._on_changed)
-        row2.addWidget(self.cmb_logo_pos, 1)
-        lay.addLayout(row2)
-
-        # Row 3: Cỡ (Size) & Độ mờ (Opacity)
-        row3 = QGridLayout()
-        row3.setHorizontalSpacing(8)
-        row3.setVerticalSpacing(6)
-
-        sz_lbl = QLabel("Cỡ (px):")
-        sz_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(sz_lbl, 0, 0)
-
-        self.spn_logo_size = QSpinBox()
-        self.spn_logo_size.setRange(20, 500)
-        self.spn_logo_size.setValue(100)
-        self.spn_logo_size.setSingleStep(10)
-        self.spn_logo_size.setSuffix(" px")
-        self.spn_logo_size.setStyleSheet("font-size: 11px;")
-        self.spn_logo_size.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_logo_size, 0, 1)
-
-        op_lbl = QLabel("Độ mờ (%):")
-        op_lbl.setStyleSheet("font-size: 11px;")
-        row3.addWidget(op_lbl, 1, 0)
-
-        self.spn_logo_opacity = QSpinBox()
-        self.spn_logo_opacity.setRange(10, 100)
-        self.spn_logo_opacity.setValue(90)
-        self.spn_logo_opacity.setSingleStep(5)
-        self.spn_logo_opacity.setSuffix(" %")
-        self.spn_logo_opacity.setStyleSheet("font-size: 11px;")
-        self.spn_logo_opacity.valueChanged.connect(self._on_changed)
-        row3.addWidget(self.spn_logo_opacity, 1, 1)
-        row3.setColumnStretch(1, 1)
-        lay.addLayout(row3)
-        logo_flow = FlowWidget()
-        logo_flow.add_field("Cỡ:", self.spn_logo_size)
-        logo_flow.add_field("Độ mờ:", self.spn_logo_opacity)
-        lay.addWidget(logo_flow)
-        sz_lbl.hide()
-        op_lbl.hide()
-
-        # Row 4: Margins (Top, Bottom, Left, Right)
-        margin_grp = QGroupBox("Cân chỉnh khoảng lề (Margin - px)")
-        margin_grp.setStyleSheet("QGroupBox { font-size: 10px; font-weight: bold; }")
-        margin_lay = QGridLayout(margin_grp)
-        margin_lay.setContentsMargins(6, 6, 6, 6)
-        margin_lay.setSpacing(6)
-
-        # Top
-        t_lay = QHBoxLayout()
-        t_lbl = QLabel("Trên:")
-        t_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
-        self.spn_margin_t = QSpinBox()
-        self.spn_margin_t.setRange(0, 300)
-        self.spn_margin_t.setValue(20)
-        self.spn_margin_t.setSuffix(" px")
-        self.spn_margin_t.setStyleSheet("font-size: 10px;")
-        self.spn_margin_t.valueChanged.connect(self._on_changed)
-        t_lay.addWidget(t_lbl)
-        t_lay.addWidget(self.spn_margin_t)
-        margin_lay.addLayout(t_lay, 0, 0)
-
-        # Bottom
-        b_lay = QHBoxLayout()
-        b_lbl = QLabel("Dưới:")
-        b_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
-        self.spn_margin_b = QSpinBox()
-        self.spn_margin_b.setRange(0, 300)
-        self.spn_margin_b.setValue(20)
-        self.spn_margin_b.setSuffix(" px")
-        self.spn_margin_b.setStyleSheet("font-size: 10px;")
-        self.spn_margin_b.valueChanged.connect(self._on_changed)
-        b_lay.addWidget(b_lbl)
-        b_lay.addWidget(self.spn_margin_b)
-        margin_lay.addLayout(b_lay, 0, 1)
-
-        # Left
-        l_lay_margin = QHBoxLayout()
-        l_lbl = QLabel("Trái:")
-        l_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
-        self.spn_margin_l = QSpinBox()
-        self.spn_margin_l.setRange(0, 500)
-        self.spn_margin_l.setValue(20)
-        self.spn_margin_l.setSuffix(" px")
-        self.spn_margin_l.setStyleSheet("font-size: 10px;")
-        self.spn_margin_l.valueChanged.connect(self._on_changed)
-        l_lay_margin.addWidget(l_lbl)
-        l_lay_margin.addWidget(self.spn_margin_l)
-        margin_lay.addLayout(l_lay_margin, 1, 0)
-
-        # Right
-        r_lay_margin = QHBoxLayout()
-        r_lbl = QLabel("Phải:")
-        r_lbl.setStyleSheet("font-size: 10px; color: #6b7280;")
-        self.spn_margin_r = QSpinBox()
-        self.spn_margin_r.setRange(0, 500)
-        self.spn_margin_r.setValue(20)
-        self.spn_margin_r.setSuffix(" px")
-        self.spn_margin_r.setStyleSheet("font-size: 10px;")
-        self.spn_margin_r.valueChanged.connect(self._on_changed)
-        r_lay_margin.addWidget(r_lbl)
-        r_lay_margin.addWidget(self.spn_margin_r)
-        margin_lay.addLayout(r_lay_margin, 1, 1)
-
-        margin_flow = FlowWidget(max_columns=2)
-        margin_flow.add_field("Trên:", self.spn_margin_t)
-        margin_flow.add_field("Dưới:", self.spn_margin_b)
-        margin_flow.add_field("Trái:", self.spn_margin_l)
-        margin_flow.add_field("Phải:", self.spn_margin_r)
-        margin_lay.addWidget(margin_flow, 0, 0, 2, 2)
-        for label in (t_lbl, b_lbl, l_lbl, r_lbl):
-            label.hide()
-
-        for spin in margin_grp.findChildren(QSpinBox):
-            spin.setMinimumWidth(84)
-            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            spin.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        lay.addSpacing(5)
-        lay.addWidget(margin_grp)
-
-        for spin in content.findChildren(QSpinBox):
-            spin.setMinimumWidth(84)
-            spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            spin.setAlignment(Qt.AlignmentFlag.AlignRight)
-
-        # Set max height and wrap in scroll area
-        content.setMaximumHeight(self.MAX_HEIGHT)
-        scroll.setWidget(content)
-        outer.addWidget(scroll)
-
-    def _on_file_changed(self, files):
-        self._on_changed()
-
-    def _on_changed(self):
-        self.changed.emit()
-
-    def get_config(self) -> ImageLayerConfig:
-        from core.video_processor import ImageLayerConfig
-        files = self.pick_logo.selected_files()
-        path = files[0] if files else ""
-        return ImageLayerConfig(
-            enabled=self.chk_enabled.isChecked(),
-            path=path,
-            position=self.cmb_logo_pos.currentIndex(),
-            size=self.spn_logo_size.value(),
-            opacity=self.spn_logo_opacity.value() / 100.0,
-            margin_t=self.spn_margin_t.value(),
-            margin_b=self.spn_margin_b.value(),
-            margin_l=self.spn_margin_l.value(),
-            margin_r=self.spn_margin_r.value()
-        )
-
-
-class PairTable(QTableWidget):
-    """Table showing matched audio↔SRT file pairs."""
-
-    COLS = ["#", "MEDIA", "PHỤ ĐỀ", "TRẠNG THÁI"]
-
-    def __init__(self, parent=None):
-        super().__init__(0, len(self.COLS), parent)
-        self.setHorizontalHeaderLabels(self.COLS)
-        header_tips = ("Số thứ tự", "Tệp audio hoặc video", "Tệp phụ đề SRT", "Trạng thái ghép cặp")
-        for column, tip in enumerate(header_tips):
-            self.horizontalHeaderItem(column).setToolTip(tip)
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.setAlternatingRowColors(True)
-        self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(26)
-        hdr = self.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        hdr.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
-        hdr.setStretchLastSection(False)
-        hdr.setTextElideMode(Qt.TextElideMode.ElideRight)
-        self.setColumnWidth(0, 42)
-        self.setColumnWidth(3, 100)
-
-    def load_pairs(self, pairs: list[FilePair], unchecked_paths: set = None):
-        if unchecked_paths is None:
-            unchecked_paths = set()
-        self.blockSignals(True)
-        try:
-            self.setRowCount(0)
-            for pair in pairs:
-                row = self.rowCount()
-                self.insertRow(row)
-                
-                try:
-                    idx_num = int(pair.index)
-                    idx_str = str(idx_num)
-                except (ValueError, TypeError):
-                    idx_str = str(pair.index)
-
-                item_idx = self._cell(idx_str, center=True, checkable=pair.matched)
-                if pair.audio_path:
-                    item_idx.setData(Qt.ItemDataRole.UserRole, pair.audio_path)
-                if pair.audio_path in unchecked_paths:
-                    item_idx.setCheckState(Qt.CheckState.Unchecked)
-                self.setItem(row, 0, item_idx)
-                
-                item_audio = self._cell(Path(pair.audio_path).name if pair.audio_path else "—")
-                item_audio.setForeground(QColor("#007aff"))
-                self.setItem(row, 1, item_audio)
-
-                item_srt = self._cell(Path(pair.srt_path).name if pair.srt_path else "—")
-                item_srt.setForeground(QColor("#007aff"))
-                self.setItem(row, 2, item_srt)
-
-                if not pair.audio_path:
-                    status_text = "✗ Thiếu file media"
-                    status_color = QColor("#ef4444")
-                elif not pair.srt_path:
-                    status_text = "✗ Thiếu file SRT"
-                    status_color = QColor("#ef4444")
-                elif pair.error == "Lệch file":
-                    status_text = "⚠️ Lệch file"
-                    status_color = QColor("#d97706")
-                elif pair.matched:
-                    status_text = "✓ Khớp"
-                    status_color = QColor("#10b981")
-                else:
-                    status_text = f"✗ {pair.error}"
-                    status_color = QColor("#ef4444")
-
-                status_item = self._cell(status_text, center=True)
-                status_item.setForeground(status_color)
-                self.setItem(row, 3, status_item)
-        finally:
-            self.blockSignals(False)
-
-    @staticmethod
-    def _cell(text: str, center: bool = False, checkable: bool = False) -> QTableWidgetItem:
-        item = QTableWidgetItem(text)
-        item.setToolTip(text)
-        if center:
-            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        if checkable:
-            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Checked)
-        return item
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _extract_video_frame(video_path: str, timestamp: str | None = None) -> QImage | None:
-    """
-    Extract a single frame from a video file using ffmpeg.
-    Returns a QImage, or None on failure.
-    Uses the middle of the video by default (more representative than start).
-    """
-    import subprocess, tempfile, os
-    from utils.gpu_detect import FFMPEG_PATH, FFPROBE_PATH
-    if not os.path.exists(video_path):
-        return None
-
-    try:
-        if timestamp is None:
-            probe_result = subprocess.run(
-                [FFPROBE_PATH, "-v", "error",
-                 "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1",
-                 video_path],
-                capture_output=True, encoding="utf-8", errors="replace", timeout=10,
-            )
-            try:
-                duration = float(probe_result.stdout.strip())
-                timestamp = max(1.0, duration / 2)
-            except (ValueError, OSError):
-                timestamp = 5.0
-
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp_path = tmp.name
-
-        cmd = [
-            FFMPEG_PATH, "-y",
-            "-ss", str(timestamp),
-            "-i", video_path,
-            "-frames:v", "1",
-            "-q:v", "2",
-            tmp_path,
-        ]
-        result = subprocess.run(
-            cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=30,
-        )
-        if result.returncode != 0 or not os.path.exists(tmp_path):
-            return None
-
-        img = QImage(tmp_path)
-        os.unlink(tmp_path)
-        return img if not img.isNull() else None
-    except Exception:
-        return None
-
-
-class FrameExtractSignals(QObject):
-    loaded = pyqtSignal(str, QImage)  # path, image
-
-class FrameExtractTask(QRunnable):
-    def __init__(self, video_path: str):
-        super().__init__()
-        self.video_path = video_path
-        self.signals = FrameExtractSignals()
-
-    def run(self):
-        img = _extract_video_frame(self.video_path)
-        if img and not img.isNull():
-            self.signals.loaded.emit(self.video_path, img)
-
-
-_DEFAULT_SYS_INFO = {
-    "cpu_name": "—", "cpu_load_pct": 0,
-    "ram_total_gb": 0, "ram_free_gb": 0, "ram_used_pct": 0,
-    "gpu_name": "…", "gpu_available": False,
-    "vram_total_mb": 0, "vram_free_mb": 0, "gpu_power_w": "—",
-}
+from ui.media_widgets import (
+    FolderPicker,
+    FrameExtractSignals,
+    FrameExtractTask,
+    PairTable,
+    _extract_video_frame,
+)
 
 
 class _BgProbeSignals(QObject):
-    sysinfo = pyqtSignal(dict)
     suspicious_proc = pyqtSignal(str)
     debugger = pyqtSignal()
 
 
 class _BgProbeTask(QRunnable):
-    """Off-thread system metrics + anti-tamper scan (kept off the UI thread)."""
+    """Off-thread anti-tamper scan (kept off the UI thread)."""
 
-    def __init__(self, want_scan: bool):
+    def __init__(self, want_scan: bool = True):
         super().__init__()
         self.want_scan = want_scan
         self.signals = _BgProbeSignals()
 
     def run(self):
-        try:
-            self.signals.sysinfo.emit(detect_system_info())
-        except Exception:
-            pass
         if not self.want_scan:
             return
         try:
@@ -654,16 +136,15 @@ class MainWindow(QMainWindow):
         self._settings = cfg.load()
         self._pairs: list[FilePair] = []
         self._worker: RenderWorker | None = None
-        self._sys_info = dict(_DEFAULT_SYS_INFO)  # populated off-thread after show()
         self._presets: list[SubtitleStylePreset] = []
         self._active_preset: SubtitleStylePreset | None = None
         self._timing_undo: dict[str, list[SubtitleEntry]] = {}  # path → original entries
-        self.logo_layers: list[ImageLayerControl] = []
+        self.logo_layers: list[VideoLayerConfigWidget] = []
         self.frame_pool = QThreadPool()
         self.frame_pool.setMaxThreadCount(2)
         self.running_extractions = set()
 
-        # Dedicated pool for lightweight background probes (sysinfo, anti-tamper,
+        # Dedicated pool for lightweight background probes (anti-tamper,
         # licence heartbeat) so none of them ever run on the UI thread.
         self._bg_pool = QThreadPool()
         self._bg_pool.setMaxThreadCount(2)
@@ -675,8 +156,7 @@ class MainWindow(QMainWindow):
 
         self.license_manager = LicenseManager()
 
-        # One background timer drives: system-metrics badges + anti-tamper scan.
-        # The debugger check itself is instant but runs off-thread with the scan.
+        # Background timer drives the periodic anti-tamper scan off the UI thread.
         self._bg_probe_timer = QTimer(self)
         self._bg_probe_timer.setInterval(5000)
         self._bg_probe_timer.timeout.connect(lambda: self._kick_bg_probe(scan=True))
@@ -702,14 +182,14 @@ class MainWindow(QMainWindow):
         self._log_debug("MainWindow initialized")
         # Defer everything that shells out so the window paints immediately.
         QTimer.singleShot(0, self._check_deps)
-        QTimer.singleShot(0, lambda: self._kick_bg_probe(scan=False))
         QTimer.singleShot(500, self._check_license_on_startup)
 
     # ---- Background probes (never block the UI thread) ----
 
-    def _kick_bg_probe(self, scan: bool):
+    def _kick_bg_probe(self, scan: bool = True):
+        if not scan:
+            return
         task = _BgProbeTask(want_scan=scan)
-        task.signals.sysinfo.connect(self._apply_sys_info)
         task.signals.debugger.connect(self._on_security_violation_debugger)
         task.signals.suspicious_proc.connect(self._on_security_violation_proc)
         self._bg_pool.start(task)
@@ -718,10 +198,6 @@ class MainWindow(QMainWindow):
         task = _LicenseCheckTask()
         task.signals.result.connect(self._on_periodic_license_result)
         self._bg_pool.start(task)
-
-    def _apply_sys_info(self, si: dict):
-        self._sys_info = si
-        self._update_sysinfo()
 
     def _on_security_violation_debugger(self):
         self._bg_probe_timer.stop()
@@ -906,28 +382,6 @@ class MainWindow(QMainWindow):
         about_act.setShortcut(QKeySequence("F1"))
         about_act.triggered.connect(self._show_about_dialog)
 
-    def _open_output_folder(self):
-        try:
-            config = self._build_config()
-            out_dir = Path(config.output_folder)
-            out_dir.mkdir(parents=True, exist_ok=True)
-            os.startfile(str(out_dir))
-        except Exception as e:
-            QMessageBox.warning(self, "Lỗi", f"Không thể mở thư mục: {e}")
-
-    def _show_gpu_info(self):
-        try:
-            info = detect_system_info()
-            msg = (
-                f"Card Đồ Họa (GPU): {info.get('gpu', 'N/A')}\n"
-                f"Bộ Vi Xử Lý (CPU): {info.get('cpu', 'N/A')}\n"
-                f"Bộ Nhớ (RAM): {info.get('ram', 'N/A')}\n"
-                f"FFmpeg Hardware Acceleration: {'Đã cài đặt' if info.get('ffmpeg') else 'Không tìm thấy'}"
-            )
-            QMessageBox.information(self, "Thông Tin Phần Cứng Hỗ Trợ", msg)
-        except Exception as e:
-            QMessageBox.warning(self, "Lỗi", f"Không thể lấy thông tin phần cứng: {e}")
-
     def _show_about_dialog(self):
         QMessageBox.about(
             self,
@@ -965,6 +419,8 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _log_debug(self, message: str):
+        if not os.environ.get("ENCOMIE_DEBUG"):
+            return
         line = f"[DEBUG] {message}"
         try:
             with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as f:
@@ -977,305 +433,14 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
 
-    def _resolve_hardcoded_media_files(self) -> list[str]:
-        source_dir = Path(HARDCODED_AUDIO_DIR)
-        self._log_debug(f"Checking hardcoded source dir: {source_dir}")
-        if not source_dir.exists():
-            self._log_debug("Hardcoded source dir does not exist")
-            return []
-        if not source_dir.is_dir():
-            self._log_debug("Hardcoded source path is not a directory")
-            return []
-
-        all_files = sorted([path for path in source_dir.iterdir() if path.is_file()], key=lambda path: path.name.lower())
-        self._log_debug(f"Found {len(all_files)} total files in hardcoded dir")
-
-        ext_counts: dict[str, int] = {}
-        for path in all_files:
-            ext = path.suffix.lower() or "<no_ext>"
-            ext_counts[ext] = ext_counts.get(ext, 0) + 1
-        for ext, count in sorted(ext_counts.items(), key=lambda item: (-item[1], item[0])):
-            self._log_debug(f"Extension summary: {ext} -> {count}")
-
-        media_files = [str(path) for path in all_files if path.suffix.lower() in MEDIA_EXTENSIONS]
-        self._log_debug(f"Found {len(media_files)} supported media files in hardcoded dir")
-        for path in media_files[:20]:
-            self._log_debug(f"Media file: {path}")
-        return media_files
-
     def _apply_theme(self):
         try:
             import PyQt6.QtSvg  # noqa: F401
         except ImportError:
             pass
 
-        from core.app_paths import get_resource_path
-        # Ưu tiên file PNG để đảm bảo hiển thị 100% không phụ thuộc plugin QtSvg ngoài
-        up_path = get_resource_path("Asset/Img/spin_up.png")
-        if not up_path.exists():
-            up_path = get_resource_path("assets/spin_up.png")
-        if not up_path.exists():
-            up_path = get_resource_path("assets/spin_up.svg")
-
-        down_path = get_resource_path("Asset/Img/spin_down.png")
-        if not down_path.exists():
-            down_path = get_resource_path("assets/spin_down.png")
-        if not down_path.exists():
-            down_path = get_resource_path("assets/spin_down.svg")
-
-        up_hover_path = get_resource_path("Asset/Img/spin_up_hover.png")
-        down_hover_path = get_resource_path("Asset/Img/spin_down_hover.png")
-
-        up_icon = str(up_path).replace("\\", "/")
-        down_icon = str(down_path).replace("\\", "/")
-        up_hover_icon = str(up_hover_path).replace("\\", "/") if up_hover_path.exists() else up_icon
-        down_hover_icon = str(down_hover_path).replace("\\", "/") if down_hover_path.exists() else down_icon
-
-        qss = """
-        /* Global Reset & Typography */
-        QWidget {
-            font-family: "Be Vietnam Pro", "Inter", "Segoe UI", sans-serif;
-            font-size: 12px;
-            color: #0f172a;
-            outline: none;
-        }
-
-        QMainWindow, QDialog {
-            background-color: #f8fafc;
-        }
-
-        /* Section Cards & GroupBoxes */
-        QGroupBox, .section-card {
-            background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            margin-top: 8px;
-            padding: 8px 8px 6px 8px;
-            font-weight: 700;
-            font-size: 11px;
-            color: #475569;
-        }
-
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            left: 10px;
-            padding: 0 4px;
-            background-color: #f8fafc;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        /* Form Controls */
-        QLineEdit, QComboBox {
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 2px 6px;
-            color: #0f172a;
-            font-size: 11px;
-            min-height: 22px;
-        }
-
-        QSpinBox, QDoubleSpinBox {
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 1px 4px 1px 6px;
-            color: #0f172a;
-            font-size: 11px;
-            min-height: 22px;
-        }
-
-        QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
-            border: 1.5px solid #007aff;
-            background-color: #ffffff;
-        }
-
-        QSpinBox::up-button, QDoubleSpinBox::up-button {
-            subcontrol-origin: border;
-            subcontrol-position: top right;
-            width: 18px;
-            height: 13px;
-            border-left: 1px solid #cbd5e1;
-            border-bottom: 0.5px solid #e2e8f0;
-            border-top-right-radius: 5px;
-            background-color: #f8fafc;
-            margin-top: 1px;
-            margin-right: 1px;
-        }
-
-        QSpinBox::down-button, QDoubleSpinBox::down-button {
-            subcontrol-origin: border;
-            subcontrol-position: bottom right;
-            width: 18px;
-            height: 13px;
-            border-left: 1px solid #cbd5e1;
-            border-bottom-right-radius: 5px;
-            background-color: #f8fafc;
-            margin-bottom: 1px;
-            margin-right: 1px;
-        }
-
-        QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-        QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
-            background-color: #e2e8f0;
-        }
-
-        QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
-            image: url("__UP_ICON__");
-            width: 9px;
-            height: 9px;
-        }
-
-        QSpinBox::up-arrow:hover, QDoubleSpinBox::up-arrow:hover {
-            image: url("__UP_HOVER_ICON__");
-        }
-
-        QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
-            image: url("__DOWN_ICON__");
-            width: 9px;
-            height: 9px;
-        }
-
-        QSpinBox::down-arrow:hover, QDoubleSpinBox::down-arrow:hover {
-            image: url("__DOWN_HOVER_ICON__");
-        }
-
-        QComboBox::drop-down {
-            subcontrol-origin: padding;
-            subcontrol-position: top right;
-            width: 20px;
-            border-left-width: 0px;
-        }
-
-        QComboBox QAbstractItemView {
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            selection-background-color: #eff6ff;
-            selection-color: #007aff;
-            padding: 4px;
-        }
-
-        /* PushButtons */
-        QPushButton {
-            background-color: #ffffff;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 5px 12px;
-            color: #0f172a;
-            font-weight: 500;
-            font-size: 11px;
-        }
-
-        QPushButton:hover {
-            background-color: #f1f5f9;
-            border-color: #007aff;
-            color: #007aff;
-        }
-
-        QPushButton:pressed {
-            background-color: #e2e8f0;
-        }
-
-        /* Tables & Lists */
-        QTableWidget, QTableView {
-            background-color: #ffffff;
-            alternate-background-color: #f8fafc;
-            border: 1px solid #e2e8f0;
-            gridline-color: #f1f5f9;
-            color: #0f172a;
-            selection-background-color: #eff6ff;
-            selection-color: #007aff;
-            border-radius: 8px;
-            font-size: 11px;
-        }
-
-        QHeaderView::section {
-            background-color: #f8fafc;
-            color: #64748b;
-            padding: 6px 8px;
-            font-weight: 700;
-            font-size: 10px;
-            border: none;
-            border-bottom: 1px solid #e2e8f0;
-            text-transform: uppercase;
-        }
-
-        /* Progress Bar */
-        QProgressBar {
-            background-color: #e2e8f0;
-            border: none;
-            border-radius: 4px;
-            text-align: center;
-            color: #0f172a;
-            font-size: 10px;
-            font-weight: 600;
-            height: 16px;
-        }
-
-        QProgressBar::chunk {
-            background-color: #10b981;
-            border-radius: 4px;
-        }
-
-        /* ScrollBar */
-        QScrollBar:vertical {
-            border: none;
-            background: #f8fafc;
-            width: 6px;
-            border-radius: 3px;
-        }
-
-        QScrollBar::handle:vertical {
-            background: #cbd5e1;
-            border-radius: 3px;
-            min-height: 20px;
-        }
-
-        QScrollBar::handle:vertical:hover {
-            background: #94a3b8;
-        }
-
-        QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
-            height: 0px;
-        }
-
-        /* Tab Widget */
-        QTabWidget::pane {
-            border: 1px solid #e2e8f0;
-            border-radius: 8px;
-            background-color: #ffffff;
-        }
-
-        QTabBar::tab {
-            background: #f8fafc;
-            color: #64748b;
-            border: 1px solid #e2e8f0;
-            padding: 5px 12px;
-            border-top-left-radius: 6px;
-            border-top-right-radius: 6px;
-            margin-right: 2px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        QTabBar::tab:selected {
-            background: #ffffff;
-            color: #007aff;
-            border-bottom: 2px solid #007aff;
-            font-weight: 700;
-        }
-        """
-        qss = (
-            qss.replace("__UP_ICON__", up_icon)
-            .replace("__DOWN_ICON__", down_icon)
-            .replace("__UP_HOVER_ICON__", up_hover_icon)
-            .replace("__DOWN_HOVER_ICON__", down_hover_icon)
-        )
-        self.setStyleSheet(qss)
+        from ui.theme import build_main_window_qss
+        self.setStyleSheet(build_main_window_qss())
 
     def _build_ui(self):
         # Enable top MenuBar
@@ -1373,105 +538,6 @@ class MainWindow(QMainWindow):
 
         self._apply_theme()
         self.statusBar().showMessage("Sẵn sàng")
-
-    def _make_title_bar(self) -> QWidget:
-        si = self._sys_info
-        bar = QWidget()
-        bar.setFixedHeight(44)
-        bar.setStyleSheet("background-color: #ffffff; border-bottom: 1px solid #d1d1d6;")
-
-        lay = QHBoxLayout(bar)
-        lay.setContentsMargins(12, 0, 12, 0)
-        lay.setSpacing(8)
-
-        # App identity
-        icon_lbl = QLabel()
-        logo_path = _root / "Asset" / "Img" / "Logo.png"
-        if logo_path.exists():
-            pixmap = QPixmap(str(logo_path))
-            if not pixmap.isNull():
-                icon_lbl.setPixmap(pixmap.scaled(
-                    24, 24, 
-                    Qt.AspectRatioMode.KeepAspectRatio, 
-                    Qt.TransformationMode.SmoothTransformation
-                ))
-            else:
-                icon_lbl.setText("E")
-                icon_lbl.setStyleSheet("color: #007aff; font-size: 16px; font-weight: bold;")
-        else:
-            icon_lbl.setText("E")
-            icon_lbl.setStyleSheet("color: #007aff; font-size: 16px; font-weight: bold;")
-
-        title_lbl = QLabel("EncoMie Studio")
-        title_lbl.setStyleSheet("color: #1c1c1e; font-size: 13px; font-weight: 600;")
-        lay.addWidget(icon_lbl)
-        lay.addWidget(title_lbl)
-        lay.addSpacing(16)
-        
-        # CPU load badge
-        self._cpu_load_lbl = QLabel(f"CPU: {si['cpu_load_pct']}%")
-        self._cpu_load_lbl.setStyleSheet(
-            "color: #b45309; font-size: 10px; "
-            "background: #fef3c7; border-radius: 4px; padding: 2px 6px; "
-            "border: 1px solid #f59e0b;"
-        )
-        lay.addWidget(self._cpu_load_lbl)
-
-        # RAM usage badge
-        self._ram_pct_lbl = QLabel(f"RAM: {si['ram_used_pct']}%")
-        self._ram_pct_lbl.setStyleSheet(
-            "color: #b91c1c; font-size: 10px; "
-            "background: #fee2e2; border-radius: 4px; padding: 2px 6px; "
-            "border: 1px solid #ef4444;"
-        )
-        lay.addWidget(self._ram_pct_lbl)
-
-        # GPU badge
-        gpu_ok = si["gpu_available"]
-        gpu_color = "#15803d" if gpu_ok else "#b91c1c"
-        gpu_bg = "#dcfce7" if gpu_ok else "#fee2e2"
-        gpu_border = "#22c55e" if gpu_ok else "#ef4444"
-        self._gpu_lbl = QLabel(f"GPU: {si['gpu_name']}")
-        if gpu_ok:
-            vram_used = si['vram_total_mb'] - si['vram_free_mb']
-            self._gpu_lbl.setText(f"GPU: {si['gpu_name']}  VRAM: {vram_used}/{si['vram_total_mb']} MB")
-        self._gpu_lbl.setStyleSheet(
-            f"color: {gpu_color}; font-size: 10px; "
-            f"background: {gpu_bg}; border-radius: 4px; padding: 2px 6px; "
-            f"border: 1px solid {gpu_border};"
-        )
-        lay.addWidget(self._gpu_lbl)
-
-        # Power badge
-        self._pwr_lbl = None
-        if gpu_ok and si["gpu_power_w"] != "—":
-            self._pwr_lbl = QLabel(f"{si['gpu_power_w']}")
-            self._pwr_lbl.setStyleSheet(
-                "color: #b45309; font-size: 10px; "
-                "background: #fef3c7; border-radius: 4px; padding: 2px 6px; "
-                "border: 1px solid #f59e0b;"
-            )
-            lay.addWidget(self._pwr_lbl)
-
-        lay.addStretch()
-
-        # Badges refresh from _bg_probe_timer (off-thread) — no timer here.
-        return bar
-
-    def _update_sysinfo(self):
-        """Refresh system-info badges from the already-fetched self._sys_info."""
-        if not hasattr(self, "_cpu_load_lbl") or self._cpu_load_lbl is None:
-            return
-        si = self._sys_info
-        self._cpu_load_lbl.setText(f"CPU: {si['cpu_load_pct']}%")
-        self._ram_pct_lbl.setText(f"RAM: {si['ram_used_pct']}%")
-        if si["gpu_available"]:
-            vram_used = si['vram_total_mb'] - si['vram_free_mb']
-            self._gpu_lbl.setText(
-                f"GPU: {si['gpu_name']}  VRAM: {vram_used}/{si['vram_total_mb']} MB"
-            )
-            if self._pwr_lbl and si["gpu_power_w"] != "—":
-                self._pwr_lbl.setText(si["gpu_power_w"])
 
     # ---- Left panel ----
 
@@ -1755,9 +821,6 @@ class MainWindow(QMainWindow):
             self.spn_bg_zoom.setValue(val)
             self.spn_bg_zoom.blockSignals(False)
             self._on_bg_zoom_changed(val)
-
-    def _on_logo_changed(self, files):
-        self._on_logo_settings_changed()
 
     def _on_logo_settings_changed(self):
         self._update_logo_preview_frames()
@@ -2312,83 +1375,6 @@ class MainWindow(QMainWindow):
         lay.addWidget(self.inspector_tab_widget, 1)
         return panel
 
-
-    def _build_bottom_bar(self) -> QWidget:
-        bar = QWidget()
-        bar.setFixedHeight(56)
-        bar.setStyleSheet(
-            "background: #f1f5f9; border-top: 1px solid #e2e8f0;"
-        )
-        lay = QHBoxLayout(bar)
-        lay.setContentsMargins(16, 8, 16, 8)
-        lay.setSpacing(12)
-
-        self.btn_render = QPushButton("▶  Bắt đầu Render")
-        self.btn_render.setFixedHeight(38)
-        self.btn_render.setMinimumWidth(160)
-        self.btn_render.setStyleSheet(
-            "QPushButton { background: #007aff; color: white; font-size: 14px; "
-            "font-weight: 600; border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #0062cc; }"
-            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
-        )
-        self.btn_render.clicked.connect(self._start_render)
-
-        self.btn_export = QPushButton("📤  Xuất JSON")
-        self.btn_export.setFixedHeight(38)
-        self.btn_export.setMinimumWidth(100)
-        self.btn_export.setStyleSheet(
-            "QPushButton { background: #34c759; color: white; font-size: 13px; "
-            "font-weight: 600; border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #28a745; }"
-        )
-        self.btn_export.clicked.connect(self._export_json)
-
-        self.btn_pause = QPushButton("⏸  Tạm dừng")
-        self.btn_pause.setFixedHeight(38)
-        self.btn_pause.setMinimumWidth(100)
-        self.btn_pause.setEnabled(False)
-        self.btn_pause.setStyleSheet(
-            "QPushButton { background: #f59e0b; color: white; font-size: 13px; "
-            "border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #d97706; }"
-            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
-        )
-        self.btn_pause.clicked.connect(self._toggle_pause_render)
-
-        self.btn_stop = QPushButton("⏹  Dừng")
-        self.btn_stop.setFixedHeight(38)
-        self.btn_stop.setMinimumWidth(80)
-        self.btn_stop.setEnabled(False)
-        self.btn_stop.setStyleSheet(
-            "QPushButton { background: #ff3b30; color: white; font-size: 13px; "
-            "border-radius: 6px; border: none; }"
-            "QPushButton:hover { background: #d32f2f; }"
-            "QPushButton:disabled { background: #e5e5ea; color: #a1a1aa; }"
-        )
-        self.btn_stop.clicked.connect(self._stop_render)
-
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setFixedHeight(28)
-        self.progress_bar.setStyleSheet(
-            "QProgressBar { border: 1px solid #d1d1d6; border-radius: 4px; "
-            "background: #e5e5ea; text-align: center; font-size: 12px; color: #1c1c1e; }"
-            "QProgressBar::chunk { background: #007aff; border-radius: 3px; }"
-        )
-
-        self.lbl_status = QLabel("Sẵn sàng")
-        self.lbl_status.setStyleSheet("font-size: 12px; color: #636366; min-width: 220px;")
-
-        lay.addWidget(self.btn_render)
-        lay.addWidget(self.btn_pause)
-        lay.addWidget(self.btn_stop)
-        lay.addWidget(self.btn_export)
-        lay.addWidget(self.progress_bar, 1)
-        lay.addWidget(self.lbl_status)
-        return bar
-
     # ------------------------------------------------------------------
     # Settings persistence
     # ------------------------------------------------------------------
@@ -2422,16 +1408,10 @@ class MainWindow(QMainWindow):
             self.pick_vid_bg.set_selected_files(vid_bg_files)
             self._log_debug(f"Restored {len(vid_bg_files)} video background files")
 
-        hardcoded_media_files = self._resolve_hardcoded_media_files()
-        if hardcoded_media_files:
-            self.pick_audio.set_selected_files(hardcoded_media_files)
-            self._log_debug(f"Applied hardcoded media path: {HARDCODED_AUDIO_DIR}")
-        else:
-            self._log_debug("No media files loaded from hardcoded path")
-            saved_audio_files = s.get("audio_files", [])
-            if isinstance(saved_audio_files, list) and saved_audio_files:
-                self.pick_audio.set_selected_files(saved_audio_files)
-                self._log_debug(f"Restored {len(saved_audio_files)} saved audio files")
+        saved_audio_files = s.get("audio_files", [])
+        if isinstance(saved_audio_files, list) and saved_audio_files:
+            self.pick_audio.set_selected_files(saved_audio_files)
+            self._log_debug(f"Restored {len(saved_audio_files)} saved audio files")
 
         saved_srt_files = s.get("srt_files", [])
         if isinstance(saved_srt_files, list) and saved_srt_files:
@@ -3063,26 +2043,6 @@ class MainWindow(QMainWindow):
         self.cmb_preset.addItem(name.strip())
         self.cmb_preset.setCurrentIndex(self.cmb_preset.count() - 1)
 
-    def _on_apply_style_to_all(self):
-        """Apply current style to all selected SRT files (batch apply)."""
-        from PyQt6.QtWidgets import QMessageBox
-        srt_files = self.pick_srt.selected_files()
-        if not srt_files:
-            QMessageBox.information(self, "Ap toan bo", "Chua co file SRT nao duoc chon.")
-            return
-        reply = QMessageBox.question(
-            self, "Ap toan bo",
-            f"Ap style hien tai cho {len(srt_files)} file SRT da chon?\n"
-            "Chi style se duoc luu vao metadata, khong thay doi noi dung SRT.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-        style = self.style_panel.get_style()
-        for srt_file in srt_files:
-            SrtService.apply_style_template(srt_file, srt_file, style.name, style.to_dict())
-        QMessageBox.information(self, "Ap toan bo", f"Da ap style cho {len(srt_files)} file.")
-
     # ------------------------------------------------------------------
     # Render config
     # ------------------------------------------------------------------
@@ -3699,57 +2659,87 @@ class MainWindow(QMainWindow):
             self._add_frame_to_cache(path, image)
             self._update_video_preview_frames()
 
+    # ---- Shared preview-layer signal helpers ----
+
+    @staticmethod
+    def _set_spin_quiet(spin, value):
+        spin.blockSignals(True)
+        spin.setValue(value)
+        spin.blockSignals(False)
+
+    def _select_layer_tab(self, tab_widget, layers, index: int):
+        if 1 <= index <= len(layers):
+            tab_widget.setCurrentIndex(index - 1)
+
+    def _apply_layer_moved(self, layers, index: int, t: int, b: int, l: int, r: int, on_changed):
+        if not (1 <= index <= len(layers)):
+            return
+        widget = layers[index - 1]
+        self._set_spin_quiet(widget.spn_margin_t, t)
+        self._set_spin_quiet(widget.spn_margin_b, b)
+        self._set_spin_quiet(widget.spn_margin_l, l)
+        self._set_spin_quiet(widget.spn_margin_r, r)
+        on_changed()
+
+    def _apply_layer_resized(self, layers, index: int, scale_pct: int, on_changed):
+        if not (1 <= index <= len(layers)):
+            return
+        widget = layers[index - 1]
+        self._set_spin_quiet(widget.spn_size, scale_pct)
+        on_changed()
+
+    def _apply_layer_cropped(self, layers, index: int, t: int, b: int, l: int, r: int, on_changed):
+        if not (1 <= index <= len(layers)):
+            return
+        widget = layers[index - 1]
+        self._set_spin_quiet(widget.spn_crop_t, t)
+        self._set_spin_quiet(widget.spn_crop_b, b)
+        self._set_spin_quiet(widget.spn_crop_l, l)
+        self._set_spin_quiet(widget.spn_crop_r, r)
+        on_changed()
+
+    def _apply_layer_color_picked(self, layers, layer_num: int, color_hex: str, on_changed):
+        if 1 <= layer_num <= len(layers):
+            layers[layer_num - 1].set_chroma_color(color_hex)
+            on_changed()
+
+    def _sync_preview_on_tab_change(self, preview_attr: str, layers_attr: str, index: int):
+        if not hasattr(self, preview_attr) or not hasattr(self, layers_attr):
+            return
+        preview = getattr(self, preview_attr)
+        layers = getattr(self, layers_attr)
+        preview.select_layer(index + 1)
+        if 0 <= index < len(layers):
+            preview.set_crop_mode(layers[index].btn_crop_mode.isChecked())
+
+    def _sync_layer_crop_toggle(self, tab_widget, layers, preview, enabled: bool, reset_text: str | None = None):
+        sender_widget = self.sender()
+        if not sender_widget:
+            return
+        current_idx = tab_widget.currentIndex()
+        if 0 <= current_idx < len(layers) and sender_widget == layers[current_idx]:
+            preview.set_crop_mode(enabled)
+        for widget in layers:
+            if widget != sender_widget and widget.btn_crop_mode.isChecked():
+                widget.btn_crop_mode.blockSignals(True)
+                widget.btn_crop_mode.setChecked(False)
+                if reset_text is not None:
+                    widget.btn_crop_mode.setText(reset_text)
+                widget.btn_crop_mode.blockSignals(False)
+
+    # ---- Video layer preview slots ----
+
     def _on_preview_layer_selected(self, index: int):
-        if 1 <= index <= 5:
-            self.video_tab_widget.setCurrentIndex(index - 1)
+        self._select_layer_tab(self.video_tab_widget, self.video_layer_widgets, index)
 
     def _on_preview_layer_moved(self, index: int, t: int, b: int, l: int, r: int):
-        widget = self.video_layer_widgets[index - 1]
-        widget.spn_margin_t.blockSignals(True)
-        widget.spn_margin_t.setValue(t)
-        widget.spn_margin_t.blockSignals(False)
-
-        widget.spn_margin_b.blockSignals(True)
-        widget.spn_margin_b.setValue(b)
-        widget.spn_margin_b.blockSignals(False)
-
-        widget.spn_margin_l.blockSignals(True)
-        widget.spn_margin_l.setValue(l)
-        widget.spn_margin_l.blockSignals(False)
-
-        widget.spn_margin_r.blockSignals(True)
-        widget.spn_margin_r.setValue(r)
-        widget.spn_margin_r.blockSignals(False)
-
-        self._on_video_layer_changed()
+        self._apply_layer_moved(self.video_layer_widgets, index, t, b, l, r, self._on_video_layer_changed)
 
     def _on_preview_layer_resized(self, index: int, scale_pct: int):
-        widget = self.video_layer_widgets[index - 1]
-        widget.spn_size.blockSignals(True)
-        widget.spn_size.setValue(scale_pct)
-        widget.spn_size.blockSignals(False)
-
-        self._on_video_layer_changed()
+        self._apply_layer_resized(self.video_layer_widgets, index, scale_pct, self._on_video_layer_changed)
 
     def _on_preview_layer_cropped(self, index: int, t: int, b: int, l: int, r: int):
-        widget = self.video_layer_widgets[index - 1]
-        widget.spn_crop_t.blockSignals(True)
-        widget.spn_crop_t.setValue(t)
-        widget.spn_crop_t.blockSignals(False)
-
-        widget.spn_crop_b.blockSignals(True)
-        widget.spn_crop_b.setValue(b)
-        widget.spn_crop_b.blockSignals(False)
-
-        widget.spn_crop_l.blockSignals(True)
-        widget.spn_crop_l.setValue(l)
-        widget.spn_crop_l.blockSignals(False)
-
-        widget.spn_crop_r.blockSignals(True)
-        widget.spn_crop_r.setValue(r)
-        widget.spn_crop_r.blockSignals(False)
-
-        self._on_video_layer_changed()
+        self._apply_layer_cropped(self.video_layer_widgets, index, t, b, l, r, self._on_video_layer_changed)
 
     def _on_eyedropper_requested(self, layer_num: int):
         if hasattr(self, "video_layout_preview"):
@@ -3757,127 +2747,45 @@ class MainWindow(QMainWindow):
             self.video_layout_preview.set_eyedropper_active(True)
 
     def _on_preview_color_picked(self, layer_num: int, color_hex: str):
-        if 1 <= layer_num <= len(self.video_layer_widgets):
-            widget = self.video_layer_widgets[layer_num - 1]
-            widget.set_chroma_color(color_hex)
-            self._on_video_layer_changed()
+        self._apply_layer_color_picked(self.video_layer_widgets, layer_num, color_hex, self._on_video_layer_changed)
+
+    def _on_video_tab_changed(self, index: int):
+        self._sync_preview_on_tab_change("video_layout_preview", "video_layer_widgets", index)
+
+    def _on_video_layer_crop_toggled(self, enabled: bool):
+        self._sync_layer_crop_toggle(
+            self.video_tab_widget, self.video_layer_widgets, self.video_layout_preview,
+            enabled, reset_text="✂  Bật Crop Mode",
+        )
+
+    # ---- Logo layer preview slots ----
 
     def _on_logo_eyedropper_requested(self, layer_num: int):
         if hasattr(self, "preview_widget"):
-            # SubtitlePreviewWidget doesn't have multiple selections, but it tracks layers.
-            # Tell the preview widget to activate eyedropper mode for layer_num.
             self.preview_widget.set_eyedropper_active(layer_num)
 
     def _on_logo_preview_color_picked(self, layer_num: int, color_hex: str):
-        if 1 <= layer_num <= len(self.logo_layers):
-            widget = self.logo_layers[layer_num - 1]
-            widget.set_chroma_color(color_hex)
-            self._on_logo_settings_changed()
+        self._apply_layer_color_picked(self.logo_layers, layer_num, color_hex, self._on_logo_settings_changed)
 
     def _on_logo_preview_layer_selected(self, index: int):
-        if 1 <= index <= len(self.logo_layers):
-            self.layer_tab_widget.setCurrentIndex(index - 1)
+        self._select_layer_tab(self.layer_tab_widget, self.logo_layers, index)
 
     def _on_logo_preview_layer_moved(self, index: int, t: int, b: int, l: int, r: int):
-        if 1 <= index <= len(self.logo_layers):
-            widget = self.logo_layers[index - 1]
-            widget.spn_margin_t.blockSignals(True)
-            widget.spn_margin_b.blockSignals(True)
-            widget.spn_margin_l.blockSignals(True)
-            widget.spn_margin_r.blockSignals(True)
-            
-            widget.spn_margin_t.setValue(t)
-            widget.spn_margin_b.setValue(b)
-            widget.spn_margin_l.setValue(l)
-            widget.spn_margin_r.setValue(r)
-            
-            widget.spn_margin_t.blockSignals(False)
-            widget.spn_margin_b.blockSignals(False)
-            widget.spn_margin_l.blockSignals(False)
-            widget.spn_margin_r.blockSignals(False)
-            
-            self._on_logo_settings_changed()
+        self._apply_layer_moved(self.logo_layers, index, t, b, l, r, self._on_logo_settings_changed)
 
     def _on_logo_preview_layer_resized(self, index: int, scale_pct: int):
-        if 1 <= index <= len(self.logo_layers):
-            widget = self.logo_layers[index - 1]
-            widget.spn_size.blockSignals(True)
-            widget.spn_size.setValue(scale_pct)
-            widget.spn_size.blockSignals(False)
-            
-            self._on_logo_settings_changed()
+        self._apply_layer_resized(self.logo_layers, index, scale_pct, self._on_logo_settings_changed)
 
     def _on_logo_preview_layer_cropped(self, index: int, t: int, b: int, l: int, r: int):
-        if 1 <= index <= len(self.logo_layers):
-            widget = self.logo_layers[index - 1]
-            widget.spn_crop_t.blockSignals(True)
-            widget.spn_crop_t.setValue(t)
-            widget.spn_crop_t.blockSignals(False)
-            
-            widget.spn_crop_b.blockSignals(True)
-            widget.spn_crop_b.setValue(b)
-            widget.spn_crop_b.blockSignals(False)
-            
-            widget.spn_crop_l.blockSignals(True)
-            widget.spn_crop_l.setValue(l)
-            widget.spn_crop_l.blockSignals(False)
-            
-            widget.spn_crop_r.blockSignals(True)
-            widget.spn_crop_r.setValue(r)
-            widget.spn_crop_r.blockSignals(False)
-            
-            self._on_logo_settings_changed()
+        self._apply_layer_cropped(self.logo_layers, index, t, b, l, r, self._on_logo_settings_changed)
 
     def _on_logo_tab_changed(self, index: int):
-        if not hasattr(self, "preview_widget") or not hasattr(self, "logo_layers"):
-            return
-        self.preview_widget.select_layer(index + 1)
-        if 0 <= index < len(self.logo_layers):
-            widget = self.logo_layers[index]
-            self.preview_widget.set_crop_mode(widget.btn_crop_mode.isChecked())
+        self._sync_preview_on_tab_change("preview_widget", "logo_layers", index)
 
     def _on_logo_crop_toggled(self, enabled: bool):
-        sender_widget = self.sender()
-        if not sender_widget:
-            return
-            
-        current_idx = self.layer_tab_widget.currentIndex()
-        if 0 <= current_idx < len(self.logo_layers):
-            active_widget = self.logo_layers[current_idx]
-            if sender_widget == active_widget:
-                self.preview_widget.set_crop_mode(enabled)
-                
-        for widget in self.logo_layers:
-            if widget != sender_widget and widget.btn_crop_mode.isChecked():
-                widget.btn_crop_mode.blockSignals(True)
-                widget.btn_crop_mode.setChecked(False)
-                widget.btn_crop_mode.blockSignals(False)
-
-    def _on_video_tab_changed(self, index: int):
-        if not hasattr(self, "video_layout_preview") or not hasattr(self, "video_layer_widgets"):
-            return
-        self.video_layout_preview.select_layer(index + 1)
-        if 0 <= index < len(self.video_layer_widgets):
-            widget = self.video_layer_widgets[index]
-            self.video_layout_preview.set_crop_mode(widget.btn_crop_mode.isChecked())
-
-    def _on_video_layer_crop_toggled(self, enabled: bool):
-        sender_widget = self.sender()
-        if not sender_widget:
-            return
-        
-        current_idx = self.video_tab_widget.currentIndex()
-        if 0 <= current_idx < len(self.video_layer_widgets):
-            active_widget = self.video_layer_widgets[current_idx]
-            if sender_widget == active_widget:
-                self.video_layout_preview.set_crop_mode(enabled)
-                
-        for widget in self.video_layer_widgets:
-            if widget != sender_widget and widget.btn_crop_mode.isChecked():
-                widget.btn_crop_mode.blockSignals(True)
-                widget.btn_crop_mode.setChecked(False)
-                widget.btn_crop_mode.setText("✂  Bật Crop Mode")
-                widget.btn_crop_mode.blockSignals(False)
+        self._sync_layer_crop_toggle(
+            self.layer_tab_widget, self.logo_layers, self.preview_widget, enabled,
+        )
 
     def _pair_select_all(self):
         for row in range(self.pair_table.rowCount()):

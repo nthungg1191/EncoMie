@@ -48,7 +48,7 @@ class SpinPressController(QObject):
 
     def _debug(self, event_name, **details):
         name = self._debug_name()
-        if not name or os.environ.get("PYTEST_CURRENT_TEST"):
+        if not name or not os.environ.get("ENCOMIE_DEBUG") or os.environ.get("PYTEST_CURRENT_TEST"):
             return
         line_edit = self.spinbox.lineEdit()
         selected = line_edit.selectedText() if line_edit is not None else ""

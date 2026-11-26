@@ -2,13 +2,11 @@
 Widget for configuring a single video layer (1 of 5) in the Edit Video tab.
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QWidget, QVBoxLayout, QHBoxLayout,
     QLabel, QComboBox, QSpinBox, QDoubleSpinBox, QCheckBox, QPushButton,
     QFrame, QLineEdit, QScrollArea, QSizePolicy, QLayout
 )
 from PyQt6.QtCore import pyqtSignal, Qt
-from pathlib import Path
-import os
 
 from core.video_processor import ImageLayerConfig
 from ui.collapsible_section import CollapsibleSection
