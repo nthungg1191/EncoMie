@@ -20,8 +20,7 @@ html.html
 /ui_audit
 /scripts
 /screenshots
-ui_mockup.html
-wireframe_box_b.html
+/docs
 ISSUE_RESOLUTION_LOG.md
 RELATED_BUGS_REPORT.md
 *.md
