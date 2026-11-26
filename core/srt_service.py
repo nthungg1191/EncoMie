@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from core.subtitle_model import SubtitleEntry
+from core.subtitle_model import SubtitleDocument, SubtitleEntry, ms_to_srt
 
 
 # SRT block pattern:
@@ -94,6 +94,18 @@ class SrtService:
         with open(file_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines))
 
+    @staticmethod
+    def save_document(doc: SubtitleDocument):
+        """Persist a SubtitleDocument to disk and clear its dirty flag."""
+        SrtService.write(doc.file_path, doc.entries)
+        doc.dirty = False
+
+    @staticmethod
+    def reload_document(doc: SubtitleDocument):
+        """Reload a SubtitleDocument's entries from disk and clear its dirty flag."""
+        doc.entries = SrtService.parse(doc.file_path)
+        doc.dirty = False
+
     # -------------------------------------------------------------------------
     # Shift entire timeline so first subtitle starts at 0
     # -------------------------------------------------------------------------
@@ -156,12 +168,12 @@ class SrtService:
         before = SubtitleEntry(
             index=entry.index,
             start_time=entry.start_time,
-            end_time=_ms_to_srt(mid),
+            end_time=ms_to_srt(mid),
             text=entry.text,
         )
         after = SubtitleEntry(
             index=entry.index + 1,
-            start_time=_ms_to_srt(mid),
+            start_time=ms_to_srt(mid),
             end_time=entry.end_time,
             text="",
         )
@@ -221,17 +233,3 @@ class SrtService:
         }
         with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(meta, f, ensure_ascii=False, indent=2)
-
-
-# ---------------------------------------------------------------------------
-# Module-level helpers (same as subtitle_model but kept here for symmetry)
-# ---------------------------------------------------------------------------
-
-def _ms_to_srt(ms: int) -> str:
-    ms = max(0, ms)
-    total_s = ms // 1000
-    ms_rem = ms % 1000
-    h = total_s // 3600
-    m = (total_s % 3600) // 60
-    s = total_s % 60
-    return f"{h:02d}:{m:02d}:{s:02d},{ms_rem:03d}"
